@@ -360,7 +360,7 @@
                 window.handleTouchend = function (touch) { // TODO: CHANGE TO A VIABLE SOLUTION
                     game.platfms.push(createPlatfm(touch.x0, touch.y0, touch.x, touch.y));
                 };
-                jQuery(document).on("tap", function (event) {
+                jQuery(document).on("click", function (event) {
                     var p;
                     if (isPaused) { // Tap *anywhere* to unpause
                         isPaused = false;
