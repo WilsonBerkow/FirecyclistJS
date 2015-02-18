@@ -115,6 +115,7 @@
                         } catch (e) {
                             updateEventLog("MAAAAA. TOUCHMOVE ERROR CAUGHT BLEG. PLZZZZZ APPEAR");
                         }
+                        event.preventDefault(); // Stops the swipe-to-move-through-browser-history feature in Chrome from interferring.
                     });
                     docEvent("touchstart", function (event) {
                         var now = Date.now(), xy = calcPos(event);
@@ -131,13 +132,15 @@
                         updateCurTouch();
                         updateEventLog(event.type);
                     });
-                    docEvent("touchend", function () {
+                    docEvent("touchend", function (event) {
                         if (typeof handleTouchend === "function") {
                             handleTouchend(curTouch);
                         }
                         curTouch = null;
                         updateCurTouch();
                         updateEventLog(event.type);
+                        // Do not use preventDefault here, it prevents
+                        // triggering of the 'tap' event.
                     });
                 }());
             }());
