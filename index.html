@@ -74,13 +74,21 @@
                 (function () {
                     var touchesCount = 0,
                         calcPos = function (event) {
+                            var usingOriginalEvent = typeof event.clientX === "number";
                             return {
                                 "x": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) / pageScaleFactor - moduleOffsetX,
-                                "y": (typeof event.clientX === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor
+                                "y": (typeof event.clientY === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor,
+                                "usingOriginalEvent": usingOriginalEvent
                             };
                         },
                         updateCurTouch = function () {
-                            jQuery("#touch").prepend("<p>" + JSON.stringify(curTouch, null, 4) + "</p>");
+                            var fmted = "(" + curTouch.x0 + ", " + curTouch.y0 + ") -> (" + curTouch.x + ", " + curTouch.y + ")"; //") at \n  " + curTouch.t0/
+                            if (curTouch.usingOriginalEvent) {
+                                fmted += " using originalEvent";
+                            } else {
+                                fmted += " NOT using originalEvent";
+                            }
+                            jQuery("#touch").prepend("<p>" + fmted + "</p>");
                         };
                     window.calcPos = calcPos; // TEMPORARY
                     window.curTouch = null; // TEMPORARY. MAKE VIABLE SOLUTION.
