@@ -23,8 +23,6 @@
         <div id="Main">
             <canvas id="canvas" width="288" height="512"></canvas>
         </div>
-        <div id="touch" style="color: white; position: absolute; top: 515px; left: 0; width: 400px; height: 6em; overflow-y: scroll;"></div>
-        <div id="events" style="color: white; position: absolute; top: 0; left: 288px; width: 100px; height: 512px; overflow-y: scroll;"></div>
         <script src="jquery-1.11.2.min.js"></script>
         <!--script src="jquery.mobile-1.4.5.min.js"></script-->
         <script src="firecyclist.js"></script>
@@ -71,49 +69,25 @@
                             htmlModule.setAttribute("style", "position: fixed; left: " + Math.floor(moduleOffsetX) + "px;");
                         }
                     };
-                //resize();
-                (function () {
+                resize();
+                (function () { // Simple Touch system, mirroring Elm's
                     var touchesCount = 0,
                         calcPos = function (event) {
                             var usingOriginalEvent = typeof event.clientX !== "number";
                             return {
                                 "x": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) / pageScaleFactor - moduleOffsetX,
-                                "y": (typeof event.clientY === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor,
-                                "usingOriginalEvent": usingOriginalEvent
+                                "y": (typeof event.clientY === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor
                             };
-                        },
-                        updateCurTouch = function () {
-                            var fmted;
-                            if (curTouch === null) {
-                                fmted = "null";
-                            } else {
-                                fmted = "(" + curTouch.x0 + ", " + curTouch.y0 + ") -> (" + curTouch.x + ", " + curTouch.y + ")"; //") at \n  " + curTouch.t0/
-                                if (curTouch.usingOriginalEvent) {
-                                    fmted += " using originalEvent";
-                                } else {
-                                    fmted += " NOT using originalEvent";
-                                }
-                            }
-                            jQuery("#touch").prepend("<p>" + fmted + " at " + Date.now() + "</p>");
-                        },
-                        updateEventLog = function (name) {
-                            jQuery("#events").prepend("<p>" + name + " " + Date.now() % 1000 + "</p>");
                         };
                     window.calcPos = calcPos; // TEMPORARY
                     window.curTouch = null; // TEMPORARY. MAKE VIABLE SOLUTION.
                     docEvent("touchmove", function (event) {
-                        try {
-                            var xy = calcPos(event);
-                            if (curTouch !== null) {
-                                curTouch.x = xy.x;
-                                curTouch.y = xy.y;
-                            } else {
-                                updateEventLog("WTF???? CURTOUCH IS NULL WHEN MOUEMOVE");
-                            }
-                            updateCurTouch();
-                            updateEventLog(event.type);
-                        } catch (e) {
-                            updateEventLog("MAAAAA. TOUCHMOVE ERROR CAUGHT BLEG. PLZZZZZ APPEAR");
+                        var xy = calcPos(event);
+                        if (curTouch !== null) {
+                            curTouch.x = xy.x;
+                            curTouch.y = xy.y;
+                        } else {
+                            console.log("WTF???? CURTOUCH IS NULL WHEN MOUEMOVE");
                         }
                         event.preventDefault(); // Stops the swipe-to-move-through-browser-history feature in Chrome from interferring.
                     });
@@ -125,20 +99,15 @@
                             "x0": xy.x,
                             "y0": xy.y,
                             "x":  xy.x,
-                            "y":  xy.y,
-                            "usingOriginalEvent": xy.usingOriginalEvent
+                            "y":  xy.y
                         };
                         touchesCount += 1;
-                        updateCurTouch();
-                        updateEventLog(event.type);
                     });
                     docEvent("touchend", function (event) {
                         if (typeof handleTouchend === "function") {
                             handleTouchend(curTouch);
                         }
                         curTouch = null;
-                        updateCurTouch();
-                        updateEventLog(event.type);
                         // Do not use preventDefault here, it prevents
                         // triggering of the 'tap' event.
                     });
