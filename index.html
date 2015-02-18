@@ -11,8 +11,11 @@
                 cursor: default;
                 background: black;
             }
-            #Main {
+            #Main, canvas {
                 background: white;
+                position: fixed;
+                top: 0;
+                left: 0;
             }
         </style>
     </head>
@@ -71,8 +74,8 @@
                     var touchesCount = 0,
                         calcPos = function (event) {
                             return {
-                                "x": (typeof event.pageX === "number" ? event.pageX : event.originalEvent.changedTouches[0].pageX) / pageScaleFactor - moduleOffsetX,
-                                "y": (typeof event.pageY === "number" ? event.pageY : event.originalEvent.changedTouches[0].pageY) / pageScaleFactor
+                                "x": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].pageX) / pageScaleFactor - moduleOffsetX,
+                                "y": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].pageY) / pageScaleFactor
                             };
                         };
                     window.calcPos = calcPos; // TEMPORARY
