@@ -178,7 +178,7 @@
                 ctx.arc(restartBtnCenterX, restartBtnCenterY, restartBtnRadius, 0, 2 * Math.PI, true);
                 ctx.fill();
                 ctx.font = (pxSize + 5) + "px arial";
-                fillShadowyText(ctx, "⟲", canvasWidth - 25 - pxSize / 2, 17 + pxSize / 2, colory);
+                fillShadowyText(ctx, "\u27F2", canvasWidth - 25 - pxSize / 2, 17 + pxSize / 2, colory);
             }),
             drawInGamePoints = drawer(function (ctx, points) {
                 ctx.textAlign = "center";
