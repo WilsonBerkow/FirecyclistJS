@@ -102,15 +102,19 @@
                     window.calcPos = calcPos; // TEMPORARY
                     window.curTouch = null; // TEMPORARY. MAKE VIABLE SOLUTION.
                     docEvent("touchmove", function (event) {
-                        var xy = calcPos(event);
-                        if (curTouch !== null) {
-                            curTouch.x = xy.x;
-                            curTouch.y = xy.y;
-                        } else {
-                            updateEventLog("WTF???? CURTOUCH IS NULL WHEN MOUEMOVE");
+                        try {
+                            var xy = calcPos(event);
+                            if (curTouch !== null) {
+                                curTouch.x = xy.x;
+                                curTouch.y = xy.y;
+                            } else {
+                                updateEventLog("WTF???? CURTOUCH IS NULL WHEN MOUEMOVE");
+                            }
+                            updateCurTouch();
+                            updateEventLog(event.type);
+                        } catch (e) {
+                            updateEventLog("MAAAAA. TOUCHMOVE ERROR CAUGHT BLEG. PLZZZZZ APPEAR");
                         }
-                        updateCurTouch();
-                        updateEventLog(event.type);
                     });
                     docEvent("touchstart", function (event) {
                         var now = Date.now(), xy = calcPos(event);
