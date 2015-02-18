@@ -24,6 +24,7 @@
             <canvas id="canvas" width="288" height="512"></canvas>
         </div>
         <div id="touch" style="color: white; position: absolute; top: 515px; left: 0; width: 400px; height: 6em; overflow-y: scroll;"></div>
+        <div id="events" style="color: white; position: absolute; top: 0; left: 288px; width: 100px; height: 512px; overflow-y: scroll;"></div>
         <script src="jquery-1.11.2.min.js"></script>
         <!--script src="jquery.mobile-1.4.5.min.js"></script-->
         <script src="firecyclist.js"></script>
@@ -82,13 +83,21 @@
                             };
                         },
                         updateCurTouch = function () {
-                            var fmted = "(" + curTouch.x0 + ", " + curTouch.y0 + ") -> (" + curTouch.x + ", " + curTouch.y + ")"; //") at \n  " + curTouch.t0/
-                            if (curTouch.usingOriginalEvent) {
-                                fmted += " using originalEvent";
+                            var fmted;
+                            if (curTouch === null) {
+                                fmted = "null";
                             } else {
-                                fmted += " NOT using originalEvent";
+                                fmted = "(" + curTouch.x0 + ", " + curTouch.y0 + ") -> (" + curTouch.x + ", " + curTouch.y + ")"; //") at \n  " + curTouch.t0/
+                                if (curTouch.usingOriginalEvent) {
+                                    fmted += " using originalEvent";
+                                } else {
+                                    fmted += " NOT using originalEvent";
+                                }
                             }
                             jQuery("#touch").prepend("<p>" + fmted + "</p>");
+                        },
+                        updateEventLog = function (name) {
+                            jQuery("#events").prepend("<p>" + name + "</p>");
                         };
                     window.calcPos = calcPos; // TEMPORARY
                     window.curTouch = null; // TEMPORARY. MAKE VIABLE SOLUTION.
@@ -99,6 +108,7 @@
                             curTouch.y = xy.y;
                         }
                         updateCurTouch();
+                        updateEventLog(event.type);
                     });
                     docEvent("touchstart", function (event) {
                         var now = Date.now(), xy = calcPos(event);
@@ -112,13 +122,15 @@
                         };
                         touchesCount += 1;
                         updateCurTouch();
+                        updateEventLog(event.type);
                     });
                     docEvent("touchend", function () {
-                        if (typeof handleTouchend !== "undefined") {
+                        if (typeof handleTouchend === "function") {
                             handleTouchend(curTouch);
                         }
                         curTouch = null;
                         updateCurTouch();
+                        updateEventLog(event.type);
                     });
                 }());
             }());
