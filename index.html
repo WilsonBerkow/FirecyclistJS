@@ -94,10 +94,10 @@
                                     fmted += " NOT using originalEvent";
                                 }
                             }
-                            jQuery("#touch").prepend("<p>" + fmted + "</p>");
+                            jQuery("#touch").prepend("<p>" + fmted + " at " + Date.now() + "</p>");
                         },
                         updateEventLog = function (name) {
-                            jQuery("#events").prepend("<p>" + name + "</p>");
+                            jQuery("#events").prepend("<p>" + name + " " + Date.now() % 1000 + "</p>");
                         };
                     window.calcPos = calcPos; // TEMPORARY
                     window.curTouch = null; // TEMPORARY. MAKE VIABLE SOLUTION.
@@ -106,6 +106,8 @@
                         if (curTouch !== null) {
                             curTouch.x = xy.x;
                             curTouch.y = xy.y;
+                        } else {
+                            updateEventLog("WTF???? CURTOUCH IS NULL WHEN MOUEMOVE");
                         }
                         updateCurTouch();
                         updateEventLog(event.type);
