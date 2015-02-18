@@ -78,6 +78,7 @@
                 ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvas.height * 2 / 3);
             }),
             drawBackground = drawer(function (ctx) {
+                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
                 ctx.fillStyle = "rgba(175, 175, 255, 0.75)"
                 ctx.fillRect(0, 0, canvasWidth, canvasHeight);
             }),
