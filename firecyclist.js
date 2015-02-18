@@ -10,6 +10,8 @@
         playerGrav = 0.3 / 28,
         fbFallRate = 2 / 20,
         fbRadius = 10,
+        coinFallRate = 2 / 20,
+        coinRadius = 10,
         platfmFallRate = 3 / 20,
         totalFbHeight = 10,
         platfmBounciness = 0.75,
@@ -76,7 +78,7 @@
                 drawPlayerAt(game.player.x, game.player.y);
                 game.platfms.forEach(drawPlatfm);
                 game.fbs.forEach(drawFb);
-                //game.coins.forEach drawCoin
+                game.coins.forEach(drawCoin);
                 drawPauseBtn(game.paused);
                 drawRestartBtn();
                 drawInGamePoints(game.points);
@@ -127,6 +129,16 @@
                 ctx.strokeStyle = "red";
                 ctx.arc(fb.x, fb.y, fbRadius, 0, 2 * Math.PI, false);
                 ctx.stroke();
+            }),
+            drawCoin = drawer(function (ctx, coin) {
+                var squareLen = 8.5;
+                ctx.lineWidth = 2;
+                circle(ctx, coin.x, coin.y, coinRadius, "yellow", "fill");
+                circle(ctx, coin.x, coin.y, coinRadius, "orange", "stroke");
+                ctx.fillStyle = "darkOrange";
+                ctx.fillRect(coin.x - squareLen / 2, coin.y - squareLen / 2, squareLen, squareLen);
+                ctx.strokeStyle = "orange";
+                ctx.strokeRect(coin.x - squareLen / 2, coin.y - squareLen / 2, squareLen, squareLen);
             }),
             drawPlatfm = drawer(function (ctx, p) {
                 ctx.beginPath();
@@ -179,6 +191,12 @@
                 ctx.fillText(text, x, y);
                 ctx.fillStyle = clr1;
                 ctx.fillText(text, x + 1, y - 1);
+            },
+            circle = function (ctx, x, y, radius, color, fillOrStroke) {
+                ctx.beginPath();
+                ctx[fillOrStroke + "Style"] = color;
+                ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
+                ctx[fillOrStroke]();
             };
         return [drawGame, drawGamePaused, drawGameDead, drawPreviewPlatfm];
     }());
@@ -280,10 +298,13 @@
                     offsetEndX = endx - player.x,
                     offsetEndY = endy - player.y,
                     bigD = offsetStartX * offsetEndY - offsetEndX * offsetStartY; // Mathematical algorithm
-                return Math.pow(rad * platLength, 2) > bigD * bigD;
+                return Math.abs(rad * platLength) > Math.abs(bigD);
             },
             playerHittingFb = function (player, fb) {
                 return dist(player.x, player.y, fb.x, fb.y) < playerRadius + fbRadius;
+            },
+            playerHittingCoin = function (player, coin) {
+                return dist(player.x, player.y, coin.x, coin.y) < playerRadius + coinRadius;
             },
             
             // PLAY:
@@ -321,9 +342,26 @@
                                 isDead = true;
                             }
                         }
+                        game.coins.forEach(function (coin, index) {
+                            if (playerHittingCoin(game.player, coin)) {
+                                game.coins.splice(index, 1);
+                                game.points += 5;
+                            }
+                        });
                         game.player.x += game.player.vx * dt / 20;
                         game.player.y += game.player.vy * dt / 20;
                         game.player.x = modulo(game.player.x, canvasWidth);
+                    },
+                    updateCoins = function (dt) {
+                        game.coins.forEach(function (coin, index) {
+                            coin.y -= coinFallRate * dt;
+                            if (coin.y < -2 * coinRadius) {
+                                game.coins.splice(index, 1);
+                            }
+                        });
+                        if (Math.random() < 1 / (1000 * 10/4) * dt) { // The '* 10/4' is drawn from the use of the 'likelihood' argument in 'randomly_create_x'
+                            game.coins.push(createCoin(Math.random() * canvasWidth, canvasHeight + coinRadius));
+                        }
                     },
                     updateFbs = function (dt) {
                         game.fbs.forEach(function (fb, index) {
@@ -365,6 +403,7 @@
                     } else {
                         // Update state
                         updatePlayer(dt);
+                        updateCoins(dt);
                         updateFbs(dt);
                         updatePlatfms(dt);
                         game.points += 2 * (dt / 1000) * (1 + game.player.y / canvasHeight);
