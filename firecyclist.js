@@ -231,7 +231,7 @@
             createGame = function () {
                 return {
                     "player": createPlayer(canvasWidth / 2, 50, 0, 0),
-                    "platfms": [],
+                    "platfms": [createPlatfm(50, 200, 150, 200)],
                     "fbs": [],
                     "coins": [],
                     "points": 0
