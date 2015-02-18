@@ -3,8 +3,8 @@
 
 (function () {
     "use strict";
-    // CONFIG:
-    var framerate = 60,
+    var // CONFIG:
+        framerate = 60,
         canvasWidth = 576 / 2,
         canvasHeight = 1024 / 2,
         playerGrav = 0.3 / 28,
@@ -20,7 +20,29 @@
         pauseBtnRadius = 65,
         restartBtnCenterX = canvasWidth - 10,
         restartBtnCenterY = -5,
-        restartBtnRadius = 65;
+        restartBtnRadius = 65,
+        
+        // UTIL:
+        makeObject = function (proto, props) {
+            var o = Object.create(proto);
+            Object.keys(props).forEach(function (key) {
+                o[key] = props[key];
+            });
+            return o;
+        },
+        modulo = function (num, modBy) {
+            return num > modBy ? modulo(num - modBy, modBy) :
+                   num < 0 ? modulo(num + modBy, modBy) :
+                   num;
+        },
+        pythag = function (a, b) { return Math.sqrt(a*a + b*b); },
+        dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
+        isOverPauseBtn = function (xy) {
+        return dist(xy.x, xy.y, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
+        },
+        isOverRestartBtn = function (xy) {
+            return dist(xy.x, xy.y, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
+        };
     
     // RENDER:
     var renderers = (function () {
@@ -55,7 +77,7 @@
                 game.platfms.forEach(drawPlatfm);
                 game.fbs.forEach(drawFb);
                 //game.coins.forEach drawCoin
-                drawPauseBtn();
+                drawPauseBtn(game.paused);
                 drawRestartBtn();
                 drawInGamePoints(game.points);
             }),
@@ -128,52 +150,43 @@
                 ctx.stroke();
             }),
             pxSize = 36,
-            drawPauseBtn = drawer(function (ctx) {
+            drawPauseBtn = drawer(function (ctx, paused) {
+                var colory = paused || (curTouch && isOverPauseBtn(curTouch));
                 ctx.beginPath();
-                ctx.fillStyle = "rgba(150, 150, 150, 0.25)"
+                ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
                 ctx.arc(pauseBtnCenterX, pauseBtnCenterY, pauseBtnRadius, 0, 2 * Math.PI, true);
                 ctx.fill();
-                ctx.fillStyle = "black";
                 ctx.font = pxSize + "px arial";
-                ctx.fillText("II", 15, 15 + pxSize / 2);
+                fillShadowyText(ctx, "II", 15, 15 + pxSize / 2, colory);
             }),
             drawRestartBtn = drawer(function (ctx) {
+                var colory = curTouch && isOverRestartBtn(curTouch);
                 ctx.beginPath();
-                ctx.fillStyle = "rgba(150, 150, 150, 0.25)"
+                ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
                 ctx.arc(restartBtnCenterX, restartBtnCenterY, restartBtnRadius, 0, 2 * Math.PI, true);
                 ctx.fill();
-                ctx.fillStyle = "black";
                 ctx.font = (pxSize + 5) + "px arial";
-                ctx.fillText("⟲", canvasWidth - 25 - pxSize / 2, 17 + pxSize / 2);
+                fillShadowyText(ctx, "⟲", canvasWidth - 25 - pxSize / 2, 17 + pxSize / 2, colory);
             }),
             drawInGamePoints = drawer(function (ctx, points) {
                 ctx.textAlign = "center";
                 ctx.font = "30px monospace";
-                ctx.fillText(Math.floor(points), canvasWidth / 2, 25);
-            });
+                fillShadowyText(ctx, Math.floor(points), canvasWidth / 2, 25);
+            }),
+            fillShadowyText = function (ctx, text, x, y, reverse) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
+                var clr0 = reverse ? "black" : "orange", clr1 = reverse ? "orange" : "black";
+                ctx.fillStyle = clr0;
+                ctx.fillText(text, x, y);
+                ctx.fillStyle = clr1;
+                ctx.fillText(text, x + 1, y - 1);
+            };
         return [drawGame, drawGamePaused, drawGameDead, drawPreviewPlatfm];
     }());
     var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawPreviewPlatfm = renderers[3];
     
     // PLAY:
     var playGame = (function (drawFns) {
-        var // UTIL:
-            makeObject = function (proto, props) {
-                var o = Object.create(proto);
-                Object.keys(props).forEach(function (key) {
-                    o[key] = props[key];
-                });
-                return o;
-            },
-            modulo = function (num, modBy) {
-                return num > modBy ? modulo(num - modBy, modBy) :
-                       num < 0 ? modulo(num + modBy, modBy) :
-                       num;
-            },
-            pythag = function (a, b) { return Math.sqrt(a*a + b*b); },
-            dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
-            
-            // MODEL + CALC:
+        var // MODEL + CALC:
             anglify = function (doCalc, f) {
                 var proto = {
                     angle: function () {
@@ -234,7 +247,8 @@
                     "platfms": [],
                     "fbs": [],
                     "coins": [],
-                    "points": 0
+                    "points": 0,
+                    "paused": false
                 };
             },
             signNum = function (num) {
@@ -273,7 +287,6 @@
             playGame = function () {
                 var
                     game = createGame(),
-                    isPaused = false,
                     isDead = false,
                     updatePlayer = function (dt) {
                         var i, platfm, playerAngle = game.player.angle(), platfmAngle, tmpVel, collided = false;
@@ -327,7 +340,6 @@
                     },
                     restart = function () {
                         game = createGame();
-                        isPaused = false;
                         isDead = false;
                     },
                     prevFrameTime = Date.now();
@@ -338,7 +350,7 @@
                     prevFrameTime = now;
                     
                     // Handle state changes
-                    if (isPaused) {
+                    if (game.paused) {
                         drawGamePaused(game);
                     } else if (isDead) {
                         drawGameDead(game);
@@ -363,15 +375,15 @@
                 };
                 jQuery(document).on("click", function (event) {
                     var p;
-                    if (isPaused) { // Tap *anywhere* to unpause
-                        isPaused = false;
+                    if (game.paused) { // Tap *anywhere* to unpause
+                        game.paused = false;
                     } else if (isDead) { // Tap *anywhere* to restart from GameOver screen.
                         restart();
                     } else { // Tap on the pause btn to pause
                         p = calcPos(event);
-                        if (dist(p.x, p.y, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius) {
-                            isPaused = true;
-                        } else if (dist(p.x, p.y, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius) {
+                        if (isOverPauseBtn(p)) {
+                            game.paused = true;
+                        } else if (isOverRestartBtn(p)) {
                             restart();
                         }
                     }
