@@ -23,6 +23,7 @@
         <div id="Main">
             <canvas id="canvas" width="288" height="512"></canvas>
         </div>
+        <div id="touch" style="color: white; position: absolute; top: 515px; left: 0; width: 400px; height: 6em; overflow-y: scroll;"></div>
         <script src="jquery-1.11.2.min.js"></script>
         <!--script src="jquery.mobile-1.4.5.min.js"></script-->
         <script src="firecyclist.js"></script>
@@ -77,6 +78,9 @@
                                 "x": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) / pageScaleFactor - moduleOffsetX,
                                 "y": (typeof event.clientX === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor
                             };
+                        },
+                        updateCurTouch = function () {
+                            jQuery("#touch").prepend("<p>" + JSON.stringify(curTouch, null, 4) + "</p>");
                         };
                     window.calcPos = calcPos; // TEMPORARY
                     window.curTouch = null; // TEMPORARY. MAKE VIABLE SOLUTION.
@@ -86,6 +90,7 @@
                             curTouch.x = xy.x;
                             curTouch.y = xy.y;
                         }
+                        updateCurTouch();
                     });
                     docEvent("touchstart", function (event) {
                         var now = Date.now(), xy = calcPos(event);
@@ -98,12 +103,14 @@
                             "y":  xy.y
                         };
                         touchesCount += 1;
+                        updateCurTouch();
                     });
                     docEvent("touchend", function () {
                         if (typeof handleTouchend !== "undefined") {
                             handleTouchend(curTouch);
                         }
                         curTouch = null;
+                        updateCurTouch();
                     });
                 }());
             }());
