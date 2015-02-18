@@ -74,20 +74,20 @@
                     var touchesCount = 0,
                         calcPos = function (event) {
                             return {
-                                "x": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].pageX) / pageScaleFactor - moduleOffsetX,
-                                "y": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].pageY) / pageScaleFactor
+                                "x": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) / pageScaleFactor - moduleOffsetX,
+                                "y": (typeof event.clientX === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor
                             };
                         };
                     window.calcPos = calcPos; // TEMPORARY
                     window.curTouch = null; // TEMPORARY. MAKE VIABLE SOLUTION.
-                    docEvent(["mousemove", "touchmove"], function (event) {
+                    docEvent("touchmove", function (event) {
                         var xy = calcPos(event);
                         if (curTouch !== null) {
                             curTouch.x = xy.x;
                             curTouch.y = xy.y;
                         }
                     });
-                    docEvent(["mousedown", "touchstart"], function (event) {
+                    docEvent("touchstart", function (event) {
                         var now = Date.now(), xy = calcPos(event);
                         curTouch = {
                             "t0": now,
@@ -99,7 +99,7 @@
                         };
                         touchesCount += 1;
                     });
-                    docEvent(["mouseup", "touchend"], function () {
+                    docEvent("touchend", function () {
                         if (typeof handleTouchend !== "undefined") {
                             handleTouchend(curTouch);
                         }
