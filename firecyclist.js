@@ -79,8 +79,8 @@
                 game.platfms.forEach(drawPlatfm);
                 game.fbs.forEach(drawFb);
                 game.coins.forEach(drawCoin);
-                drawPauseBtn(game.paused);
-                drawRestartBtn();
+                drawPauseBtn(game);
+                drawRestartBtn(game);
                 drawInGamePoints(game.points);
             }),
             drawGamePaused = gameOverlayDrawer(function (ctx, game) {
@@ -162,8 +162,8 @@
                 ctx.stroke();
             }),
             pxSize = 36,
-            drawPauseBtn = drawer(function (ctx, paused) {
-                var colory = paused || (curTouch && isOverPauseBtn(curTouch));
+            drawPauseBtn = drawer(function (ctx, game) {
+                var colory = !game.dead && (game.paused || (curTouch && isOverPauseBtn(curTouch)));
                 ctx.beginPath();
                 ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
                 ctx.arc(pauseBtnCenterX, pauseBtnCenterY, pauseBtnRadius, 0, 2 * Math.PI, true);
@@ -171,8 +171,8 @@
                 ctx.font = pxSize + "px arial";
                 fillShadowyText(ctx, "II", 15, 15 + pxSize / 2, colory);
             }),
-            drawRestartBtn = drawer(function (ctx) {
-                var colory = curTouch && isOverRestartBtn(curTouch);
+            drawRestartBtn = drawer(function (ctx, game) {
+                var colory = !game.dead && !game.paused && curTouch && isOverRestartBtn(curTouch);
                 ctx.beginPath();
                 ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
                 ctx.arc(restartBtnCenterX, restartBtnCenterY, restartBtnRadius, 0, 2 * Math.PI, true);
@@ -266,7 +266,8 @@
                     "fbs": [],
                     "coins": [],
                     "points": 0,
-                    "paused": false
+                    "paused": false,
+                    "dead": false
                 };
             },
             signNum = function (num) {
@@ -311,11 +312,10 @@
             playGame = function () {
                 var
                     game = createGame(),
-                    isDead = false,
                     updatePlayer = function (dt) {
                         var i, platfm, playerAngle = game.player.angle(), platfmAngle, tmpVel, collided = false;
                         if (game.player.y > canvasHeight + playerRadius) {
-                            isDead = true;
+                            game.dead = true;
                             // The frame finishes, with all other components also
                             // being updated before the GameOver screen apperas, so
                             // so does the player's position. This is why there is
@@ -339,7 +339,7 @@
                         }
                         for (i = 0; i < game.fbs.length; i += 1) {
                             if (playerHittingFb(game.player, game.fbs[i])) {
-                                isDead = true;
+                                game.dead = true;
                             }
                         }
                         game.coins.forEach(function (coin, index) {
@@ -386,7 +386,6 @@
                     },
                     restart = function () {
                         game = createGame();
-                        isDead = false;
                     },
                     prevFrameTime = Date.now();
                 window.game = game; // FOR DEBUGGING
@@ -398,7 +397,7 @@
                     // Handle state changes
                     if (game.paused) {
                         drawGamePaused(game);
-                    } else if (isDead) {
+                    } else if (game.dead) {
                         drawGameDead(game);
                     } else {
                         // Update state
@@ -424,7 +423,7 @@
                     var p;
                     if (game.paused) { // Tap *anywhere* to unpause
                         game.paused = false;
-                    } else if (isDead) { // Tap *anywhere* to restart from GameOver screen.
+                    } else if (game.dead) { // Tap *anywhere* to restart from GameOver screen.
                         restart();
                     } else { // Tap on the pause btn to pause
                         p = calcPos(event);
