@@ -75,7 +75,7 @@
                 (function () {
                     var touchesCount = 0,
                         calcPos = function (event) {
-                            var usingOriginalEvent = typeof event.clientX === "number";
+                            var usingOriginalEvent = typeof event.clientX !== "number";
                             return {
                                 "x": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) / pageScaleFactor - moduleOffsetX,
                                 "y": (typeof event.clientY === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor,
@@ -118,7 +118,8 @@
                             "x0": xy.x,
                             "y0": xy.y,
                             "x":  xy.x,
-                            "y":  xy.y
+                            "y":  xy.y,
+                            "usingOriginalEvent": xy.usingOriginalEvent
                         };
                         touchesCount += 1;
                         updateCurTouch();
