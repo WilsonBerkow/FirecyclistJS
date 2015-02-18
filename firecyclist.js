@@ -282,6 +282,9 @@
                     bigD = offsetStartX * offsetEndY - offsetEndX * offsetStartY; // Mathematical algorithm
                 return Math.pow(rad * platLength, 2) > bigD * bigD;
             },
+            playerHittingFb = function (player, fb) {
+                return dist(player.x, player.y, fb.x, fb.y) < playerRadius + fbRadius;
+            },
             
             // PLAY:
             playGame = function () {
@@ -312,6 +315,11 @@
                         }
                         if (!collided) {
                             game.player.vy += playerGrav * dt;
+                        }
+                        for (i = 0; i < game.fbs.length; i += 1) {
+                            if (playerHittingFb(game.player, game.fbs[i])) {
+                                isDead = true;
+                            }
                         }
                         game.player.x += game.player.vx * dt / 20;
                         game.player.y += game.player.vy * dt / 20;
