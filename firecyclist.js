@@ -297,10 +297,8 @@
             },
             drawMenuPlayBtn = drawer(function (ctx) {
                 var x = canvasWidth / 2, y = 310;
-                ctx.font = "bold 48px monospace";
+                ctx.font = "bold 54px monospace";
                 ctx.textAlign = "center";
-                ctx.fillStyle = "rgba(215, 195, 180, 0.65)";
-                roundedRect(ctx, x - 65, y - 45, 129, 65, 30, "fill");
                 ctx.fillStyle = "rgb(150, 140, 130)";
                 ctx.fillText("Play", x, y);
             });
