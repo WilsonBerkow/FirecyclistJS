@@ -3,6 +3,75 @@
 
 (function () {
     "use strict";
+    // Screen-resizing code:
+    var htmlModule = document.getElementById("canvas"),
+        htmlBody = document.querySelector("body"),
+        windowDims = {
+            "width": window.innerWidth || document.documentElement.clientWidth, // The defaulting expression (.documentElement....) is for IE
+            "height": window.innerHeight || document.documentElement.clientHeight
+        },
+        pageScaleFactor = 1,
+        moduleOffsetX = 0,
+        resize = function () { // This zooms the page so that the Firecyclist rectangle (initially always (576/2) by (1024/2) in dimensions), fits to the page.
+            var scaleX = windowDims.width / (576 / 2),
+                scaleY = windowDims.height / (1024 / 2),
+                unfitAxis;
+            pageScaleFactor = Math.min(scaleX, scaleY);
+            unfitAxis = pageScaleFactor === scaleX ? "y" : "x";
+            htmlBody.setAttribute("style", [ // Using htmlBody.style[property] didn't work, but just using setAttribute is fine here as this is the only style that will ever be applied.
+                "-moz-transform-origin: 0 0",
+                "-moz-transform: scale(" + pageScaleFactor + ")",
+                "-webkit-transform-origin: 0 0",
+                "-webkit-transform: scale(" + pageScaleFactor + ")",
+                "-ms-transform-origin: 0 0",
+                "-ms-transform: scale(" + pageScaleFactor + ")"
+            ].join("; "));
+            if (unfitAxis === "x") {
+                moduleOffsetX = ((windowDims.width - (576 / 2) * pageScaleFactor) / 2) / pageScaleFactor; // The last division, by pageScaleFactor, is there because the zoom done above will automatically scale this whole expression/offest by pageScaleFactor, so the division undoes that.
+                htmlModule.setAttribute("style", "position: fixed; left: " + Math.floor(moduleOffsetX) + "px;");
+            }
+        },
+        calcTouchPos = function (event) {
+            var usingOriginalEvent = typeof event.clientX !== "number";
+            return {
+                "x": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) / pageScaleFactor - moduleOffsetX,
+                "y": (typeof event.clientY === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor
+            };
+        },
+        handleTouchend,
+        curTouch = null;
+    resize();
+    (function () { // Simple Touch system, mirroring Elm's
+        var touchesCount = 0;
+        jQuery(document).on("touchmove", function (event) {
+            var xy = calcTouchPos(event);
+            if (curTouch !== null) { // Should always pass
+                curTouch.x = xy.x;
+                curTouch.y = xy.y;
+            }
+            event.preventDefault(); // Stops the swipe-to-move-through-browser-history feature in Chrome from interferring.
+        });
+        jQuery(document).on("touchstart", function (event) {
+            var now = Date.now(), xy = calcTouchPos(event);
+            curTouch = {
+                "t0": now,
+                "id": touchesCount,
+                "x0": xy.x,
+                "y0": xy.y,
+                "x":  xy.x,
+                "y":  xy.y
+            };
+            touchesCount += 1;
+        });
+        jQuery(document).on("touchend", function (event) {
+            if (typeof handleTouchend === "function") {
+                handleTouchend(curTouch);
+            }
+            curTouch = null;
+            // Do not use preventDefault here, it prevents
+            // triggering of the 'tap' event.
+        });
+    }());
     var // CONFIG:
         framerate = 60,
         canvasWidth = 576 / 2,
@@ -40,7 +109,7 @@
         pythag = function (a, b) { return Math.sqrt(a*a + b*b); },
         dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
         isOverPauseBtn = function (xy) {
-        return dist(xy.x, xy.y, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
+            return dist(xy.x, xy.y, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
         },
         isOverRestartBtn = function (xy) {
             return dist(xy.x, xy.y, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
@@ -283,8 +352,7 @@
                 };
             },
             playerIntesectingPlatfm = function (player, platfm) {
-                var
-                    rad = playerRadius + platfmThickness,
+                var rad = playerRadius + platfmThickness,
                     startx = Math.min(platfm.x0, platfm.x1),
                     starty = Math.min(platfm.y0, platfm.y1),
                     endx = Math.max(platfm.x0, platfm.x1),
@@ -293,8 +361,7 @@
                 if (player.x + rad < startx || player.x - rad > endx || player.y + rad < starty || player.y - rad > endy) {
                     return false;
                 }
-                var
-                    offsetStartX = startx - player.x,
+                var offsetStartX = startx - player.x,
                     offsetStartY = starty - player.y,
                     offsetEndX = endx - player.x,
                     offsetEndY = endy - player.y,
@@ -388,7 +455,7 @@
                         game = createGame();
                     },
                     prevFrameTime = Date.now();
-                window.game = game; // FOR DEBUGGING
+                window.game = game; // FOR DEBUGGING. It is a good idea to have this in case a see an issue at an unexpected time.
                 setInterval(function () {
                     // Handle time (necessary, regardless of pausing)
                     var now = Date.now(), dt = now - prevFrameTime;
@@ -416,7 +483,7 @@
                         }
                     }
                 }, 1000 / framerate);
-                window.handleTouchend = function (touch) { // TODO: CHANGE TO A VIABLE SOLUTION (i.e. one that doesn't involve global variables)
+                handleTouchend = function (touch) { // TODO: CHANGE TO A VIABLE SOLUTION (i.e. one that doesn't involve global variables)
                     if (!game.paused && !game.dead) {
                         game.platfms.push(createPlatfm(touch.x0, touch.y0, touch.x, touch.y));
                     }
@@ -428,7 +495,7 @@
                     } else if (game.dead) { // Tap *anywhere* to restart from GameOver screen.
                         restart();
                     } else { // Tap on the pause btn to pause
-                        p = calcPos(event);
+                        p = calcTouchPos(event);
                         if (isOverPauseBtn(p)) {
                             game.paused = true;
                         } else if (isOverRestartBtn(p)) {
@@ -439,5 +506,5 @@
             };
         return playGame;
     }());
-    window.playGame = playGame;
+    playGame();
 }());
