@@ -390,7 +390,7 @@
                     "y": Math.abs(slope) * 3 - platfmFallRate * dt - platfmBounciness
                 };
             },
-            playerIntesectingPlatfm = function (player, platfm) {
+            playerIntersectingPlatfm = function (player, platfm) {
                 var rad = playerRadius + platfmThickness,
                     startx = Math.min(platfm.x0, platfm.x1),
                     starty = Math.min(platfm.y0, platfm.y1),
@@ -443,7 +443,7 @@
                         for (i = 0; i < game.platfms.length; i += 1) {
                             platfm = game.platfms[i];
                             platfmAngle = platfm.angle();
-                            if (playerIntesectingPlatfm(game.player, platfm)) {
+                            if (playerIntersectingPlatfm(game.player, platfm)) {
                                 //game.player.setAngle(2 * platfmAngle - playerAngle);
                                 //game.player.scaleMagnitude(Math.sqrt(Math.sqrt(playerAngle / modulo(-1 / platfmAngle, 2 * Math.PI))));
                                 //game.platfms.splice(i, 1);
