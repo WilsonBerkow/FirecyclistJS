@@ -153,21 +153,21 @@
                 drawInGamePoints(game.points);
             }),
             drawGamePaused = gameOverlayDrawer(function (ctx, game) {
-                ctx.fillStyle = "orange";
-                ctx.font = "48px monospace";
+                ctx.fillStyle = "darkOrange";
+                ctx.font = "bold 54px monospace";
                 ctx.textAlign = "center";
                 ctx.fillText("Paused", canvasWidth / 2, canvasHeight / 2 - 12);
             }),
             drawGameDead = gameOverlayDrawer(function (ctx, game) {
                 // 'Game Over' text
-                ctx.fillStyle = "orange";
-                ctx.font = "96px monospace";
+                ctx.fillStyle = "darkOrange";
+                ctx.font = "bold italic 90px monospace";
                 ctx.textAlign = "center";
-                ctx.fillText("Game", canvasWidth / 2, 100);
-                ctx.fillText("Over", canvasWidth / 2, 175);
+                ctx.fillText("Game", canvasWidth / 2, 110);
+                ctx.fillText("Over", canvasWidth / 2, 195);
                 
                 // Points big
-                ctx.font = "140px monospace";
+                ctx.font = "bold 140px monospace";
                 ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvas.height * 2 / 3);
             }),
             drawBackground = drawer(function (ctx) {
@@ -237,7 +237,7 @@
                 ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
                 ctx.arc(pauseBtnCenterX, pauseBtnCenterY, pauseBtnRadius, 0, 2 * Math.PI, true);
                 ctx.fill();
-                ctx.font = pxSize + "px arial";
+                ctx.font = "bold " + pxSize + "px arial";
                 fillShadowyText(ctx, "II", 15, 15 + pxSize / 2, colory);
             }),
             drawRestartBtn = drawer(function (ctx, game) {
@@ -246,30 +246,67 @@
                 ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
                 ctx.arc(restartBtnCenterX, restartBtnCenterY, restartBtnRadius, 0, 2 * Math.PI, true);
                 ctx.fill();
-                ctx.font = (pxSize + 5) + "px arial";
+                ctx.font = "bold " + (pxSize + 5) + "px arial";
                 fillShadowyText(ctx, "\u27F2", canvasWidth - 25 - pxSize / 2, 17 + pxSize / 2, colory);
             }),
             drawInGamePoints = drawer(function (ctx, points) {
                 ctx.textAlign = "center";
-                ctx.font = "30px monospace";
+                ctx.font = "bold 30px monospace";
                 fillShadowyText(ctx, Math.floor(points), canvasWidth / 2, 25);
             }),
-            fillShadowyText = function (ctx, text, x, y, reverse) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
-                var clr0 = reverse ? "black" : "orange", clr1 = reverse ? "orange" : "black";
+            fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
+                var clr0 = reverse ? "black" : "darkOrange",
+                    clr1 = reverse ? "darkOrange" : "black",
+                    offset = offsetAmt || 1;
                 ctx.fillStyle = clr0;
                 ctx.fillText(text, x, y);
                 ctx.fillStyle = clr1;
-                ctx.fillText(text, x + 1, y - 1);
+                ctx.fillText(text, x + offset, y - offset);
             },
             circle = function (ctx, x, y, radius, color, fillOrStroke) {
                 ctx.beginPath();
                 ctx[fillOrStroke + "Style"] = color;
                 ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
                 ctx[fillOrStroke]();
-            };
-        return [drawGame, drawGamePaused, drawGameDead, drawPreviewPlatfm];
+            },
+            drawMenu = drawer(function (ctx, menu) {
+                drawBackground();
+                drawMenuTitle();
+                drawMenuPlayBtn();
+            }),
+            drawMenuTitle = drawer(function (ctx) {
+                ctx.font = "italic bold 170px arial";
+                ctx.textAlign = "center";
+                fillShadowyText(ctx, "Fire", canvasWidth / 2 - 3, 190, true, 3);
+                ctx.font = "italic bold 95px arial";
+                fillShadowyText(ctx, "cyclist", canvasWidth / 2 - 3, 240, true, 2);
+            }),
+            roundedRect = function (ctx, x, y, width, height, radius, fillOrStroke) { // Based on function by Juan Mendes at http://stackoverflow.com/questions/1255512/how-to-draw-a-rounded-rectangle-on-html-canvas
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + width - radius, y);
+                ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+                ctx.lineTo(x + width, y + height - radius);
+                ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+                ctx.lineTo(x + radius, y + height);
+                ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+                ctx[fillOrStroke]();
+            },
+            drawMenuPlayBtn = drawer(function (ctx) {
+                var x = canvasWidth / 2, y = 310;
+                ctx.font = "bold 48px monospace";
+                ctx.textAlign = "center";
+                ctx.fillStyle = "rgba(215, 195, 180, 0.65)";
+                roundedRect(ctx, x - 65, y - 45, 129, 65, 30, "fill");
+                ctx.fillStyle = "rgb(150, 140, 130)";
+                ctx.fillText("Play", x, y);
+            });
+        return [drawGame, drawGamePaused, drawGameDead, drawPreviewPlatfm, drawMenu];
     }());
-    var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawPreviewPlatfm = renderers[3];
+    var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawPreviewPlatfm = renderers[3], drawMenu = renderers[4];
     
     // PLAY:
     var playGame = (function (drawFns) {
@@ -452,11 +489,14 @@
                         });
                     },
                     restart = function () {
+                        // intervalId isn't cleared because the same interval is
+                        // used for the next game (after the restart).
                         game = createGame();
                     },
-                    prevFrameTime = Date.now();
+                    prevFrameTime = Date.now(),
+                    intervalId;
                 window.game = game; // FOR DEBUGGING. It is a good idea to have this in case a see an issue at an unexpected time.
-                setInterval(function () {
+                intervalId = setInterval(function () {
                     // Handle time (necessary, regardless of pausing)
                     var now = Date.now(), dt = now - prevFrameTime;
                     prevFrameTime = now;
@@ -503,8 +543,22 @@
                         }
                     }
                 });
+            },
+            createMenu = function () { return {}; },
+            runMenu = function () {
+                var menu = createMenu(),
+                    updateButtons = function () {},
+                    intervalId;
+                intervalId = setInterval(function () {
+                    updateButtons();
+                    drawMenu();
+                }, 1000 / framerate);
+                jQuery(document).one("click", function (event) {
+                    clearInterval(intervalId);
+                    playGame();
+                });
             };
-        return playGame;
+        return runMenu;
     }());
     playGame();
 }());
