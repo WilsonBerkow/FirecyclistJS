@@ -391,21 +391,27 @@
                 };
             },
             playerIntersectingPlatfm = function (player, platfm) {
+                // Make sure that the ball is in the square who's opposite
+                // corners are the endpoints of the platfm. Necessary because
+                // the algorithm for testing intersection used below is made
+                // for (infinite) lines, not line segments, which the platfm is.
                 var rad = playerRadius + platfmThickness,
                     startx = Math.min(platfm.x0, platfm.x1),
                     starty = Math.min(platfm.y0, platfm.y1),
                     endx = Math.max(platfm.x0, platfm.x1),
-                    endy = Math.max(platfm.y0, platfm.y1),
-                    platLength = dist(platfm.x0, platfm.y0, platfm.x1, platfm.y1);
+                    endy = Math.max(platfm.y0, platfm.y1);
                 if (player.x + rad < startx || player.x - rad > endx || player.y + rad < starty || player.y - rad > endy) {
                     return false;
                 }
-                var offsetStartX = startx - player.x,
-                    offsetStartY = starty - player.y,
-                    offsetEndX = endx - player.x,
-                    offsetEndY = endy - player.y,
-                    bigD = offsetStartX * offsetEndY - offsetEndX * offsetStartY; // Mathematical algorithm
-                return Math.abs(rad * platLength) > Math.abs(bigD);
+                
+                // Algorithm from http://mathworld.wolfram.com/Circle-LineIntersection.html
+                var offsetStartX = platfm.x0 - player.x,
+                    offsetStartY = platfm.y0 - player.y,
+                    offsetEndX = platfm.x1 - player.x,
+                    offsetEndY = platfm.y1 - player.y,
+                    platLength = dist(platfm.x0, platfm.y0, platfm.x1, platfm.y1),
+                    bigD = offsetStartX * offsetEndY - offsetEndX * offsetStartY;
+                return Math.pow(rad * platLength, 2) >= bigD * bigD;
             },
             playerHittingFb = function (player, fb) {
                 return dist(player.x, player.y, fb.x, fb.y) < playerRadius + fbRadius;
