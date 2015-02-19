@@ -97,7 +97,7 @@
         });
     }());
     var // CONFIG:
-        framerate = 60,
+        framerate = 40,
         canvasWidth = 576 / 2,
         canvasHeight = 1024 / 2,
         playerGrav = 0.3 / 28,
