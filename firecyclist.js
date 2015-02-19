@@ -92,6 +92,10 @@
         restartBtnCenterX = canvasWidth - 10,
         restartBtnCenterY = -5,
         restartBtnRadius = 65,
+        menuPlayBtnX = canvasWidth / 2,
+        menuPlayBtnY = 310,
+        menuPlayBtnW = 121,
+        menuPlayBtnH = 44,
         
         // UTIL:
         makeObject = function (proto, props) {
@@ -271,6 +275,7 @@
             },
             drawMenu = drawer(function (ctx, menu) {
                 drawBackground();
+                menu.fbs.forEach(drawFb);
                 drawMenuTitle();
                 drawMenuPlayBtn();
             }),
@@ -296,11 +301,10 @@
                 ctx[fillOrStroke]();
             },
             drawMenuPlayBtn = drawer(function (ctx) {
-                var x = canvasWidth / 2, y = 310;
                 ctx.font = "italic bold 54px monospace";
                 ctx.textAlign = "center";
                 ctx.fillStyle = "rgb(150, 140, 130)";
-                ctx.fillText("Play", x, y);
+                ctx.fillText("Play", menuPlayBtnX, menuPlayBtnY, menuPlayBtnW, menuPlayBtnH);
             });
         return [drawGame, drawGamePaused, drawGameDead, drawPreviewPlatfm, drawMenu];
     }());
@@ -409,6 +413,19 @@
             playerHittingCoin = function (player, coin) {
                 return dist(player.x, player.y, coin.x, coin.y) < playerRadius + coinRadius;
             },
+            updateFbsGeneric = function (fbArray) {
+                return function (dt) { // This is used in playGame AND runMenu, and thus must be declared here.
+                    fbArray.forEach(function (fb, index) {
+                        fb.y -= fbFallRate * dt;
+                        if (fb.y < -totalFbHeight) {
+                            fbArray.splice(index, 1);
+                        }
+                    });
+                    if (Math.random() < 1 / 1000 * dt) {
+                        fbArray.push(createFb(Math.random() * canvasWidth, canvasHeight + fbRadius));
+                    }
+                };
+            },
             
             // PLAY:
             playGame = function () {
@@ -454,6 +471,7 @@
                         game.player.y += game.player.vy * dt / 20;
                         game.player.x = modulo(game.player.x, canvasWidth);
                     },
+                    updateFbs = updateFbsGeneric(game.fbs),
                     updateCoins = function (dt) {
                         game.coins.forEach(function (coin, index) {
                             coin.y -= coinFallRate * dt;
@@ -463,17 +481,6 @@
                         });
                         if (Math.random() < 1 / (1000 * 10/4) * dt) { // The '* 10/4' is drawn from the use of the 'likelihood' argument in 'randomly_create_x'
                             game.coins.push(createCoin(Math.random() * canvasWidth, canvasHeight + coinRadius));
-                        }
-                    },
-                    updateFbs = function (dt) {
-                        game.fbs.forEach(function (fb, index) {
-                            fb.y -= fbFallRate * dt;
-                            if (fb.y < -totalFbHeight) {
-                                game.fbs.splice(index, 1);
-                            }
-                        });
-                        if (Math.random() < 1 / 1000 * dt) {
-                            game.fbs.push(createFb(Math.random() * canvasWidth, canvasHeight + fbRadius));
                         }
                     },
                     updatePlatfms = function (dt) {
@@ -542,14 +549,20 @@
                     }
                 });
             },
-            createMenu = function () { return {}; },
+            createMenu = function () { return {fbs: []}; },
             runMenu = function () {
                 var menu = createMenu(),
                     updateButtons = function () {},
-                    intervalId;
+                    updateFbs = updateFbsGeneric(menu.fbs),
+                    intervalId,
+                    prevTime = Date.now();
+                window.menu = menu;
                 intervalId = setInterval(function () {
+                    var now = Date.now(), dt = now - prevTime;
+                    prevTime = now;
                     updateButtons();
-                    drawMenu();
+                    updateFbs(dt);
+                    drawMenu(menu);
                 }, 1000 / framerate);
                 jQuery(document).one("click", function (event) {
                     clearInterval(intervalId);
