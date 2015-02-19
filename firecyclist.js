@@ -39,7 +39,31 @@
             };
         },
         handleTouchend,
-        curTouch = null;
+        curTouch = null,
+        highscores = (function () {
+            var highscores = [null, null, null]; // Highest scores are at the beginning, null represents an empty slot.
+            return {
+                highest: function (n) { // Note that the nulls of empty slots are included
+                    var arr = [], i;
+                    n = n || highscores.length;
+                    for (i = 0; i < Math.min(n, highscores.length); i += 1) {
+                        arr.push(highscores[i]);
+                    }
+                    return arr;
+                },
+                sendScore: function (score) {
+                    var i;
+                    for (i = 0; i < highscores.length; i += 1) {
+                        if (score > highscores[i] || highscores[i] == null) {
+                            highscores.splice(i, 0, score);
+                            highscores.splice(highscores.length - 1, 1);
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            };
+        }());
     resize();
     (function () { // Simple Touch system, mirroring Elm's
         var touchesCount = 0;
@@ -173,6 +197,24 @@
                 // Points big
                 ctx.font = "bold 140px monospace";
                 ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvas.height * 2 / 3);
+                
+                // Line separator
+                ctx.beginPath();
+                ctx.strokeStyle = "darkOrange";
+                ctx.moveTo(30, 370);
+                ctx.lineTo(canvasWidth - 30, 370);
+                ctx.moveTo(30, 372);
+                ctx.lineTo(canvasWidth - 30, 372);
+                ctx.stroke();
+                
+                // Highscores
+                ctx.font = "bold italic 24px monospace";
+                ctx.fillText("Highscores", canvasWidth / 2, 410);
+                ctx.font = "bold 24px monospace";
+                var highest = highscores.highest().map(function (score) {
+                    return score === null ? "\u2014" : String(score); // Em-dash for empty slots
+                });
+                ctx.fillText(highest.join(" "), canvasWidth / 2, 435);
             }),
             drawBackground = drawer(function (ctx) {
                 ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -440,7 +482,7 @@
                     updatePlayer = function (dt) {
                         var i, platfm, playerAngle = game.player.angle(), platfmAngle, tmpVel, collided = false;
                         if (game.player.y > canvasHeight + playerRadius) {
-                            game.dead = true;
+                            die();
                             // The frame finishes, with all other components also
                             // being updated before the GameOver screen apperas, so
                             // so does the player's position. This is why there is
@@ -464,7 +506,7 @@
                         }
                         for (i = 0; i < game.fbs.length; i += 1) {
                             if (playerHittingFb(game.player, game.fbs[i])) {
-                                game.dead = true;
+                                die();
                             }
                         }
                         game.coins.forEach(function (coin, index) {
@@ -500,6 +542,10 @@
                                 game.platfms.splice(index, 1);
                             }
                         });
+                    },
+                    die = function () {
+                        game.dead = true;
+                        highscores.sendScore(Math.floor(game.points));
                     },
                     restart = function () {
                         // intervalId isn't cleared because the same interval is
