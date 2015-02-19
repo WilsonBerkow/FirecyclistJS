@@ -256,7 +256,7 @@
             drawInGamePoints = drawer(function (ctx, points) {
                 ctx.textAlign = "center";
                 ctx.font = "bold 30px monospace";
-                fillShadowyText(ctx, Math.floor(points), canvasWidth / 2, 25);
+                fillShadowyText(ctx, Math.floor(points), canvasWidth / 2, 28);
             }),
             fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
                 var clr0 = reverse ? "black" : "darkOrange",
