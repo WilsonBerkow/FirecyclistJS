@@ -109,7 +109,11 @@
         totalFbHeight = 10,
         platfmBounciness = 0.75,
         platfmThickness = 6,
+        playerTorsoLen = 15,
         playerRadius = 10,
+        playerHeadRadius = 9,
+        playerElbowXDiff = 8,
+        playerElbowYDiff = 2,
         pauseBtnCenterX = 10,
         pauseBtnCenterY = -5,
         pauseBtnRadius = 65,
@@ -172,7 +176,7 @@
             }()),
             drawGame = drawer(function (ctx, game) {
                 drawBackground();
-                drawPlayerAt(game.player.x, game.player.y);
+                drawPlayerAt(game.player.x, game.player.y, game.player.wheelAngle);
                 game.platfms.forEach(drawPlatfm);
                 game.fbs.forEach(drawFb);
                 game.coins.forEach(drawCoin);
@@ -221,11 +225,39 @@
                 ctx.fillStyle = "rgba(175, 175, 255, 0.75)"
                 ctx.fillRect(0, 0, canvasWidth, canvasHeight);
             }),
-            drawPlayerAt = drawer(function (ctx, x, y) {
+            drawPlayerAt = drawer(function (ctx, x, y, angle) {
+                drawHeadAt(x, y - playerTorsoLen - playerRadius - playerHeadRadius);
+                line(ctx, x, y - playerTorsoLen - playerRadius, x, y);
+                drawOneArm(x, y, 1);
+                drawOneArm(x, y, -1);
+                drawWheelAt(x, y, angle);
+            }),
+            drawOneArm = drawer(function (ctx, x, y, reverse) {
+                ctx.translate(x, y - playerRadius - playerTorsoLen / 2);
+                ctx.scale(reverse, reverse);
+                line(ctx, 0, 0,
+                          -playerElbowXDiff, -playerElbowYDiff);
+                line(ctx, -playerElbowXDiff, -playerElbowYDiff,
+                          -2 * playerElbowXDiff, playerElbowYDiff);
+            }),
+            drawHeadAt = drawer(function (ctx, x, y) {
+                circle(ctx, x, y, playerHeadRadius, "black", "stroke");
+            }),
+            drawWheelAt = drawer(function (ctx, x, y, angle) {
+                circle(ctx, x, y, playerRadius, "black", "stroke");
+                [0, 1, 2, 3, 4, 5].forEach(function (sixths) {
+                    drawSpoke(x, y, sixths / 6, angle);
+                });
+            }),
+            drawSpoke = drawer(function (ctx, x, y, turnAmt, extraAngle) {
+                ctx.strokeStyle = "black";
                 ctx.beginPath();
-                ctx.fillStyle = "darkBlue";
-                ctx.arc(x, y, playerRadius, 0, 2 * Math.PI, false);
-                ctx.fill();
+                ctx.translate(x, y);
+                ctx.rotate(2 * Math.PI * turnAmt);
+                ctx.rotate(extraAngle * Math.PI / 180);
+                ctx.moveTo(-playerRadius, 0);
+                ctx.lineTo(playerRadius, 0);
+                ctx.stroke();
             }),
             drawFb = drawer(function (ctx, fb) {
                 ctx.beginPath();
@@ -315,6 +347,12 @@
                 ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
                 ctx[fillOrStroke]();
             },
+            line = function (ctx, x0, y0, x1, y1, color) {
+                ctx.beginPath();
+                ctx.moveTo(x0, y0);
+                ctx.lineTo(x1, y1);
+                ctx.stroke();
+            },
             drawMenu = drawer(function (ctx, menu) {
                 drawBackground();
                 menu.fbs.forEach(drawFb);
@@ -398,7 +436,7 @@
                 };
             },
             createPlayer = anglify(false, function (x, y, vx, vy) {
-                return {"is": "ball", "x": x, "y": y, "vx": vx, "vy": vy};
+                return {"is": "ball", "x": x, "y": y, "vx": vx, "vy": vy, "wheelAngle": 0};
             }),
             createPlatfm = anglify(true, function (x0, y0, x1, y1) {
                 return {"is": "platfm", "x0": x0, "y0": y0, "x1": x1, "y1": y1, "time_left": 800};
@@ -518,6 +556,7 @@
                         game.player.x += game.player.vx * dt / 20;
                         game.player.y += game.player.vy * dt / 20;
                         game.player.x = modulo(game.player.x, canvasWidth);
+                        game.player.wheelAngle += signNum(game.player.vx) * 0.15 * dt;
                     },
                     updateFbs = function (dt) {
                         updateFbsGeneric(game.fbs, dt);
