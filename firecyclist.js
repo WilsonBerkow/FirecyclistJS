@@ -226,39 +226,45 @@
                 ctx.fillRect(0, 0, canvasWidth, canvasHeight);
             }),
             drawPlayerAt = drawer(function (ctx, x, y, angle) {
-                drawHeadAt(x, y - playerTorsoLen - playerRadius - playerHeadRadius);
-                line(ctx, x, y - playerTorsoLen - playerRadius, x, y);
-                drawOneArm(x, y, 1);
-                drawOneArm(x, y, -1);
-                drawWheelAt(x, y, angle);
-            }),
-            drawOneArm = drawer(function (ctx, x, y, reverse) {
-                ctx.translate(x, y - playerRadius - playerTorsoLen / 2);
-                ctx.scale(reverse, reverse);
-                line(ctx, 0, 0,
-                          -playerElbowXDiff, -playerElbowYDiff);
-                line(ctx, -playerElbowXDiff, -playerElbowYDiff,
-                          -2 * playerElbowXDiff, playerElbowYDiff);
-            }),
-            drawHeadAt = drawer(function (ctx, x, y) {
-                circle(ctx, x, y, playerHeadRadius, "black", "stroke");
-            }),
-            drawWheelAt = drawer(function (ctx, x, y, angle) {
-                circle(ctx, x, y, playerRadius, "black", "stroke");
-                [0, 1, 2, 3, 4, 5].forEach(function (sixths) {
-                    drawSpoke(x, y, sixths / 6, angle);
-                });
-            }),
-            drawSpoke = drawer(function (ctx, x, y, turnAmt, extraAngle) {
-                ctx.strokeStyle = "black";
                 ctx.beginPath();
-                ctx.translate(x, y);
-                ctx.rotate(2 * Math.PI * turnAmt);
-                ctx.rotate(extraAngle * Math.PI / 180);
-                ctx.moveTo(-playerRadius, 0);
-                ctx.lineTo(playerRadius, 0);
+                circleAt(ctx, x, y - playerTorsoLen - playerRadius - playerHeadRadius, playerHeadRadius, 0, 2 * Math.PI, true);
+                ctx.moveTo(x, y - playerTorsoLen - playerRadius);
+                ctx.lineTo(x, y); // (x, y) is the center of the wheel
+                
+                ctx.save();
+                ctx.translate(x, y - playerRadius - playerTorsoLen / 2);
+                oneArm(ctx, x, y);
+                oneArm(ctx, x, y, true);
+                ctx.restore();
+                
+                wheelAt(ctx, x, y, angle);
+                
                 ctx.stroke();
             }),
+            oneArm = function (ctx, x, y, reverse) {
+                if (reverse) {
+                    ctx.scale(-1, -1);
+                }
+                ctx.moveTo(0, 0);
+                ctx.lineTo(-playerElbowXDiff, -playerElbowYDiff);
+                ctx.lineTo(-2 * playerElbowXDiff, playerElbowYDiff);
+            },
+            wheelAt = function (ctx, x, y, angle) {
+                var i;
+                circleAt(ctx, x, y, playerRadius, 0, 2 * Math.PI, true);
+                
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(angle * Math.PI / 180);
+                for (i = 0; i < 6; i += 1) {
+                    ctx.moveTo(-playerRadius, 0);
+                    ctx.lineTo(playerRadius, 0);
+                    if (i !== 5) {
+                        ctx.rotate(1/3 * Math.PI); // Rotate a sixth of a turn
+                    }
+                }
+                ctx.restore();
+            },
             drawFb = drawer(function (ctx, fb) {
                 ctx.beginPath();
                 ctx.fillStyle = "red"
@@ -347,11 +353,13 @@
                 ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
                 ctx[fillOrStroke]();
             },
-            line = function (ctx, x0, y0, x1, y1, color) {
-                ctx.beginPath();
+            circleAt = function (ctx, x, y, radius) {
+                ctx.moveTo(x + radius, y); // A line is always drawn from the current position to the start of the drawing of the circle, so the '+ radius' puts the brush at that point on the circle, (x+radius, y), to prevent extraneous lines from being painted.
+                ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
+            },
+            lineFromTo = function (ctx, x0, y0, x1, y1) {
                 ctx.moveTo(x0, y0);
                 ctx.lineTo(x1, y1);
-                ctx.stroke();
             },
             drawMenu = drawer(function (ctx, menu) {
                 drawBackground();
