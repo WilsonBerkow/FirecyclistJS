@@ -413,18 +413,18 @@
             playerHittingCoin = function (player, coin) {
                 return dist(player.x, player.y, coin.x, coin.y) < playerRadius + coinRadius;
             },
-            updateFbsGeneric = function (fbArray) {
-                return function (dt) { // This is used in playGame AND runMenu, and thus must be declared here.
-                    fbArray.forEach(function (fb, index) {
-                        fb.y -= fbFallRate * dt;
-                        if (fb.y < -totalFbHeight) {
-                            fbArray.splice(index, 1);
-                        }
-                    });
-                    if (Math.random() < 1 / 1000 * dt) {
-                        fbArray.push(createFb(Math.random() * canvasWidth, canvasHeight + fbRadius));
+            updateFbsGeneric = function (fbArray, dt) { // This is used in both playGame and runMenu, and thus must be declared here.
+                // fbArray can't be abstracted out and used in closure, because
+                // every new game uses a different 'fbs' array and 'game' object
+                fbArray.forEach(function (fb, index) {
+                    fb.y -= fbFallRate * dt;
+                    if (fb.y < -totalFbHeight) {
+                        fbArray.splice(index, 1);
                     }
-                };
+                });
+                if (Math.random() < 1 / 1000 * dt) {
+                    fbArray.push(createFb(Math.random() * canvasWidth, canvasHeight + fbRadius));
+                }
             },
             
             // PLAY:
@@ -471,7 +471,9 @@
                         game.player.y += game.player.vy * dt / 20;
                         game.player.x = modulo(game.player.x, canvasWidth);
                     },
-                    updateFbs = updateFbsGeneric(game.fbs),
+                    updateFbs = function (dt) {
+                        updateFbsGeneric(game.fbs, dt);
+                    },
                     updateCoins = function (dt) {
                         game.coins.forEach(function (coin, index) {
                             coin.y -= coinFallRate * dt;
@@ -553,7 +555,9 @@
             runMenu = function () {
                 var menu = createMenu(),
                     updateButtons = function () {},
-                    updateFbs = updateFbsGeneric(menu.fbs),
+                    updateFbs = function (dt) {
+                        updateFbsGeneric(menu.fbs, dt);
+                    },
                     intervalId,
                     prevTime = Date.now();
                 window.menu = menu;
