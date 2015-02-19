@@ -196,7 +196,7 @@
                 
                 // Points big
                 ctx.font = "bold 140px monospace";
-                ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvas.height * 2 / 3);
+                ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvas.height * 2 / 3 - 18);
                 
                 // Line separator
                 ctx.beginPath();
@@ -214,7 +214,7 @@
                 var highest = highscores.highest().map(function (score) {
                     return score === null ? "\u2014" : String(score); // Em-dash for empty slots
                 });
-                ctx.fillText(highest.join(" "), canvasWidth / 2, 435);
+                ctx.fillText(highest.join(" "), canvasWidth / 2, 439);
             }),
             drawBackground = drawer(function (ctx) {
                 ctx.clearRect(0, 0, canvasWidth, canvasHeight);
