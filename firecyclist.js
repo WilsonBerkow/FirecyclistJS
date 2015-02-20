@@ -122,10 +122,10 @@
         pythag = function (a, b) { return Math.sqrt(a*a + b*b); },
         dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
         isOverPauseBtn = function (xy) {
-            return dist(xy.x, xy.y, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
+            return dist(xy.x1, xy.y1, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
         },
         isOverRestartBtn = function (xy) {
-            return dist(xy.x, xy.y, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
+            return dist(xy.x1, xy.y1, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
         },
         
         // CONFIG:
