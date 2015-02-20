@@ -496,6 +496,16 @@
             touchToPlatfm = function (touch) {
                 return createPlatfm(touch.x0, touch.y0, touch.x1, touch.y1);
             },
+            copyTouch = function (t) {
+                return {
+                    "t0": t.t0,
+                    "id": t.id,
+                    "x0": t.x0,
+                    "y0": t.y0,
+                    "x1": t.x1,
+                    "y1": t.y1
+                };
+            },
             createCoin = function (x, y) {
                 return {"is": "coin", "x": x, "y": y};
             },
@@ -683,6 +693,7 @@
                     },
                     die = function () {
                         game.dead = true;
+                        //game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch);
                         highscores.sendScore(Math.floor(game.points));
                     },
                     restart = function () {
@@ -719,7 +730,9 @@
                         //  points <- g.points + 2 * (Time.inSeconds dt) * (1 + g.player.pos.y / toFloat game_total_height) + points_from_coins
                         
                         // Render
-                        game.previewPlatfmTouch = curTouch;
+                        if (!game.dead && !game.paused) { // The paused check is just in case of a bug, or for the future, as now one cannot pause while drawing a platfm
+                            game.previewPlatfmTouch = curTouch;
+                        }
                         drawGame(game);
                     }
                 }, 1000 / framerate);
