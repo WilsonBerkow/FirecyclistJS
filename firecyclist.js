@@ -96,7 +96,39 @@
             // triggering of the 'tap' event.
         });
     }());
-    var // CONFIG:
+    var // UTIL:
+        makeObject = function (proto, props) {
+            var o = Object.create(proto);
+            Object.keys(props).forEach(function (key) {
+                o[key] = props[key];
+            });
+            return o;
+        },
+        avg = (function () {
+            var sum2 = function (a, b) { return a + b; },
+                sum = function (arr) {
+                    return arr.reduce(sum2);
+                };
+            return function () {
+                var nums = [].slice.apply(arguments);
+                return sum(nums) / nums.length;
+            };
+        }()),
+        modulo = function (num, modBy) {
+            return num > modBy ? modulo(num - modBy, modBy) :
+                   num < 0 ? modulo(num + modBy, modBy) :
+                   num;
+        },
+        pythag = function (a, b) { return Math.sqrt(a*a + b*b); },
+        dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
+        isOverPauseBtn = function (xy) {
+            return dist(xy.x, xy.y, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
+        },
+        isOverRestartBtn = function (xy) {
+            return dist(xy.x, xy.y, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
+        },
+        
+        // CONFIG:
         framerate = 50,
         canvasWidth = 576 / 2,
         canvasHeight = 1024 / 2,
@@ -114,6 +146,7 @@
         playerHeadRadius = 9 * 5/8,
         playerElbowXDiff = 8 * 5/8,
         playerElbowYDiff = 2 * 5/8,
+        powerupTotalLifetime = 5500, // in milliseconds
         pauseBtnCenterX = 10,
         pauseBtnCenterY = -5,
         pauseBtnRadius = 65,
@@ -124,28 +157,9 @@
         menuPlayBtnY = 310,
         menuPlayBtnW = 121,
         menuPlayBtnH = 44,
-        
-        // UTIL:
-        makeObject = function (proto, props) {
-            var o = Object.create(proto);
-            Object.keys(props).forEach(function (key) {
-                o[key] = props[key];
-            });
-            return o;
-        },
-        modulo = function (num, modBy) {
-            return num > modBy ? modulo(num - modBy, modBy) :
-                   num < 0 ? modulo(num + modBy, modBy) :
-                   num;
-        },
-        pythag = function (a, b) { return Math.sqrt(a*a + b*b); },
-        dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
-        isOverPauseBtn = function (xy) {
-            return dist(xy.x, xy.y, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
-        },
-        isOverRestartBtn = function (xy) {
-            return dist(xy.x, xy.y, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
-        };
+        powerupX2Width = 36,
+        powerupX2Height = 30,
+        powerupX2ApproxRadius = avg(powerupX2Height / 2, pythag(powerupX2Width, powerupX2Height) / 2); // Average of the short and long radii.
     
     // RENDER:
     var renderers = (function () {
@@ -180,6 +194,7 @@
                 game.platfms.forEach(drawPlatfm);
                 game.fbs.forEach(drawFb);
                 game.coins.forEach(drawCoin);
+                game.powerups.forEach(drawPowerup);
                 drawPauseBtn(game);
                 drawRestartBtn(game);
                 drawInGamePoints(game.points);
@@ -338,6 +353,15 @@
                 ctx.font = "bold 30px monospace";
                 fillShadowyText(ctx, Math.floor(points), canvasWidth / 2, 28);
             }),
+            drawPowerup = drawer(function (ctx, powerup) {
+                if (powerup.type === "X2") {
+                    ctx.fillStyle = "gold";
+                    ctx.font = "italic 26px monospace";
+                    ctx.fillText("X2", powerup.xPos(), powerup.yPos(), powerupX2Width, powerupX2Height);
+                    ctx.strokeStyle = "orange";
+                    ctx.strokeText("X2", powerup.xPos(), powerup.yPos(), powerupX2Width, powerupX2Width);
+                }
+            }),
             fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
                 var clr0 = reverse ? "black" : "darkOrange",
                     clr1 = reverse ? "darkOrange" : "black",
@@ -458,15 +482,30 @@
             createVel = anglify(false, function (vx, vy) {
                 return {"is": "vel", "vx": vx, "vy": vy};
             }),
-            createGame = function () {
+            createPowerup = (function () {
+                var proto = {
+                    xPos: function () {
+                        return this.lifetime / powerupTotalLifetime * canvasWidth;
+                    },
+                    yPos: function () {
+                        return this.offsetY + Math.sin(this.xPos() / 20) * 40;
+                    }
+                };
+                return function (y, powerupType) {
+                    return makeObject(proto, {"is": "powerup", "offsetY": y, "lifetime": 0, "type": powerupType});
+                };
+            }()),
+            createGame = function (handlePowerup) {
                 return {
                     "player": createPlayer(canvasWidth / 2, 50, 0, 0),
                     "platfms": [],
                     "fbs": [],
                     "coins": [],
+                    "powerups": [],
                     "points": 0,
                     "paused": false,
-                    "dead": false
+                    "dead": false,
+                    "handlePowerup": handlePowerup
                 };
             },
             signNum = function (num) {
@@ -512,6 +551,11 @@
             playerHittingCoin = function (player, coin) {
                 return dist(player.x, player.y, coin.x, coin.y) < playerRadius + coinRadius;
             },
+            playerHittingPowerup = function (player, powerup) {
+                if (powerup.type === "X2") {
+                    return dist(player.x, player.y, powerup.xPos(), powerup.yPos()) < playerRadius + powerupX2ApproxRadius;
+                }
+            },
             updateFbsGeneric = function (fbArray, dt) { // This is used in both playGame and runMenu, and thus must be declared here.
                 // fbArray can't be abstracted out and used in closure, because
                 // every new game uses a different 'fbs' array and 'game' object
@@ -529,7 +573,8 @@
             // PLAY:
             playGame = function () {
                 var
-                    game = createGame(),
+                    handlePowerup = function () {},
+                    game = createGame(handlePowerup),
                     updatePlayer = function (dt) {
                         var i, platfm, playerAngle = game.player.angle(), platfmAngle, tmpVel, collided = false;
                         if (game.player.y > canvasHeight + playerRadius) {
@@ -566,6 +611,12 @@
                                 game.points += 5;
                             }
                         });
+                        game.powerups.forEach(function (powerup, index) {
+                            if (playerHittingPowerup(game.player, powerup)) {
+                                game.powerups.splice(index, 1);
+                                game.handlePowerup(powerup.type);
+                            }
+                        });
                         game.player.x += game.player.vx * dt / 20;
                         game.player.y += game.player.vy * dt / 20;
                         game.player.x = modulo(game.player.x, canvasWidth);
@@ -595,6 +646,17 @@
                             }
                         });
                     },
+                    updatePowerups = function (dt) {
+                        game.powerups.forEach(function (powerup, index) {
+                            powerup.lifetime += dt;
+                            if (powerup.xPos() > canvasWidth + 20) { // 20 is just a random margin to be safe
+                                game.powerups.splice(index, 1);
+                            }
+                        });
+                        if (Math.random() < 1 / 75000 * dt) { // 100 times less frequent than fireballs
+                            game.powerups.push(createPowerup(Math.random() * 85 + 25, "X2"));
+                        }
+                    },
                     die = function () {
                         game.dead = true;
                         highscores.sendScore(Math.floor(game.points));
@@ -602,7 +664,7 @@
                     restart = function () {
                         // intervalId isn't cleared because the same interval is
                         // used for the next game (after the restart).
-                        game = createGame();
+                        game = createGame(handlePowerup);
                     },
                     prevFrameTime = Date.now(),
                     intervalId;
@@ -623,6 +685,7 @@
                         updateCoins(dt);
                         updateFbs(dt);
                         updatePlatfms(dt);
+                        updatePowerups(dt);
                         game.points += 2 * (dt / 1000) * (1 + game.player.y / canvasHeight);
                         // Point logic from Elm:
                         //  points <- g.points + 2 * (Time.inSeconds dt) * (1 + g.player.pos.y / toFloat game_total_height) + points_from_coins
