@@ -748,13 +748,17 @@
                     }
                 };
                 jQuery(document).on("click", function (event) {
-                    var p;
+                    var q, p;
                     if (game.paused) { // Tap *anywhere* to unpause
                         game.paused = false;
                     } else if (game.dead) { // Tap *anywhere* to restart from GameOver screen.
                         restart();
                     } else { // Tap on the pause btn to pause
-                        p = calcTouchPos(event);
+                        q = calcTouchPos(event);
+                        p = {
+                            "x1": q.x,
+                            "y1": q.y
+                        };
                         if (isOverPauseBtn(p)) {
                             game.paused = true;
                         } else if (isOverRestartBtn(p)) {
