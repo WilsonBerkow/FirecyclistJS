@@ -65,13 +65,13 @@
             };
         }());
     resize();
-    (function () { // Simple Touch system, mirroring Elm's
+    (function () { // Simple Touch system, similar to Elm's but compatible with the Platfm interface
         var touchesCount = 0;
         jQuery(document).on("touchmove", function (event) {
             var xy = calcTouchPos(event);
-            if (curTouch !== null) { // Should always pass
-                curTouch.x = xy.x;
-                curTouch.y = xy.y;
+            if (curTouch !== null) { // Condition fails when a platfm has been materialized, and thus curTouch was reset to null
+                curTouch.x1 = xy.x;
+                curTouch.y1 = xy.y;
             }
             event.preventDefault(); // Stops the swipe-to-move-through-browser-history feature in Chrome from interferring.
         });
@@ -82,13 +82,13 @@
                 "id": touchesCount,
                 "x0": xy.x,
                 "y0": xy.y,
-                "x":  xy.x,
-                "y":  xy.y
+                "x1":  xy.x,
+                "y1":  xy.y
             };
             touchesCount += 1;
         });
         jQuery(document).on("touchend", function (event) {
-            if (typeof handleTouchend === "function") {
+            if (typeof handleTouchend === "function" && curTouch) {
                 handleTouchend(curTouch);
             }
             curTouch = null;
@@ -192,6 +192,9 @@
                 drawBackground();
                 drawPlayerAt(game.player.x, game.player.y, game.player.wheelAngle);
                 game.platfms.forEach(drawPlatfm);
+                if (game.previewPlatfmTouch) {
+                    drawPreviewPlatfm(game.previewPlatfmTouch);
+                }
                 game.fbs.forEach(drawFb);
                 game.coins.forEach(drawCoin);
                 game.powerups.forEach(drawPowerup);
@@ -326,7 +329,7 @@
                 ctx.lineCap = "round";
                 ctx.lineJoin = "smooth";
                 ctx.moveTo(touch.x0, touch.y0);
-                ctx.lineTo(touch.x, touch.y);
+                ctx.lineTo(touch.x1, touch.y1);
                 ctx.stroke();
             }),
             pxSize = 36,
@@ -435,9 +438,9 @@
                 ctx.fillStyle = "rgb(150, 140, 130)";
                 ctx.fillText("Play", menuPlayBtnX, menuPlayBtnY, menuPlayBtnW, menuPlayBtnH);
             });
-        return [drawGame, drawGamePaused, drawGameDead, drawPreviewPlatfm, drawMenu];
+        return [drawGame, drawGamePaused, drawGameDead, drawMenu];
     }());
-    var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawPreviewPlatfm = renderers[3], drawMenu = renderers[4];
+    var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawMenu = renderers[3];
     
     // PLAY:
     var playGame = (function (drawFns) {
@@ -490,6 +493,9 @@
             createPlatfm = anglify(true, function (x0, y0, x1, y1) {
                 return {"is": "platfm", "x0": x0, "y0": y0, "x1": x1, "y1": y1, "time_left": 800};
             }),
+            touchToPlatfm = function (touch) {
+                return createPlatfm(touch.x0, touch.y0, touch.x1, touch.y1);
+            },
             createCoin = function (x, y) {
                 return {"is": "coin", "x": x, "y": y};
             },
@@ -516,6 +522,7 @@
                 return {
                     "player": createPlayer(canvasWidth / 2, 50, 0, 0),
                     "platfms": [],
+                    "previewPlatfmTouch": null,
                     "fbs": [],
                     "coins": [],
                     "powerups": [],
@@ -698,6 +705,10 @@
                         drawGameDead(game);
                     } else {
                         // Update state
+                        if (curTouch && playerIntersectingPlatfm(game.player, curTouch)) {
+                            game.platfms.push(touchToPlatfm(curTouch));
+                            curTouch = null;
+                        }
                         updatePlayer(dt);
                         updateCoins(dt);
                         updateFbs(dt);
@@ -708,19 +719,17 @@
                         //  points <- g.points + 2 * (Time.inSeconds dt) * (1 + g.player.pos.y / toFloat game_total_height) + points_from_coins
                         
                         // Render
+                        game.previewPlatfmTouch = curTouch;
                         drawGame(game);
-                        if (curTouch) {
-                            drawPreviewPlatfm(curTouch);
-                        }
                     }
                 }, 1000 / framerate);
                 handleTouchend = function (touch) {
                     var tx0 = touch.x0;
-                    if (!game.paused && !game.dead && !(touch.x0 === touch.x && touch.y0 === touch.y)) {
-                        if (touch.x0 === touch.x) {
+                    if (!game.paused && !game.dead && !(touch.x0 === touch.x1 && touch.y0 === touch.y1)) {
+                        if (touch.x0 === touch.x1) {
                             tx0 -= 1;
                         }
-                        game.platfms.push(createPlatfm(tx0, touch.y0, touch.x, touch.y));
+                        game.platfms.push(createPlatfm(tx0, touch.y0, touch.x1, touch.y1));
                     }
                 };
                 jQuery(document).on("click", function (event) {
