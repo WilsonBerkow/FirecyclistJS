@@ -693,7 +693,9 @@
                     },
                     die = function () {
                         game.dead = true;
-                        game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
+                        if (game.previewPlatfmTouch) {
+                            game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
+                        }
                         highscores.sendScore(Math.floor(game.points));
                     },
                     restart = function () {
