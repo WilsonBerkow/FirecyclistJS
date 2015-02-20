@@ -506,6 +506,9 @@
                     "y1": t.y1
                 };
             },
+            touchIsNaNMaker = function (touch) {
+                return touch.x0 === touch.x1 && touch.y0 === touch.y1
+            },
             createCoin = function (x, y) {
                 return {"is": "coin", "x": x, "y": y};
             },
@@ -680,6 +683,16 @@
                             }
                         });
                     },
+                    tryToAddPlatfmFromTouch = function (touch) {
+                        var tx0 = touch.x0;
+                        if (touchIsNaNMaker(touch)) {
+                            return;
+                        }
+                        if (touch.x0 === touch.x1) {
+                            tx0 -= 1;
+                        }
+                        game.platfms.push(createPlatfm(tx0, touch.y0, touch.x1, touch.y1));
+                    },
                     updatePowerups = function (dt) {
                         game.powerups.forEach(function (powerup, index) {
                             powerup.lifetime += dt;
@@ -719,7 +732,7 @@
                     } else {
                         // Update state
                         if (curTouch && playerIntersectingPlatfm(game.player, curTouch)) {
-                            game.platfms.push(touchToPlatfm(curTouch));
+                            tryToAddPlatfmFromTouch(curTouch);
                             curTouch = null;
                         }
                         updatePlayer(dt);
@@ -740,11 +753,8 @@
                 }, 1000 / framerate);
                 handleTouchend = function (touch) {
                     var tx0 = touch.x0;
-                    if (!game.paused && !game.dead && !(touch.x0 === touch.x1 && touch.y0 === touch.y1)) {
-                        if (touch.x0 === touch.x1) {
-                            tx0 -= 1;
-                        }
-                        game.platfms.push(createPlatfm(tx0, touch.y0, touch.x1, touch.y1));
+                    if (!game.paused && !game.dead) {
+                        tryToAddPlatfmFromTouch(touch);
                     }
                 };
                 jQuery(document).on("click", function (event) {
