@@ -697,9 +697,13 @@
                         }
                     }
                 }, 1000 / framerate);
-                handleTouchend = function (touch) { // TODO: CHANGE TO A VIABLE SOLUTION (i.e. one that doesn't involve global variables)
-                    if (!game.paused && !game.dead) {
-                        game.platfms.push(createPlatfm(touch.x0, touch.y0, touch.x, touch.y));
+                handleTouchend = function (touch) {
+                    var tx0 = touch.x0;
+                    if (!game.paused && !game.dead && !(touch.x0 === touch.x && touch.y0 === touch.y)) {
+                        if (touch.x0 === touch.x) {
+                            tx0 -= 1;
+                        }
+                        game.platfms.push(createPlatfm(tx0, touch.y0, touch.x, touch.y));
                     }
                 };
                 jQuery(document).on("click", function (event) {
