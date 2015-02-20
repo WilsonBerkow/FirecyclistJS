@@ -339,15 +339,32 @@
                 ctx.font = "bold " + pxSize + "px arial";
                 fillShadowyText(ctx, "II", 15, 15 + pxSize / 2, colory);
             }),
-            drawRestartBtn = drawer(function (ctx, game) {
-                var colory = !game.dead && !game.paused && curTouch && isOverRestartBtn(curTouch);
-                ctx.beginPath();
-                ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
-                ctx.arc(restartBtnCenterX, restartBtnCenterY, restartBtnRadius, 0, 2 * Math.PI, true);
-                ctx.fill();
-                ctx.font = "bold " + (pxSize + 5) + "px arial";
-                fillShadowyText(ctx, "\u27F2", canvasWidth - 25 - pxSize / 2, 17 + pxSize / 2, colory);
-            }),
+            offCanvImg = function (w, h, src) {
+                var offCanvas = document.createElement('canvas'),
+                    offCtx,
+                    img = document.getElementById(src);
+                offCanvas.width = w;
+                offCanvas.height = h;
+                offCtx = offCanvas.getContext('2d');
+                offCtx.drawImage(img, 0, 0, w, h);
+                return offCanvas;
+            },
+            drawRestartBtn = (function () {
+                var offCanvasBlack = offCanvImg(pxSize, pxSize, "restart-arrow-black"),
+                    offCanvasOrange = offCanvImg(pxSize, pxSize, "restart-arrow-orange");
+                return drawer(function (ctx, game) {
+                    var colory = !game.dead && !game.paused && curTouch && isOverRestartBtn(curTouch);
+                    ctx.beginPath();
+                    ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
+                    ctx.arc(restartBtnCenterX, restartBtnCenterY, restartBtnRadius, 0, 2 * Math.PI, true);
+                    ctx.fill();
+                    if (colory) {
+                        ctx.drawImage(offCanvasOrange, canvasWidth - 25 - pxSize / 2, -13 + pxSize / 2, pxSize, pxSize);
+                    } else {
+                        ctx.drawImage(offCanvasBlack, canvasWidth - 25 - pxSize / 2, -13 + pxSize / 2, pxSize, pxSize);
+                    }
+                });
+            }()),
             drawInGamePoints = drawer(function (ctx, points) {
                 ctx.textAlign = "center";
                 ctx.font = "bold 30px monospace";
