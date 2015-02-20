@@ -455,6 +455,9 @@
             createFb = function (x, y) {
                 return {"is": "fb", "x": x, "y": y};
             },
+            createVel = anglify(false, function (vx, vy) {
+                return {"is": "vel", "vx": vx, "vy": vy};
+            }),
             createGame = function () {
                 return {
                     "player": createPlayer(canvasWidth / 2, 50, 0, 0),
@@ -471,11 +474,13 @@
                        num < 0 ? -1 :
                        0;
             },
-            velFromPlatfm = function (dt, platfm) {
-                var slope = platfm.slope();
+            velFromPlatfm = function (dt, player, platfm) {
+                var slope = platfm.slope(),
+                    cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmFallRate * dt - platfmBounciness);
+                cartesianVel.setMagnitude(Math.min(cartesianVel.magnitude(), player.magnitude()) + playerGrav * dt);
                 return {
-                    "x": signNum(slope) * 3,
-                    "y": Math.abs(slope) * 3 - platfmFallRate * dt - platfmBounciness
+                    "x": cartesianVel.vx,
+                    "y": cartesianVel.vy
                 };
             },
             playerIntersectingPlatfm = function (player, platfm) {
@@ -541,7 +546,7 @@
                                 //game.player.setAngle(2 * platfmAngle - playerAngle);
                                 //game.player.scaleMagnitude(Math.sqrt(Math.sqrt(playerAngle / modulo(-1 / platfmAngle, 2 * Math.PI))));
                                 //game.platfms.splice(i, 1);
-                                tmpVel = velFromPlatfm(dt, platfm);
+                                tmpVel = velFromPlatfm(dt, game.player, platfm);
                                 game.player.vx = tmpVel.x;
                                 game.player.vy = tmpVel.y;
                                 collided = true;
