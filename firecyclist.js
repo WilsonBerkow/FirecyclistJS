@@ -146,20 +146,23 @@
         playerHeadRadius = 9 * 5/8,
         playerElbowXDiff = 8 * 5/8,
         playerElbowYDiff = 2 * 5/8,
-        powerupTotalLifetime = 5500, // in milliseconds
+        powerupTotalLifespan = 5500, // in milliseconds
         pauseBtnCenterX = 10,
         pauseBtnCenterY = -5,
         pauseBtnRadius = 65,
         restartBtnCenterX = canvasWidth - 10,
         restartBtnCenterY = -5,
         restartBtnRadius = 65,
+        inGamePointsPxSize = 30,
+        inGamePointsYPos = 28,
         menuPlayBtnX = canvasWidth / 2,
         menuPlayBtnY = 310,
         menuPlayBtnW = 121,
         menuPlayBtnH = 44,
         powerupX2Width = 36,
         powerupX2Height = 30,
-        powerupX2ApproxRadius = avg(powerupX2Height / 2, pythag(powerupX2Width, powerupX2Height) / 2); // Average of the short and long radii.
+        powerupX2ApproxRadius = avg(powerupX2Height / 2, pythag(powerupX2Width, powerupX2Height) / 2), // Average of the short and long radii.
+        activePowerupLifespan = 10000;
     
     // RENDER:
     var renderers = (function () {
@@ -197,7 +200,10 @@
                 }
                 game.fbs.forEach(drawFb);
                 game.coins.forEach(drawCoin);
-                game.powerups.forEach(drawPowerup);
+                game.powerups.forEach(function (powerup) {
+                    drawPowerup(powerup.type, powerup.xPos(), powerup.yPos());
+                });
+                drawActivePowerups(game.activePowerups);
                 drawPauseBtn(game);
                 drawRestartBtn(game);
                 drawInGamePoints(game.points);
@@ -370,16 +376,23 @@
             }()),
             drawInGamePoints = drawer(function (ctx, points) {
                 ctx.textAlign = "center";
-                ctx.font = "bold 30px monospace";
-                fillShadowyText(ctx, Math.floor(points), canvasWidth / 2, 28);
+                ctx.font = "bold " + inGamePointsPxSize + "px monospace";
+                fillShadowyText(ctx, Math.floor(points), canvasWidth / 2, inGamePointsYPos);
             }),
-            drawPowerup = drawer(function (ctx, powerup) {
-                if (powerup.type === "X2") {
+            drawPowerup = drawer(function (ctx, type, x, y) {
+                if (type === "X2") {
                     ctx.fillStyle = "gold";
                     ctx.font = "italic 26px monospace";
-                    ctx.fillText("X2", powerup.xPos(), powerup.yPos(), powerupX2Width, powerupX2Height);
+                    ctx.fillText("X2", x, y, powerupX2Width, powerupX2Height);
                     ctx.strokeStyle = "orange";
-                    ctx.strokeText("X2", powerup.xPos(), powerup.yPos(), powerupX2Width, powerupX2Width);
+                    ctx.strokeText("X2", x, y, powerupX2Width, powerupX2Width);
+                }
+            }),
+            drawActivePowerups = drawer(function (ctx, actives) { // NOTE: THIS IS A SIMPLE, PRIMITIVE FIRST VERSION
+                var xPos = canvasWidth / 2 + inGamePointsPxSize, yPos = inGamePointsYPos, i;
+                for (i = actives.length - 1; i >= 0; i -= 1) { // Start with the last activepowerups, which have been around the longest.
+                    drawPowerup(actives[i].type, xPos, yPos);
+                    xPos += powerupX2Width; // TEMPORARY
                 }
             }),
             fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
@@ -521,7 +534,7 @@
             createPowerup = (function () {
                 var proto = {
                     xPos: function () {
-                        return this.lifetime / powerupTotalLifetime * canvasWidth;
+                        return this.lifetime / powerupTotalLifespan * canvasWidth;
                     },
                     yPos: function () {
                         return this.offsetY + Math.sin(this.xPos() / 20) * 40;
@@ -531,7 +544,10 @@
                     return makeObject(proto, {"is": "powerup", "offsetY": y, "lifetime": 0, "type": powerupType});
                 };
             }()),
-            createGame = function (handlePowerup) {
+            createActivePowerup = function (type) {
+                return {"is": "activePowerup", "type": type, "lifetime": activePowerupLifespan}; // TODO: INCLUDE srcX, srcY, timeSinceAcquired FOR ANIMATIONS
+            },
+            createGame = function () {
                 return {
                     "player": createPlayer(canvasWidth / 2, 50, 0, 0),
                     "platfms": [],
@@ -539,10 +555,10 @@
                     "fbs": [],
                     "coins": [],
                     "powerups": [],
+                    "activePowerups": [],
                     "points": 0,
                     "paused": false,
-                    "dead": false,
-                    "handlePowerup": handlePowerup
+                    "dead": false
                 };
             },
             signNum = function (num) {
@@ -610,8 +626,7 @@
             // PLAY:
             playGame = function () {
                 var
-                    handlePowerup = function () {},
-                    game = createGame(handlePowerup),
+                    game = createGame(),
                     updatePlayer = function (dt) {
                         var i, platfm, playerAngle = game.player.angle(), platfmAngle, tmpVel, collided = false;
                         if (game.player.y > canvasHeight + playerRadius) {
@@ -651,7 +666,9 @@
                         game.powerups.forEach(function (powerup, index) {
                             if (playerHittingPowerup(game.player, powerup)) {
                                 game.powerups.splice(index, 1);
-                                game.handlePowerup(powerup.type);
+                                if (powerup.type === "X2") {
+                                    game.activePowerups.push(createActivePowerup("X2"));
+                                }
                             }
                         });
                         game.player.x += game.player.vx * dt / 20;
@@ -704,6 +721,14 @@
                             game.powerups.push(createPowerup(Math.random() * 85 + 25, "X2"));
                         }
                     },
+                    updateActivePowerups = function (dt) {
+                        game.activePowerups.forEach(function (activePowerup, index) {
+                            if (activePowerup.lifetime <= 0) {
+                                game.activePowerups.splice(index, 1);
+                            }
+                            activePowerup.lifetime -= dt;
+                        });
+                    },
                     die = function () {
                         game.dead = true;
                         if (game.previewPlatfmTouch) {
@@ -714,7 +739,7 @@
                     restart = function () {
                         // intervalId isn't cleared because the same interval is
                         // used for the next game (after the restart).
-                        game = createGame(handlePowerup);
+                        game = createGame();
                     },
                     prevFrameTime = Date.now(),
                     intervalId;
@@ -740,6 +765,7 @@
                         updateFbs(dt);
                         updatePlatfms(dt);
                         updatePowerups(dt);
+                        updateActivePowerups(dt);
                         game.points += 2 * (dt / 1000) * (1 + game.player.y / canvasHeight);
                         // Point logic from Elm:
                         //  points <- g.points + 2 * (Time.inSeconds dt) * (1 + g.player.pos.y / toFloat game_total_height) + points_from_coins
