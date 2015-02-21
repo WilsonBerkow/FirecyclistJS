@@ -6,12 +6,12 @@ fire, sliding and manuevering on platforms that you create in order to avoid all
 fireballs around you and get the maximum number of points!
 
 ### Screenshots
-![Home 0](screenshots/home-0.png)
+<img src="screenshots/home-0.png" alt="Home 0" style="width: 200px;" />
 
-![Gameplay 0](screenshots/gameplay-0.png)
+<img src="screenshots/gameplay-0.png" alt="Gameplay 0" style="width: 200px;" />
 
-![Gameplay 1](screenshots/gameplay-1.png)
+<img src="screenshots/gameplay-1.png" alt="Gameplay 1" style="width: 200px;" />
 
-![Gameover 0](screenshots/gameover-0.png)
+<img src="screenshots/gameover-0.png" alt="Gameover 0" style="width: 200px;" />
 
-![Gameover 1](screenshots/gameover-1.png)
+<img src="screenshots/gameover-1.png" alt="Gameover 1" style="width: 200px;" />
