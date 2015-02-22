@@ -628,6 +628,15 @@
             playGame = function () {
                 var
                     game = createGame(),
+                    handleActivesPoints = function ($$$) {
+                        var i;
+                        for (i = 0; i < game.activePowerups.length; i += 1) {
+                            if (game.activePowerups[i].type === "X2") { // These powerups don't stack. TODO: Consider changing rendering to reflect this.
+                                return $$$ * 2;
+                            }
+                        }
+                        return $$$;
+                    },
                     updatePlayer = function (dt) {
                         var i, platfm, playerAngle = game.player.angle(), platfmAngle, tmpVel, collided = false;
                         if (game.player.y > canvasHeight + playerRadius) {
@@ -659,9 +668,10 @@
                             }
                         }
                         game.coins.forEach(function (coin, index) {
+                            var i;
                             if (playerHittingCoin(game.player, coin)) {
                                 game.coins.splice(index, 1);
-                                game.points += coinValue;
+                                game.points += handleActivesPoints(coinValue);
                             }
                         });
                         game.powerups.forEach(function (powerup, index) {
@@ -718,7 +728,7 @@
                                 game.powerups.splice(index, 1);
                             }
                         });
-                        if (Math.random() < 1 / 75000 * dt) { // 100 times less frequent than fireballs
+                        if (Math.random() < 1 / /*75*/1000 * dt) { // 100 times less frequent than fireballs
                             game.powerups.push(createPowerup(Math.random() * 85 + 25, "X2"));
                         }
                     },
@@ -767,7 +777,7 @@
                         updatePlatfms(dt);
                         updatePowerups(dt);
                         updateActivePowerups(dt);
-                        game.points += 2 * (dt / 1000) * (1 + game.player.y / canvasHeight);
+                        game.points += handleActivesPoints(2 * (dt / 1000) * (1 + game.player.y / canvasHeight));
                         // Point logic from Elm:
                         //  points <- g.points + 2 * (Time.inSeconds dt) * (1 + g.player.pos.y / toFloat game_total_height) + points_from_coins
                         
