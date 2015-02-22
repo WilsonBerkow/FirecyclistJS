@@ -137,6 +137,7 @@
         fbRadius = 10,
         coinFallRate = 2 / 20,
         coinRadius = 10,
+        coinValue = 10,
         platfmFallRate = 3 / 20,
         totalFbHeight = 10,
         platfmBounciness = 0.75,
@@ -660,7 +661,7 @@
                         game.coins.forEach(function (coin, index) {
                             if (playerHittingCoin(game.player, coin)) {
                                 game.coins.splice(index, 1);
-                                game.points += 5;
+                                game.points += coinValue;
                             }
                         });
                         game.powerups.forEach(function (powerup, index) {
