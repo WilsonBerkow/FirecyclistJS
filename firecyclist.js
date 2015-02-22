@@ -163,6 +163,7 @@
         powerupX2Width = 36,
         powerupX2Height = 30,
         powerupX2ApproxRadius = avg(powerupX2Height / 2, pythag(powerupX2Width, powerupX2Height) / 2), // Average of the short and long radii.
+        powerupSlowRadius = 10,
         activePowerupLifespan = 10000;
     
     // RENDER:
@@ -387,13 +388,23 @@
                     ctx.fillText("X2", x, y, powerupX2Width, powerupX2Height);
                     ctx.strokeStyle = "orange";
                     ctx.strokeText("X2", x, y, powerupX2Width, powerupX2Width);
+                } else if (type === "slow") {
+                    ctx.globalAlpha = 0.7;
+                    circle(ctx, x, y, powerupSlowRadius, "silver", "fill");
+                    ctx.globalAlpha = 1;
+                    ctx.lineWidth = 3;
+                    circle(ctx, x, y, powerupSlowRadius, "gray", "stroke");
+                    ctx.beginPath();
+                    lineFromTo(ctx, x, y, x, y - powerupSlowRadius * 0.75);
+                    lineFromTo(ctx, x, y, x + powerupSlowRadius * 0.75, y);
+                    ctx.stroke();
                 }
             }),
             drawActivePowerups = drawer(function (ctx, actives) { // NOTE: THIS IS A SIMPLE, PRIMITIVE FIRST VERSION
                 var xPos = canvasWidth / 2 + inGamePointsPxSize, yPos = inGamePointsYPos, i;
                 for (i = actives.length - 1; i >= 0; i -= 1) { // Start with the last activepowerups, which have been around the longest.
                     drawPowerup(actives[i].type, xPos, yPos);
-                    xPos += powerupX2Width; // TEMPORARY
+                    xPos += actives[i].width;
                 }
             }),
             fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
@@ -546,7 +557,14 @@
                 };
             }()),
             createActivePowerup = function (type) {
-                return {"is": "activePowerup", "type": type, "lifetime": activePowerupLifespan}; // TODO: INCLUDE srcX, srcY, timeSinceAcquired FOR ANIMATIONS
+                return {
+                    "is": "activePowerup",
+                    "type": type,
+                    "width": type === "X2"   ? powerupX2Width :
+                             type === "slow" ? powerupSlowRadius * 2 :
+                             0,
+                    "lifetime": type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan,
+                }; // TODO: INCLUDE srcX, srcY, timeSinceAcquired FOR ANIMATIONS
             },
             createGame = function () {
                 return {
@@ -608,6 +626,8 @@
             playerHittingPowerup = function (player, powerup) {
                 if (powerup.type === "X2") {
                     return dist(player.x, player.y, powerup.xPos(), powerup.yPos()) < playerRadius + powerupX2ApproxRadius;
+                } else if (powerup.type === "slow") {
+                    return dist(player.x, player.y, powerup.xPos(), powerup.yPos()) < playerRadius + powerupSlowRadius;
                 }
             },
             updateFbsGeneric = function (fbArray, dt) { // This is used in both playGame and runMenu, and thus must be declared here.
@@ -636,6 +656,15 @@
                             }
                         }
                         return $$$;
+                    },
+                    slowPowerupObtained = function () {
+                        var i;
+                        for (i = 0; i < game.activePowerups.length; i += 1) {
+                            if (game.activePowerups[i].type === "slow") {
+                                return true;
+                            }
+                        }
+                        return false;
                     },
                     updatePlayer = function (dt) {
                         var i, platfm, playerAngle = game.player.angle(), platfmAngle, tmpVel, collided = false;
@@ -679,6 +708,8 @@
                                 game.powerups.splice(index, 1);
                                 if (powerup.type === "X2") {
                                     game.activePowerups.push(createActivePowerup("X2"));
+                                } else if (powerup.type === "slow") {
+                                    game.activePowerups.push(createActivePowerup("slow"));
                                 }
                             }
                         });
@@ -721,6 +752,9 @@
                         }
                         game.platfms.push(createPlatfm(tx0, touch.y0, touch.x1, touch.y1));
                     },
+                    makePowerupRandom = function (type, start, range) {
+                        return createPowerup(Math.random() * range + start, type);
+                    },
                     updatePowerups = function (dt) {
                         game.powerups.forEach(function (powerup, index) {
                             powerup.lifetime += dt;
@@ -728,8 +762,11 @@
                                 game.powerups.splice(index, 1);
                             }
                         });
-                        if (Math.random() < 1 / 75000 * dt) { // 100 times less frequent than fireballs
-                            game.powerups.push(createPowerup(Math.random() * 85 + 25, "X2"));
+                        if (Math.random() < 1 / 1000 * dt) { // 100 times less frequent than fireballs
+                            game.powerups.push(makePowerupRandom("X2", 25, 85));
+                        }
+                        if (Math.random() < 1 / 1000 * dt) {
+                            game.powerups.push(makePowerupRandom("slow", 25, 120));
                         }
                     },
                     updateActivePowerups = function (dt) {
@@ -758,6 +795,9 @@
                 intervalId = setInterval(function () {
                     // Handle time (necessary, regardless of pausing)
                     var now = Date.now(), dt = now - prevFrameTime;
+                    if (slowPowerupObtained()) {
+                        dt = dt * 2/3; // Sloooooooow
+                    }
                     prevFrameTime = now;
                     
                     // Handle state changes
