@@ -762,10 +762,10 @@
                                 game.powerups.splice(index, 1);
                             }
                         });
-                        if (Math.random() < 1 / 1000 * dt) { // 100 times less frequent than fireballs
+                        if (Math.random() < 1 / 75000 * dt) { // 100 times less frequent than fireballs
                             game.powerups.push(makePowerupRandom("X2", 25, 85));
                         }
-                        if (Math.random() < 1 / 1000 * dt) {
+                        if (Math.random() < 1 / 75000 * dt) {
                             game.powerups.push(makePowerupRandom("slow", 25, 120));
                         }
                     },
