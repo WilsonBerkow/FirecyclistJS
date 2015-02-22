@@ -137,7 +137,7 @@
         fbRadius = 10,
         coinFallRate = 2 / 20,
         coinRadius = 10,
-        coinValue = 10,
+        coinValue = 11,
         platfmFallRate = 3 / 20,
         totalFbHeight = 10,
         platfmBounciness = 0.75,
