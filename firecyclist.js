@@ -41,7 +41,14 @@
         handleTouchend,
         curTouch = null,
         highscores = (function () {
-            var highscores = [null, null, null]; // Highest scores are at the beginning, null represents an empty slot.
+            var highscores = [null, null, null], // Highest scores are at the beginning, null represents an empty slot.
+                fromLocal = localStorage.getItem("highscores");
+            if (fromLocal !== null) {
+                fromLocal = JSON.parse(fromLocal);
+                if (fromLocal) {
+                    highscores = fromLocal;
+                }
+            }
             return {
                 highest: function (n) { // Note that the nulls of empty slots are included
                     var arr = [], i;
@@ -52,15 +59,17 @@
                     return arr;
                 },
                 sendScore: function (score) {
-                    var i;
+                    var i, result = false;
                     for (i = 0; i < highscores.length; i += 1) {
                         if (score > highscores[i] || highscores[i] == null) {
                             highscores.splice(i, 0, score);
                             highscores.splice(highscores.length - 1, 1);
-                            return true;
+                            result = true;
+                            break;
                         }
                     }
-                    return false;
+                    localStorage.setItem("highscores", JSON.stringify(highscores));
+                    return result;
                 }
             };
         }());
@@ -778,11 +787,11 @@
                         });
                     },
                     die = function () {
+                        if (game.dead) { return; }
                         game.dead = true;
                         if (game.previewPlatfmTouch) {
                             game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
                         }
-                        highscores.sendScore(Math.floor(game.points));
                     },
                     restart = function () {
                         // intervalId isn't cleared because the same interval is
@@ -824,6 +833,9 @@
                         // Render
                         if (!game.dead && !game.paused) { // The paused check is just in case of a bug, or for the future, as now one cannot pause while drawing a platfm
                             game.previewPlatfmTouch = curTouch;
+                        }
+                        if (game.dead) {
+                            highscores.sendScore(Math.floor(game.points));
                         }
                         drawGame(game);
                     }
