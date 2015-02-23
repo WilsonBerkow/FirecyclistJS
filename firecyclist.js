@@ -203,20 +203,26 @@
                 };
             }()),
             drawGame = drawer(function (ctx, game) {
-                drawBackground();
-                drawPlayerAt(game.player.x, game.player.y, game.player.wheelAngle);
-                game.platfms.forEach(drawPlatfm);
+                drawBackground(ctx);
+                drawPlayerAt(ctx, game.player.x, game.player.y, game.player.wheelAngle);
+                setupGenericPlatfmChars(ctx);
+                game.platfms.forEach(function (platfm) {
+                    drawPlatfm(ctx, platfm);
+                });
+                ctx.globalAlpha = 1; // Changed in platfm drawing, so must be reset
                 if (game.previewPlatfmTouch) {
-                    drawPreviewPlatfm(game.previewPlatfmTouch);
+                    drawPreviewPlatfm(ctx, game.previewPlatfmTouch);
                 }
-                game.fbs.forEach(drawFb);
-                game.coins.forEach(drawCoin);
+                drawFbs(ctx, game.fbs);
+                game.coins.forEach(function (coin) {
+                    drawCoin(ctx, coin);
+                });
                 game.powerups.forEach(function (powerup) {
                     drawPowerup(powerup.type, powerup.xPos(), powerup.yPos());
                 });
                 drawActivePowerups(game.activePowerups);
-                drawPauseBtn(game);
-                drawRestartBtn(game);
+                drawPauseBtn(ctx, game);
+                drawRestartBtn(ctx, game);
                 drawInGamePoints(game.points);
             }),
             drawGamePaused = gameOverlayDrawer(function (ctx, game) {
@@ -255,12 +261,12 @@
                 });
                 ctx.fillText(highest.join(" "), canvasWidth / 2, 439);
             }),
-            drawBackground = drawer(function (ctx) {
+            drawBackground = function (ctx) {
                 ctx.clearRect(0, 0, canvasWidth, canvasHeight);
                 ctx.fillStyle = "rgba(175, 175, 255, 0.75)"
                 ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-            }),
-            drawPlayerAt = drawer(function (ctx, x, y, angle) {
+            },
+            drawPlayerAt = function (ctx, x, y, angle) {
                 ctx.beginPath();
                 circleAt(ctx, x, y - playerTorsoLen - playerRadius - playerHeadRadius, playerHeadRadius, 0, 2 * Math.PI, true);
                 ctx.moveTo(x, y - playerTorsoLen - playerRadius);
@@ -275,7 +281,7 @@
                 wheelAt(ctx, x, y, angle);
                 
                 ctx.stroke();
-            }),
+            },
             oneArm = function (ctx, x, y, reverse) {
                 if (reverse) {
                     ctx.scale(-1, -1);
@@ -300,25 +306,31 @@
                 }
                 ctx.restore();
             },
-            drawFb = drawer(function (ctx, fb) {
+            drawFbs = function (ctx, fbs) {
                 ctx.beginPath();
-                ctx.fillStyle = "red"
-                ctx.moveTo(fb.x - fbRadius + 2, fb.y + fbRadius / 2);
-                ctx.lineTo(fb.x, fb.y + fbRadius * 2);
-                ctx.lineTo(fb.x + fbRadius - 2, fb.y + fbRadius / 2);
-                ctx.fill();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = "red";
+                fbs.forEach(function (fb) {
+                    circleAt(ctx, fb.x, fb.y, fbRadius);
+                });
+                ctx.stroke();
                 // 
+                ctx.beginPath();
+                ctx.fillStyle = "red";
+                fbs.forEach(function (fb) {
+                    ctx.moveTo(fb.x - fbRadius + 2, fb.y + fbRadius / 2);
+                    ctx.lineTo(fb.x, fb.y + fbRadius * 2);
+                    ctx.lineTo(fb.x + fbRadius - 2, fb.y + fbRadius / 2);
+                });
+                ctx.fill();
                 ctx.beginPath();
                 ctx.fillStyle = "orange";
-                ctx.arc(fb.x, fb.y, fbRadius, 0, 2 * Math.PI, false);
+                fbs.forEach(function (fb) {
+                    circleAt(ctx, fb.x, fb.y, fbRadius - 1/2);
+                });
                 ctx.fill();
-                // 
-                ctx.beginPath();
-                ctx.strokeStyle = "red";
-                ctx.arc(fb.x, fb.y, fbRadius, 0, 2 * Math.PI, false);
-                ctx.stroke();
-            }),
-            drawCoin = drawer(function (ctx, coin) {
+            },
+            drawCoin = function (ctx, coin) {
                 var squareLen = 8.5;
                 ctx.lineWidth = 2;
                 circle(ctx, coin.x, coin.y, coinRadius, "yellow", "fill");
@@ -327,30 +339,29 @@
                 ctx.fillRect(coin.x - squareLen / 2, coin.y - squareLen / 2, squareLen, squareLen);
                 ctx.strokeStyle = "orange";
                 ctx.strokeRect(coin.x - squareLen / 2, coin.y - squareLen / 2, squareLen, squareLen);
-            }),
-            drawPlatfm = drawer(function (ctx, p) {
-                ctx.beginPath();
-                ctx.globalAlpha = Math.max(0, p.time_left / 1000);
+            },
+            setupGenericPlatfmChars = function (ctx) {
                 ctx.strokeStyle = "black";
                 ctx.lineWidth = platfmThickness;
                 ctx.lineCap = "round";
                 ctx.lineJoin = "smooth";
+            },
+            drawPlatfm = function (ctx, p) { // Must be run after setupGenericPlatfmChars
+                ctx.beginPath();
+                ctx.globalAlpha = Math.max(0, p.time_left / 1000);
                 ctx.moveTo(p.x0, p.y0);
                 ctx.lineTo(p.x1, p.y1);
                 ctx.stroke();
-            }),
-            drawPreviewPlatfm = drawer(function (ctx, touch) {
+            },
+            drawPreviewPlatfm = function (ctx, touch) { // Must be run after setupGenericPlatfmChars
                 ctx.beginPath();
                 ctx.strokeStyle = "grey";
-                ctx.lineWidth = platfmThickness;
-                ctx.lineCap = "round";
-                ctx.lineJoin = "smooth";
                 ctx.moveTo(touch.x0, touch.y0);
                 ctx.lineTo(touch.x1, touch.y1);
                 ctx.stroke();
-            }),
+            },
             pxSize = 36,
-            drawPauseBtn = drawer(function (ctx, game) {
+            drawPauseBtn = function (ctx, game) {
                 var colory = !game.dead && (game.paused || (curTouch && isOverPauseBtn(curTouch)));
                 ctx.beginPath();
                 ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
@@ -358,7 +369,7 @@
                 ctx.fill();
                 ctx.font = "bold " + pxSize + "px arial";
                 fillShadowyText(ctx, "II", 15, 15 + pxSize / 2, colory);
-            }),
+            },
             offCanvImg = function (w, h, src) {
                 var offCanvas = document.createElement('canvas'),
                     offCtx,
@@ -372,7 +383,7 @@
             drawRestartBtn = (function () {
                 var offCanvasBlack = offCanvImg(pxSize, pxSize, "restart-arrow-black"),
                     offCanvasOrange = offCanvImg(pxSize, pxSize, "restart-arrow-orange");
-                return drawer(function (ctx, game) {
+                return function (ctx, game) {
                     var colory = !game.dead && !game.paused && curTouch && isOverRestartBtn(curTouch);
                     ctx.beginPath();
                     ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
@@ -383,7 +394,7 @@
                     } else {
                         ctx.drawImage(offCanvasBlack, canvasWidth - 25 - pxSize / 2, -13 + pxSize / 2, pxSize, pxSize);
                     }
-                });
+                };
             }()),
             drawInGamePoints = drawer(function (ctx, points) {
                 ctx.textAlign = "center";
@@ -440,8 +451,8 @@
                 ctx.lineTo(x1, y1);
             },
             drawMenu = drawer(function (ctx, menu) {
-                drawBackground();
-                menu.fbs.forEach(drawFb);
+                drawBackground(ctx);
+                drawFbs(ctx, menu.fbs);
                 drawMenuTitle();
                 drawMenuPlayBtn();
             }),
