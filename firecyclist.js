@@ -420,7 +420,7 @@
                     ctx.stroke();
                 }
             }),
-            drawActivePowerups = drawer(function (ctx, actives) { // NOTE: THIS IS A SIMPLE, PRIMITIVE FIRST VERSION
+            drawActivePowerups = drawer(function (ctx, actives) {
                 var xPos = canvasWidth / 2 + inGamePointsPxSize, yPos = inGamePointsYPos, i;
                 for (i = actives.length - 1; i >= 0; i -= 1) { // Start with the last activepowerups, which have been around the longest.
                     drawPowerup(actives[i].type, xPos, yPos);
