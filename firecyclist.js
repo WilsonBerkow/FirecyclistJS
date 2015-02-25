@@ -1,6 +1,12 @@
 // (c) Wilson Berkow
 // Firecyclist.js
 
+if (!Math.log2) {
+    Math.log2 = function (e) {
+        return Math.log(e) / Math.log(2);
+    };
+}
+
 (function () {
     "use strict";
     // Screen-resizing code:
@@ -816,7 +822,7 @@
                     },
                     prevFrameTime = Date.now(),
                     intervalId;
-                window.game = game; // FOR DEBUGGING. It is a good idea to have this in case a see an issue at an unexpected time.
+                window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
                 intervalId = setInterval(function () {
                     // Handle time (necessary, regardless of pausing)
                     var now = Date.now(), dt = now - prevFrameTime;
