@@ -179,7 +179,8 @@ if (!Math.log2) {
         powerupX2Height = 30,
         powerupX2ApproxRadius = avg(powerupX2Height / 2, pythag(powerupX2Width, powerupX2Height) / 2), // Average of the short and long radii.
         powerupSlowRadius = 10,
-        activePowerupLifespan = 10000;
+        activePowerupLifespan = 10000,
+        fireRed = "rgb(230, 0, 0)";
     
     // RENDER:
     var renderers = (function () {
@@ -219,6 +220,7 @@ if (!Math.log2) {
                 if (game.previewPlatfmTouch) {
                     drawPreviewPlatfm(ctx, game.previewPlatfmTouch);
                 }
+                drawFirebits(ctx, game.firebits);
                 drawFbs(ctx, game.fbs);
                 game.coins.forEach(function (coin) {
                     drawCoin(ctx, coin);
@@ -314,15 +316,14 @@ if (!Math.log2) {
             },
             drawFbs = function (ctx, fbs) {
                 ctx.beginPath();
-                ctx.lineWidth = 1;
-                ctx.strokeStyle = "red";
+                ctx.strokeStyle = fireRed;
                 fbs.forEach(function (fb) {
                     circleAt(ctx, fb.x, fb.y, fbRadius);
                 });
                 ctx.stroke();
                 // 
                 ctx.beginPath();
-                ctx.fillStyle = "red";
+                ctx.fillStyle = fireRed;
                 fbs.forEach(function (fb) {
                     ctx.moveTo(fb.x - fbRadius + 2, fb.y + fbRadius / 2);
                     ctx.lineTo(fb.x, fb.y + fbRadius * 2);
@@ -335,6 +336,16 @@ if (!Math.log2) {
                     circleAt(ctx, fb.x, fb.y, fbRadius - 1/2);
                 });
                 ctx.fill();
+            },
+            drawFirebits = function (ctx, firebits) {
+                var i;
+                ctx.beginPath();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = fireRed;
+                for (i = 0; i < firebits.length; i += 1) {
+                    circleAt(ctx, firebits[i].x, firebits[i].y, Math.random());
+                }
+                ctx.stroke();
             },
             drawCoin = function (ctx, coin) {
                 var squareLen = 8.5;
@@ -458,6 +469,7 @@ if (!Math.log2) {
             },
             drawMenu = drawer(function (ctx, menu) {
                 drawBackground(ctx);
+                drawFirebits(ctx, menu.firebits);
                 drawFbs(ctx, menu.fbs);
                 drawMenuTitle();
                 drawMenuPlayBtn();
@@ -566,6 +578,9 @@ if (!Math.log2) {
             createFb = function (x, y) {
                 return {"is": "fb", "x": x, "y": y};
             },
+            createFirebit = function (x, y) {
+                return {"is": "fbBit", "x": x, "y": y, "lifetime": 225 + Math.random() * 50};
+            },
             createVel = anglify(false, function (vx, vy) {
                 return {"is": "vel", "vx": vx, "vy": vy};
             }),
@@ -598,6 +613,7 @@ if (!Math.log2) {
                     "platfms": [],
                     "previewPlatfmTouch": null,
                     "fbs": [],
+                    "firebits": [],
                     "coins": [],
                     "powerups": [],
                     "activePowerups": [],
@@ -656,7 +672,15 @@ if (!Math.log2) {
                     return dist(player.x, player.y, powerup.xPos(), powerup.yPos()) < playerRadius + powerupSlowRadius;
                 }
             },
-            updateFbsGeneric = function (fbArray, dt) { // This is used in both playGame and runMenu, and thus must be declared here.
+            makeFirebitAround = function (fbX, fbY) {
+                var x = fbX + Math.random() * 1.5 * fbRadius - 0.75*fbRadius,
+                    y = fbY + Math.random() * fbRadius;
+                return createFirebit(x, fbY);
+            },
+            updateFbsGeneric = function (obj, dt) { // This is used in both playGame and runMenu, and thus must be declared here.
+                var fbArray = Array.isArray(obj) ? obj : obj.fbs,
+                    fbFirebits = Array.isArray(obj) ? null : obj.firebits,
+                    x, y;
                 // fbArray can't be abstracted out and used in closure, because
                 // every new game uses a different 'fbs' array and 'game' object
                 fbArray.forEach(function (fb, index) {
@@ -664,9 +688,23 @@ if (!Math.log2) {
                     if (fb.y < -totalFbHeight) {
                         fbArray.splice(index, 1);
                     }
+                    if (fbFirebits) {
+                        fbFirebits.push(makeFirebitAround(fb.x, fb.y));
+                    }
+                });
+                console.info("fb.firebits is... " + fbFirebits + JSON.stringify(fbFirebits));
+                (fbFirebits || []).forEach(function (firebit, index) {
+                    firebit.y += Math.random() * 2 + 0.1;
+                    firebit.x += Math.random() * 2 - 1;
+                    firebit.lifetime -= dt;
+                    if (firebit.lifetime <= 0 || firebit.y > canvasHeight || firebit.x < 0 || firebit.x > canvasWidth) {
+                        fbFirebits.splice(index, 1);
+                    }
                 });
                 if (Math.random() < 1 / 1000 * dt) {
-                    fbArray.push(createFb(Math.random() * canvasWidth, canvasHeight + fbRadius));
+                    x = Math.random() * canvasWidth;
+                    y = canvasHeight + fbRadius;
+                    fbArray.push(createFb(x, y));
                 }
             },
             
@@ -745,7 +783,7 @@ if (!Math.log2) {
                         game.player.wheelAngle += signNum(game.player.vx) * 0.15 * dt;
                     },
                     updateFbs = function (dt) {
-                        updateFbsGeneric(game.fbs, dt);
+                        updateFbsGeneric(game, dt);
                     },
                     updateCoins = function (dt) {
                         game.coins.forEach(function (coin, index) {
@@ -894,12 +932,12 @@ if (!Math.log2) {
                     }
                 });
             },
-            createMenu = function () { return {fbs: []}; },
+            createMenu = function () { return {fbs: [], firebits: []}; },
             runMenu = function () {
                 var menu = createMenu(),
                     updateButtons = function () {},
                     updateFbs = function (dt) {
-                        updateFbsGeneric(menu.fbs, dt);
+                        updateFbsGeneric(menu, dt);
                     },
                     intervalId,
                     prevTime = Date.now();
