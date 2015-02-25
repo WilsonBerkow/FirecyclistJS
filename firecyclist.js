@@ -799,7 +799,7 @@
                     },
                     difficultyCurve = function (x) {
                         var dtScale = Math.log2(x + 0.1) / 80 + 0.85;
-                        console.log(dtScale);
+                        //console.log(dtScale);
                         return dtScale;
                     },
                     die = function () {
