@@ -797,6 +797,11 @@
                             activePowerup.lifetime -= dt;
                         });
                     },
+                    difficultyCurve = function (x) {
+                        var dtScale = Math.log2(x + 0.1) / 80 + 0.85;
+                        console.log(dtScale);
+                        return dtScale;
+                    },
                     die = function () {
                         if (game.dead) { return; }
                         game.dead = true;
@@ -818,6 +823,12 @@
                     if (slowPowerupObtained()) {
                         dt = dt * 2/3; // Sloooooooow
                     }
+                    //if () {
+                        // SCALE dt BY PROGRESS FOR DIFFICULTY CURVE
+                        //  This also is good because it means that you'll get points faster over time
+                        // For now, just testing...
+                        dt *= difficultyCurve(game.points);
+                    //}
                     prevFrameTime = now;
                     
                     // Handle state changes
