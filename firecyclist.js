@@ -265,10 +265,16 @@ if (!Math.log2) {
                 ctx.font = "bold italic 24px monospace";
                 ctx.fillText("Highscores", canvasWidth / 2, 410);
                 ctx.font = "bold 24px monospace";
-                var highest = highscores.highest().map(function (score) {
-                    return score === null ? "\u2014" : String(score); // Em-dash for empty slots
+                //var highest = highscores.highest().map(function (score) {
+                    //return score === null ? "\u2014" : String(score); // Em-dash for empty slots
+                //});
+                //ctx.fillText(highest.join(" "), canvasWidth / 2, 439);
+                var curY = 435;
+                highscores.highest().forEach(function (score) {
+                    if (!score) { return; }
+                    ctx.fillText(score, canvasWidth / 2, curY);
+                    curY += 26;
                 });
-                ctx.fillText(highest.join(" "), canvasWidth / 2, 439);
             }),
             drawBackground = function (ctx) {
                 ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -603,11 +609,14 @@ if (!Math.log2) {
             }),
             createPowerup = (function () {
                 var proto = {
+                    xDistanceTravelled: function () {
+                        return this.lifetime / powerupTotalLifespan * canvasWidth;
+                    },
                     xPos: function () {
-                        return this.lifetime / powerupTotalLifespan * canvasWidth - this.offsetX;
+                        return this.xDistanceTravelled() - this.offsetX;
                     },
                     yPos: function () {
-                        return this.offsetY + Math.sin(this.xPos() / 20) * 40;
+                        return this.offsetY + Math.sin(this.xDistanceTravelled() / 20) * 40;
                     }
                 };
                 return function (y, powerupType) {
