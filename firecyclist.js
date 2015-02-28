@@ -171,7 +171,7 @@ if (!Math.log2) {
         restartBtnCenterY = -5,
         restartBtnRadius = 65,
         inGamePointsPxSize = 30,
-        inGamePointsYPos = 28,
+        inGamePointsYPos = 30,
         menuPlayBtnX = canvasWidth / 2,
         menuPlayBtnY = 310,
         menuPlayBtnW = 121,
@@ -266,10 +266,6 @@ if (!Math.log2) {
                 ctx.fillText("Highscores", canvasWidth / 2, 410);
                 var scoreFontSize = 24;
                 ctx.font = "bold " + scoreFontSize + "px monospace";
-                //var highest = highscores.highest().map(function (score) {
-                    //return score === null ? "\u2014" : String(score); // Em-dash for empty slots
-                //});
-                //ctx.fillText(highest.join(" "), canvasWidth / 2, 439);
                 var curY = 435;
                 highscores.highest().forEach(function (score) {
                     if (!score) { return; }
