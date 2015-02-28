@@ -306,13 +306,16 @@ if (typeof Math.log2 !== "function") {
                 ctx.fill();
             },
             drawFirebits = function (ctx, firebits, color) {
-                //var i;
+                var i, w;
                 //ctx.beginPath();
-                //for (i = 0; i < firebits.length; i += 1) {
-                //    if (objIsVisible(1.4, firebits[i])) {
-                //        circleAt(ctx, firebits[i].x, firebits[i].y, Math.random() + 0.4);
-                //    }
-                //}
+                ctx.fillStyle = color;
+                for (i = 0; i < firebits.length; i += 1) {
+                    if (objIsVisible(1.4, firebits[i])) {
+                        w = 2.5;//2 * (Math.random() + 0.8);
+                        ctx.fillRect(firebits[i].x, firebits[i].y, w, w);
+                        //circleAt(ctx, firebits[i].x, firebits[i].y, Math.random() + 0.4);
+                    }
+                }
                 //ctx.lineWidth = 1;
                 //ctx.strokeStyle = color;
                 //ctx.stroke();
@@ -697,7 +700,7 @@ if (typeof Math.log2 !== "function") {
                     fbFirebitsRed = Array.isArray(obj) ? null : obj.firebitsRed,
                     fbFirebitsOrg = Array.isArray(obj) ? null : obj.firebitsOrg,
                     firebitBeyondVisibility = function (firebit) { // So that when one moves left, to make a fb on the right side go offscreen, and then quickly goes back, the user doesn't notice that the firebits are temporarily depleted.
-                        return firebit.x > -fbRadius * 10 && firebit.x < canvasWidth + fbRadius * 10;
+                        return firebit.x > -fbRadius * 4 && firebit.x < canvasWidth + fbRadius * 4;
                     },
                     x, y,
                     updateFirebits = function (firebits) {
