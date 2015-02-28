@@ -395,6 +395,7 @@ if (typeof Math.log2 !== "function") {
                 if (type === "X2") {
                     ctx.fillStyle = "gold";
                     ctx.font = "italic 26px Consolas";
+                    ctx.lineWidth = 2;
                     ctx.fillText("X2", x, y, powerupX2Width, powerupX2Height);
                     ctx.strokeStyle = "orange";
                     ctx.strokeText("X2", x, y, powerupX2Width, powerupX2Width);
@@ -948,7 +949,7 @@ if (typeof Math.log2 !== "function") {
                         updatePlatfms(dt);
                         updatePowerups(dt);
                         updateActivePowerups(dt);
-                        game.points += handleActivesPoints(2 * (realDt / 1000) * (1 + game.player.y / canvasHeight)); // The use of realDt here means that when you get the slow powerup, you still get points at normal speed.
+                        game.points += handleActivesPoints(4 * (realDt / 1000) * Math.sqrt(Math.max(0, game.player.y / canvasHeight))); // The use of realDt here means that when you get the slow powerup, you still get points at normal speed.
                         // Point logic from Elm:
                         //  points <- g.points + 2 * (Time.inSeconds dt) * (1 + g.player.pos.y / toFloat game_total_height) + points_from_coins
                         
