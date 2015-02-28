@@ -152,6 +152,7 @@ if (!Math.log2) {
         fbRadius = 10,
         coinFallRate = 2 / 20,
         coinRadius = 10,
+        coinSquareLen = 8.5,
         coinValue = 11,
         platfmFallRate = 3 / 20,
         totalFbHeight = 10,
@@ -314,6 +315,9 @@ if (!Math.log2) {
                 }
                 ctx.restore();
             },
+            objIsVisible = function (width, obj) {
+                return obj.x > -width && obj.x < canvasWidth + width;
+            },
             drawFbs = function (ctx, fbs) {
                 var scaleFactor = 10 / 12.6, // To get it to the right size
                     ctrlX = 0 * scaleFactor,
@@ -327,6 +331,7 @@ if (!Math.log2) {
                 var triColor = "darkRed", ballColor = "darkRed";
                 ctx.beginPath();
                 fbs.forEach(function (fb) {
+                    if (!objIsVisible(2 * fbRadius, fb)) { return; }
                     ctx.moveTo(fb.x + ctrlX, fb.y + curveTipY);
                     ctx.quadraticCurveTo(fb.x + ctrlX, fb.y + ctrlY, fb.x + curveRightestEndX, fb.y + curveEndY);
                     ctx.moveTo(fb.x + ctrlX, fb.y + curveTipY);
@@ -337,6 +342,7 @@ if (!Math.log2) {
                 ctx.stroke();
                 ctx.beginPath();
                 fbs.forEach(function (fb) {
+                    if (!objIsVisible(2 * fbRadius, fb)) { return; }
                     ctx.moveTo(fb.x + ctrlX, fb.y + curveTipY - 4 * scaleFactor);
                     ctx.lineTo(fb.x + 9 * scaleFactor, fb.y + curveEndY);
                     ctx.lineTo(fb.x - 9 * scaleFactor, fb.y + curveEndY);
@@ -352,19 +358,21 @@ if (!Math.log2) {
                 ctx.lineWidth = 1;
                 ctx.strokeStyle = "darkOrange";
                 for (i = 0; i < firebits.length; i += 1) {
-                    circleAt(ctx, firebits[i].x, firebits[i].y, Math.random() + 0.3);
+                    if (objIsVisible(1.3, firebits[i])) {
+                        circleAt(ctx, firebits[i].x, firebits[i].y, Math.random() + 0.3);
+                    }
                 }
                 ctx.stroke();
             },
             drawCoin = function (ctx, coin) {
-                var squareLen = 8.5;
+                if (!objIsVisible(2 * coinRadius, coin)) { return; }
                 ctx.lineWidth = 2;
                 circle(ctx, coin.x, coin.y, coinRadius, "yellow", "fill");
                 circle(ctx, coin.x, coin.y, coinRadius, "orange", "stroke");
                 ctx.fillStyle = "darkOrange";
-                ctx.fillRect(coin.x - squareLen / 2, coin.y - squareLen / 2, squareLen, squareLen);
+                ctx.fillRect(coin.x - coinSquareLen / 2, coin.y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
                 ctx.strokeStyle = "orange";
-                ctx.strokeRect(coin.x - squareLen / 2, coin.y - squareLen / 2, squareLen, squareLen);
+                ctx.strokeRect(coin.x - coinSquareLen / 2, coin.y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
             },
             setupGenericPlatfmChars = function (ctx) {
                 ctx.strokeStyle = "black";
