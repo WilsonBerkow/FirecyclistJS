@@ -912,16 +912,13 @@ if (!Math.log2) {
                 window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
                 intervalId = setInterval(function () {
                     // Handle time (necessary, regardless of pausing)
-                    var now = Date.now(), dt = now - prevFrameTime;
+                    var now = Date.now(), realDt = now - prevFrameTime, dt;
+                    realDt *= difficultyCurve(game.points);
                     if (slowPowerupObtained()) {
-                        dt = dt * 2/3; // Sloooooooow
+                        dt = realDt * 2/3; // Sloooooooow
+                    } else {
+                        dt = realDt;
                     }
-                    //if () {
-                        // SCALE dt BY PROGRESS FOR DIFFICULTY CURVE
-                        //  This also is good because it means that you'll get points faster over time
-                        // For now, just testing...
-                        dt *= difficultyCurve(game.points);
-                    //}
                     prevFrameTime = now;
                     
                     // Handle state changes
@@ -941,7 +938,7 @@ if (!Math.log2) {
                         updatePlatfms(dt);
                         updatePowerups(dt);
                         updateActivePowerups(dt);
-                        game.points += handleActivesPoints(2 * (dt / 1000) * (1 + game.player.y / canvasHeight));
+                        game.points += handleActivesPoints(2 * (realDt / 1000) * (1 + game.player.y / canvasHeight)); // The use of realDt here means that when you get the slow powerup, you still get points at normal speed.
                         // Point logic from Elm:
                         //  points <- g.points + 2 * (Time.inSeconds dt) * (1 + g.player.pos.y / toFloat game_total_height) + points_from_coins
                         
