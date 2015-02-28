@@ -596,14 +596,15 @@ if (!Math.log2) {
             createPowerup = (function () {
                 var proto = {
                     xPos: function () {
-                        return this.lifetime / powerupTotalLifespan * canvasWidth;
+                        return this.lifetime / powerupTotalLifespan * canvasWidth - this.offsetX;
                     },
                     yPos: function () {
                         return this.offsetY + Math.sin(this.xPos() / 20) * 40;
                     }
                 };
                 return function (y, powerupType) {
-                    return makeObject(proto, {"is": "powerup", "offsetY": y, "lifetime": 0, "type": powerupType});
+                    // offsetX is for the scrolling effect.
+                    return makeObject(proto, {"is": "powerup", "offsetY": y, "offsetX": 0, "lifetime": 0, "type": powerupType});
                 };
             }()),
             createActivePowerup = function (type) {
@@ -681,6 +682,9 @@ if (!Math.log2) {
                     return dist(player.x, player.y, powerup.xPos(), powerup.yPos()) < playerRadius + powerupSlowRadius;
                 }
             },
+            randomXPosition = function () {
+                return Math.random() * canvasWidth * 3 - canvasWidth * 1.5;
+            },
             makeFirebitAround = function (fbX, fbY) {
                 var x = fbX + Math.random() * 1.5 * fbRadius - 0.75*fbRadius,
                     y = fbY + Math.random() * fbRadius;
@@ -701,7 +705,6 @@ if (!Math.log2) {
                         fbFirebits.push(makeFirebitAround(fb.x, fb.y));
                     }
                 });
-                console.info("fb.firebits is... " + fbFirebits + JSON.stringify(fbFirebits));
                 (fbFirebits || []).forEach(function (firebit, index) {
                     firebit.y += Math.random() * 1.5 + 0.1;
                     firebit.x += Math.random() * 1.5 - 1;
@@ -710,8 +713,8 @@ if (!Math.log2) {
                         fbFirebits.splice(index, 1);
                     }
                 });
-                if (Math.random() < 1 / 1000 * dt) {
-                    x = Math.random() * canvasWidth;
+                if (Math.random() < 1 / 1000 * 4 * dt) {
+                    x = randomXPosition();
                     y = canvasHeight + fbRadius;
                     fbArray.push(createFb(x, y));
                 }
@@ -738,6 +741,21 @@ if (!Math.log2) {
                             }
                         }
                         return false;
+                    },
+                    xShifter = function (dx) {
+                        return function (obj) {
+                            obj.x += dx;
+                        };
+                    },
+                    shiftAllOtherXs = function (dx) {
+                        var shift = xShifter(dx);
+                        game.fbs.forEach(shift);
+                        game.coins.forEach(shift);
+                        game.firebits.forEach(shift);
+                        game.platfms.forEach(function (platfm) {
+                            platfm.x0 += dx;
+                            platfm.x1 += dx;
+                        });
                     },
                     updatePlayer = function (dt) {
                         var i, platfm, playerAngle = game.player.angle(), platfmAngle, tmpVel, collided = false;
@@ -786,9 +804,14 @@ if (!Math.log2) {
                                 }
                             }
                         });
-                        game.player.x += game.player.vx * dt / 20;
-                        game.player.y += game.player.vy * dt / 20;
-                        game.player.x = modulo(game.player.x, canvasWidth);
+                        var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
+                        if (true){//(game.player.x < canvasWidth / 4 && game.player.vx < 0) || (game.player.x > canvasWidth * 3 / 4 && game.player.vx > 0)) {
+                            shiftAllOtherXs(-dx);
+                        } else {
+                            game.player.x += dx;
+                            game.player.x = modulo(game.player.x, canvasWidth);
+                        }
+                        game.player.y += dy;
                         game.player.wheelAngle += signNum(game.player.vx) * 0.15 * dt;
                     },
                     updateFbs = function (dt) {
@@ -801,8 +824,8 @@ if (!Math.log2) {
                                 game.coins.splice(index, 1);
                             }
                         });
-                        if (Math.random() < 1 / (1000 * 10/4) * dt) { // The '* 10/4' is drawn from the use of the 'likelihood' argument in 'randomly_create_x'
-                            game.coins.push(createCoin(Math.random() * canvasWidth, canvasHeight + coinRadius));
+                        if (Math.random() < 1 / (1000 * 10/4) * 4 * dt) { // The '* 10/4' is drawn from the use of the 'likelihood' argument in 'randomly_create_x'
+                            game.coins.push(createCoin(randomXPosition(), canvasHeight + coinRadius));
                         }
                     },
                     updatePlatfms = function (dt) {
@@ -851,9 +874,7 @@ if (!Math.log2) {
                         });
                     },
                     difficultyCurve = function (x) {
-                        var dtScale = Math.log2(x + 0.1) / 80 + 0.85;
-                        console.log(dtScale);
-                        return dtScale;
+                        return Math.log2(x + 0.1) / 80 + 0.85;
                     },
                     die = function () {
                         if (game.dead) { return; }
