@@ -174,12 +174,15 @@ if (typeof Math.log2 !== "function") {
         powerupX2ApproxRadius = avg(powerupX2Height / 2, pythag(powerupX2Width, powerupX2Height) / 2), // Average of the short and long radii.
         powerupSlowRadius = 10,
         activePowerupLifespan = 10000,
-        // Touch util:
+        // More util:
         isOverPauseBtn = function (xy) {
             return dist(xy.x1, xy.y1, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
         },
         isOverRestartBtn = function (xy) {
             return dist(xy.x1, xy.y1, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
+        },
+        objIsVisible = function (width, obj) {
+            return obj.x > -width && obj.x < canvasWidth + width;
         };
     // RENDER:
     var renderers = (function () {
@@ -261,9 +264,6 @@ if (typeof Math.log2 !== "function") {
                 
                 ctx.stroke();
             },
-            objIsVisible = function (width, obj) {
-                return obj.x > -width && obj.x < canvasWidth + width;
-            },
             drawFbs = function (ctx, fbs) {
                 /*var scaleFactor = 10 / 12.6, // To get it to the right size
                     ctrlX = 0,
@@ -299,7 +299,7 @@ if (typeof Math.log2 !== "function") {
                 ctx.beginPath();
                 fbs.forEach(function (fb) {
                     if (objIsVisible(2 * fbRadius, fb)) {
-                        circleAt(ctx, fb.x, fb.y, fbRadius + 1);
+                        circleAt(ctx, fb.x, fb.y, fbRadius);
                     }
                 });
                 ctx.fillStyle = "orange";
@@ -308,13 +308,13 @@ if (typeof Math.log2 !== "function") {
             drawFirebits = function (ctx, firebits, color) {
                 var i;
                 ctx.beginPath();
-                ctx.lineWidth = 1;
-                ctx.strokeStyle = color;
                 for (i = 0; i < firebits.length; i += 1) {
-                    if (objIsVisible(1.3, firebits[i])) {
-                        circleAt(ctx, firebits[i].x, firebits[i].y, 0.8);//Math.random() + 0.4);
+                    if (objIsVisible(1.4, firebits[i])) {
+                        circleAt(ctx, firebits[i].x, firebits[i].y, Math.random() + 0.4);
                     }
                 }
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = color;
                 ctx.stroke();
             },
             drawCoin = function (ctx, coin) {
@@ -430,7 +430,7 @@ if (typeof Math.log2 !== "function") {
             drawMenu = drawer(function (ctx, menu) {
                 drawBackground(ctx);
                 drawFbs(ctx, menu.fbs);
-                drawFirebits(ctx, menu.firebitsRed, "darkRed");
+                drawFirebits(ctx, menu.firebitsRed, "red");
                 drawFirebits(ctx, menu.firebitsOrg, "darkOrange");
                 drawMenuTitle();
                 drawMenuPlayBtn();
@@ -447,7 +447,7 @@ if (typeof Math.log2 !== "function") {
                     drawPreviewPlatfm(ctx, game.previewPlatfmTouch);
                 }
                 drawFbs(ctx, game.fbs);
-                drawFirebits(ctx, game.firebitsRed, "darkRed");
+                drawFirebits(ctx, game.firebitsRed, "red");
                 drawFirebits(ctx, game.firebitsOrg, "darkOrange");
                 game.coins.forEach(function (coin) {
                     drawCoin(ctx, coin);
@@ -555,10 +555,10 @@ if (typeof Math.log2 !== "function") {
                 };
             },
             createPlayer = anglify(false, function (x, y, vx, vy) {
-                return {"is": "ball", "x": x, "y": y, "vx": vx, "vy": vy, "wheelAngle": 0};
+                return {"x": x, "y": y, "vx": vx, "vy": vy, "wheelAngle": 0};
             }),
             createPlatfm = anglify(true, function (x0, y0, x1, y1) {
-                return {"is": "platfm", "x0": x0, "y0": y0, "x1": x1, "y1": y1, "time_left": 800};
+                return {"x0": x0, "y0": y0, "x1": x1, "y1": y1, "time_left": 800};
             }),
             copyTouch = function (t) {
                 return {
@@ -570,20 +570,20 @@ if (typeof Math.log2 !== "function") {
                     "y1": t.y1
                 };
             },
-            touchIsNaNMaker = function (touch) {
+            touchIsNaNMaker = function (touch) { // Returns whether or not `touch` will cause NaN to appear.
                 return touch.x0 === touch.x1 && touch.y0 === touch.y1;
             },
             createCoin = function (x, y) {
-                return {"is": "coin", "x": x, "y": y};
+                return {"x": x, "y": y};
             },
             createFb = function (x, y) {
-                return {"is": "fb", "x": x, "y": y};
+                return {"x": x, "y": y};
             },
             createFirebit = function (x, y) {
-                return {"is": "fbBit", "x": x, "y": y, "lifespan": 0};
+                return {"x": x, "y": y, "lifespan": 0};
             },
             createVel = anglify(false, function (vx, vy) {
-                return {"is": "vel", "vx": vx, "vy": vy};
+                return {"vx": vx, "vy": vy};
             }),
             createPowerup = (function () {
                 var proto = {
@@ -591,7 +591,7 @@ if (typeof Math.log2 !== "function") {
                         return this.lifetime / powerupTotalLifespan * canvasWidth;
                     },
                     xPos: function () {
-                        return this.xDistanceTravelled();// - this.offsetX;
+                        return this.xDistanceTravelled() - this.offsetX;
                     },
                     yPos: function () {
                         return this.offsetY + Math.sin(this.xDistanceTravelled() / 20) * 40;
@@ -599,12 +599,11 @@ if (typeof Math.log2 !== "function") {
                 };
                 return function (y, powerupType) {
                     // offsetX is for the scrolling effect.
-                    return makeObject(proto, {"is": "powerup", "offsetY": y, "offsetX": 0, "lifetime": 0, "type": powerupType});
+                    return makeObject(proto, {"offsetY": y, "offsetX": 0, "lifetime": 0, "type": powerupType});
                 };
             }()),
             createActivePowerup = function (type) {
                 return {
-                    "is": "activePowerup",
                     "type": type,
                     "width": type === "X2"   ? powerupX2Width :
                              type === "slow" ? powerupSlowRadius * 2 :
@@ -684,7 +683,7 @@ if (typeof Math.log2 !== "function") {
                 }
             },
             randomXPosition = function () {
-                return Math.random() * canvasWidth * 3 - canvasWidth * 1.5;
+                return Math.random() * canvasWidth * 7 - canvasWidth * 3;
             },
             makeFirebitAround = function (fbX, fbY) {
                 var relX = Math.random() * 2 * fbRadius - fbRadius,
@@ -697,9 +696,15 @@ if (typeof Math.log2 !== "function") {
                 var fbArray = Array.isArray(obj) ? obj : obj.fbs,
                     fbFirebitsRed = Array.isArray(obj) ? null : obj.firebitsRed,
                     fbFirebitsOrg = Array.isArray(obj) ? null : obj.firebitsOrg,
+                    firebitBeyondVisibility = function (firebit) { // So that when one moves left, to make a fb on the right side go offscreen, and then quickly goes back, the user doesn't notice that the firebits are temporarily depleted.
+                        return firebit.x > -fbRadius * 10 && firebit.x < canvasWidth + fbRadius * 10;
+                    },
                     x, y,
                     updateFirebits = function (firebits) {
                         firebits.forEach(function (firebit, index) {
+                            if (!firebitBeyondVisibility(firebit)) {
+                                firebits.splice(index, 1);
+                            }
                             firebit.y += Math.random() * 1.5 + 0.1;
                             firebit.x += Math.random() * 1.5 - 1;
                             firebit.lifespan += dt;
@@ -715,6 +720,7 @@ if (typeof Math.log2 !== "function") {
                     if (fb.y < -totalFbHeight) {
                         fbArray.splice(index, 1);
                     }
+                    if (!objIsVisible(2 * fbRadius, fb)) { return; }
                     if (fbFirebitsRed) {
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
