@@ -262,9 +262,10 @@ if (!Math.log2) {
                 ctx.stroke();
                 
                 // Highscores
-                ctx.font = "bold italic 24px monospace";
+                ctx.font = "bold italic 28px monospace";
                 ctx.fillText("Highscores", canvasWidth / 2, 410);
-                ctx.font = "bold 24px monospace";
+                var scoreFontSize = 24;
+                ctx.font = "bold " + scoreFontSize + "px monospace";
                 //var highest = highscores.highest().map(function (score) {
                     //return score === null ? "\u2014" : String(score); // Em-dash for empty slots
                 //});
@@ -273,7 +274,7 @@ if (!Math.log2) {
                 highscores.highest().forEach(function (score) {
                     if (!score) { return; }
                     ctx.fillText(score, canvasWidth / 2, curY);
-                    curY += 26;
+                    curY += scoreFontSize + 2;
                 });
             }),
             drawBackground = function (ctx) {
