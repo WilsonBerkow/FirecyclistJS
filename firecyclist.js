@@ -683,17 +683,21 @@ if (!Math.log2) {
                     bigD = offsetStartX * offsetEndY - offsetEndX * offsetStartY;
                 return Math.pow(rad * platLength, 2) >= bigD * bigD;
             },
+            playerHittingCircle = function (player, x, y, circleRadius) {
+                return dist(player.x, player.y, x, y) < playerRadius + circleRadius
+                    || dist(player.x, player.y - playerRadius - playerTorsoLen - playerHeadRadius, x, y) < playerHeadRadius + circleRadius;
+            },
             playerHittingFb = function (player, fb) {
-                return dist(player.x, player.y, fb.x, fb.y) < playerRadius + fbRadius;
+                return playerHittingCircle(player, fb.x, fb.y, fbRadius);
             },
             playerHittingCoin = function (player, coin) {
-                return dist(player.x, player.y, coin.x, coin.y) < playerRadius + coinRadius;
+                return playerHittingCircle(player, coin.x, coin.y, coinRadius);
             },
             playerHittingPowerup = function (player, powerup) {
                 if (powerup.type === "X2") {
-                    return dist(player.x, player.y, powerup.xPos(), powerup.yPos()) < playerRadius + powerupX2ApproxRadius;
+                    return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupX2ApproxRadius);
                 } else if (powerup.type === "slow") {
-                    return dist(player.x, player.y, powerup.xPos(), powerup.yPos()) < playerRadius + powerupSlowRadius;
+                    return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
                 }
             },
             randomXPosition = function () {
