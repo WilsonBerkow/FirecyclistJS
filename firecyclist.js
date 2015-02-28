@@ -752,6 +752,7 @@ if (!Math.log2) {
                         game.fbs.forEach(shift);
                         game.coins.forEach(shift);
                         game.firebits.forEach(shift);
+                        game.powerups.forEach(shift);
                         game.platfms.forEach(function (platfm) {
                             platfm.x0 += dx;
                             platfm.x1 += dx;
