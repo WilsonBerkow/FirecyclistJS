@@ -306,16 +306,16 @@ if (typeof Math.log2 !== "function") {
                 ctx.fill();
             },
             drawFirebits = function (ctx, firebits, color) {
-                var i;
-                ctx.beginPath();
-                for (i = 0; i < firebits.length; i += 1) {
-                    if (objIsVisible(1.4, firebits[i])) {
-                        circleAt(ctx, firebits[i].x, firebits[i].y, Math.random() + 0.4);
-                    }
-                }
-                ctx.lineWidth = 1;
-                ctx.strokeStyle = color;
-                ctx.stroke();
+                //var i;
+                //ctx.beginPath();
+                //for (i = 0; i < firebits.length; i += 1) {
+                //    if (objIsVisible(1.4, firebits[i])) {
+                //        circleAt(ctx, firebits[i].x, firebits[i].y, Math.random() + 0.4);
+                //    }
+                //}
+                //ctx.lineWidth = 1;
+                //ctx.strokeStyle = color;
+                //ctx.stroke();
             },
             drawCoin = function (ctx, coin) {
                 if (!objIsVisible(2 * coinRadius, coin)) { return; }
