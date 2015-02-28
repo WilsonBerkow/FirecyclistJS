@@ -812,7 +812,7 @@ if (!Math.log2) {
                             game.player.x = modulo(game.player.x, canvasWidth);
                         }
                         game.player.y += dy;
-                        game.player.wheelAngle += signNum(game.player.vx) * 0.15 * dt;
+                        game.player.wheelAngle += signNum(game.player.vx) * 0.2 * dt;
                     },
                     updateFbs = function (dt) {
                         updateFbsGeneric(game, dt);
