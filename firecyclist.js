@@ -912,7 +912,7 @@ if (typeof Math.log2 !== "function") {
                         });
                     },
                     difficultyCurve = function (x) {
-                        return Math.log2(x + 0.1) / 80 + 0.85;
+                        return Math.log2(x + 100) / 37 + 0.67;
                     },
                     restart = function () {
                         // The interval isn't cleared because the same interval
