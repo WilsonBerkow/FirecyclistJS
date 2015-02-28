@@ -1,8 +1,9 @@
 // (c) Wilson Berkow
 // Firecyclist.js
 
-if (!Math.log2) {
+if (typeof Math.log2 !== "function") {
     Math.log2 = function (e) {
+        "use strict";
         return Math.log(e) / Math.log(2);
     };
 }
@@ -38,7 +39,6 @@ if (!Math.log2) {
             }
         },
         calcTouchPos = function (event) {
-            var usingOriginalEvent = typeof event.clientX !== "number";
             return {
                 "x": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) / pageScaleFactor - moduleOffsetX,
                 "y": (typeof event.clientY === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor
@@ -47,34 +47,34 @@ if (!Math.log2) {
         handleTouchend,
         curTouch = null,
         highscores = (function () {
-            var highscores = [null, null, null], // Highest scores are at the beginning, null represents an empty slot.
+            var scores = [null, null, null], // Highest scores are at the beginning, null represents an empty slot.
                 fromLocal = localStorage.getItem("highscores");
             if (fromLocal !== null) {
                 fromLocal = JSON.parse(fromLocal);
                 if (fromLocal) {
-                    highscores = fromLocal;
+                    scores = fromLocal;
                 }
             }
             return {
                 highest: function (n) { // Note that the nulls of empty slots are included
                     var arr = [], i;
-                    n = n || highscores.length;
-                    for (i = 0; i < Math.min(n, highscores.length); i += 1) {
-                        arr.push(highscores[i]);
+                    n = n || scores.length;
+                    for (i = 0; i < Math.min(n, scores.length); i += 1) {
+                        arr.push(scores[i]);
                     }
                     return arr;
                 },
                 sendScore: function (score) {
                     var i, result = false;
-                    for (i = 0; i < highscores.length; i += 1) {
-                        if (score > highscores[i] || highscores[i] == null) {
-                            highscores.splice(i, 0, score);
-                            highscores.splice(highscores.length - 1, 1);
+                    for (i = 0; i < scores.length; i += 1) {
+                        if (score > scores[i] || scores[i] === null) {
+                            scores.splice(i, 0, score);
+                            scores.splice(scores.length - 1, 1);
                             result = true;
                             break;
                         }
                     }
-                    localStorage.setItem("highscores", JSON.stringify(highscores));
+                    localStorage.setItem("highscores", JSON.stringify(scores));
                     return result;
                 }
             };
@@ -102,7 +102,7 @@ if (!Math.log2) {
             };
             touchesCount += 1;
         });
-        jQuery(document).on("touchend", function (event) {
+        jQuery(document).on("touchend", function () {
             if (typeof handleTouchend === "function" && curTouch) {
                 handleTouchend(curTouch);
             }
@@ -136,13 +136,6 @@ if (!Math.log2) {
         },
         pythag = function (a, b) { return Math.sqrt(a*a + b*b); },
         dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
-        isOverPauseBtn = function (xy) {
-            return dist(xy.x1, xy.y1, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
-        },
-        isOverRestartBtn = function (xy) {
-            return dist(xy.x1, xy.y1, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
-        },
-        
         // CONFIG:
         framerate = 50,
         canvasWidth = 576 / 2,
@@ -181,8 +174,13 @@ if (!Math.log2) {
         powerupX2ApproxRadius = avg(powerupX2Height / 2, pythag(powerupX2Width, powerupX2Height) / 2), // Average of the short and long radii.
         powerupSlowRadius = 10,
         activePowerupLifespan = 10000,
-        fireRed = "rgb(230, 0, 0)";
-    
+        // Touch util:
+        isOverPauseBtn = function (xy) {
+            return dist(xy.x1, xy.y1, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
+        },
+        isOverRestartBtn = function (xy) {
+            return dist(xy.x1, xy.y1, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
+        };
     // RENDER:
     var renderers = (function () {
         var drawer = (function () {
@@ -195,106 +193,35 @@ if (!Math.log2) {
                     };
                 };
             }()),
-            gameOverlayDrawer = (function () { // Specialized version of 'drawer' for drawing game overlays like the Paused or GameOver screens.
-                var vagueify = drawer(function (ctx) {
-                    ctx.fillStyle = "rgba(200, 200, 200, 0.75)";
-                    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-                });
-                return function (f) {
-                    var overlawDrawer = drawer(f);
-                    return drawer(function (ctx, game) {
-                        var args = [].slice.apply(arguments).slice(1);
-                        drawGame(game);
-                        vagueify();
-                        overlawDrawer.apply(null, args); // 'args' includes 'game'
-                    });
-                };
-            }()),
-            drawGame = drawer(function (ctx, game) {
-                drawBackground(ctx);
-                drawPlayerAt(ctx, game.player.x, game.player.y, game.player.wheelAngle);
-                setupGenericPlatfmChars(ctx);
-                game.platfms.forEach(function (platfm) {
-                    drawPlatfm(ctx, platfm);
-                });
-                ctx.globalAlpha = 1; // Changed in platfm drawing, so must be reset
-                if (game.previewPlatfmTouch) {
-                    drawPreviewPlatfm(ctx, game.previewPlatfmTouch);
-                }
-                drawFirebits(ctx, game.firebits);
-                drawFbs(ctx, game.fbs);
-                game.coins.forEach(function (coin) {
-                    drawCoin(ctx, coin);
-                });
-                game.powerups.forEach(function (powerup) {
-                    drawPowerup(powerup.type, powerup.xPos(), powerup.yPos());
-                });
-                drawActivePowerups(game.activePowerups);
-                drawPauseBtn(ctx, game);
-                drawRestartBtn(ctx, game);
-                drawInGamePoints(game.points);
-            }),
-            drawGamePaused = gameOverlayDrawer(function (ctx, game) {
-                ctx.fillStyle = "darkOrange";
-                ctx.font = "bold 54px monospace";
-                ctx.textAlign = "center";
-                ctx.fillText("Paused", canvasWidth / 2, canvasHeight / 2 - 12);
-            }),
-            drawGameDead = gameOverlayDrawer(function (ctx, game) {
-                // 'Game Over' text
-                ctx.fillStyle = "darkOrange";
-                ctx.font = "bold italic 90px monospace";
-                ctx.textAlign = "center";
-                ctx.fillText("Game", canvasWidth / 2, 110);
-                ctx.fillText("Over", canvasWidth / 2, 195);
-                
-                // Points big
-                ctx.font = "bold 140px monospace";
-                ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvas.height * 2 / 3 - 18);
-                
-                // Line separator
+            fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
+                var clr0 = reverse ? "black" : "darkOrange",
+                    clr1 = reverse ? "darkOrange" : "black",
+                    offset = offsetAmt || 1;
+                ctx.fillStyle = clr0;
+                ctx.fillText(text, x, y);
+                ctx.fillStyle = clr1;
+                ctx.fillText(text, x + offset, y - offset);
+            },
+            circle = function (ctx, x, y, radius, color, fillOrStroke) {
                 ctx.beginPath();
-                ctx.strokeStyle = "darkOrange";
-                ctx.moveTo(30, 370);
-                ctx.lineTo(canvasWidth - 30, 370);
-                ctx.moveTo(30, 372);
-                ctx.lineTo(canvasWidth - 30, 372);
-                ctx.stroke();
-                
-                // Highscores
-                ctx.font = "bold italic 28px monospace";
-                ctx.fillText("Highscores", canvasWidth / 2, 410);
-                var scoreFontSize = 24;
-                ctx.font = "bold " + scoreFontSize + "px monospace";
-                var curY = 435;
-                highscores.highest().forEach(function (score) {
-                    if (!score) { return; }
-                    ctx.fillText(score, canvasWidth / 2, curY);
-                    curY += scoreFontSize + 2;
-                });
-            }),
+                ctx[fillOrStroke + "Style"] = color;
+                ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
+                ctx[fillOrStroke]();
+            },
+            circleAt = function (ctx, x, y, radius) {
+                ctx.moveTo(x + radius, y); // A line is always drawn from the current position to the start of the drawing of the circle, so the '+ radius' puts the brush at that point on the circle, (x+radius, y), to prevent extraneous lines from being painted.
+                ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
+            },
+            lineFromTo = function (ctx, x0, y0, x1, y1) {
+                ctx.moveTo(x0, y0);
+                ctx.lineTo(x1, y1);
+            },
             drawBackground = function (ctx) {
                 ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-                ctx.fillStyle = "rgba(175, 175, 255, 0.75)"
+                ctx.fillStyle = "rgba(175, 175, 255, 0.75)";
                 ctx.fillRect(0, 0, canvasWidth, canvasHeight);
             },
-            drawPlayerAt = function (ctx, x, y, angle) {
-                ctx.beginPath();
-                circleAt(ctx, x, y - playerTorsoLen - playerRadius - playerHeadRadius, playerHeadRadius, 0, 2 * Math.PI, true);
-                ctx.moveTo(x, y - playerTorsoLen - playerRadius);
-                ctx.lineTo(x, y); // (x, y) is the center of the wheel
-                
-                ctx.save();
-                ctx.translate(x, y - playerRadius - playerTorsoLen / 2);
-                oneArm(ctx, x, y);
-                oneArm(ctx, x, y, true);
-                ctx.restore();
-                
-                wheelAt(ctx, x, y, angle);
-                
-                ctx.stroke();
-            },
-            oneArm = function (ctx, x, y, reverse) {
+            oneArm = function (ctx, reverse) {
                 if (reverse) {
                     ctx.scale(-1, -1);
                 }
@@ -318,20 +245,35 @@ if (!Math.log2) {
                 }
                 ctx.restore();
             },
+            drawPlayerAt = function (ctx, x, y, angle) {
+                ctx.beginPath();
+                circleAt(ctx, x, y - playerTorsoLen - playerRadius - playerHeadRadius, playerHeadRadius, 0, 2 * Math.PI, true);
+                ctx.moveTo(x, y - playerTorsoLen - playerRadius);
+                ctx.lineTo(x, y); // (x, y) is the center of the wheel
+                
+                ctx.save();
+                ctx.translate(x, y - playerRadius - playerTorsoLen / 2);
+                oneArm(ctx);
+                oneArm(ctx, true);
+                ctx.restore();
+                
+                wheelAt(ctx, x, y, angle);
+                
+                ctx.stroke();
+            },
             objIsVisible = function (width, obj) {
                 return obj.x > -width && obj.x < canvasWidth + width;
             },
             drawFbs = function (ctx, fbs) {
                 var scaleFactor = 10 / 12.6, // To get it to the right size
-                    ctrlX = 0 * scaleFactor,
+                    ctrlX = 0,
                     ctrlY = 19 * scaleFactor,
                     curveEndY = 19 * scaleFactor - ctrlY,
-                    curveXMiddle = ctrlX,
                     curveRightestEndX = 11.9 * scaleFactor,
                     curveLeftestEndX = -11.9 * scaleFactor,
                     curveTipY = ctrlY + 9 * scaleFactor,
                     radius = 12.6 * scaleFactor;
-                var triColor = "darkRed", ballColor = "darkRed";
+                var triColor = "darkRed";
                 ctx.beginPath();
                 fbs.forEach(function (fb) {
                     if (!objIsVisible(2 * fbRadius, fb)) { return; }
@@ -401,7 +343,7 @@ if (!Math.log2) {
             drawPauseBtn = function (ctx, game) {
                 var colory = !game.dead && (game.paused || (curTouch && isOverPauseBtn(curTouch)));
                 ctx.beginPath();
-                ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
+                ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)";
                 ctx.arc(pauseBtnCenterX, pauseBtnCenterY, pauseBtnRadius, 0, 2 * Math.PI, true);
                 ctx.fill();
                 ctx.font = "bold " + pxSize + "px arial";
@@ -423,7 +365,7 @@ if (!Math.log2) {
                 return function (ctx, game) {
                     var colory = !game.dead && !game.paused && curTouch && isOverRestartBtn(curTouch);
                     ctx.beginPath();
-                    ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)"
+                    ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)";
                     ctx.arc(restartBtnCenterX, restartBtnCenterY, restartBtnRadius, 0, 2 * Math.PI, true);
                     ctx.fill();
                     if (colory) {
@@ -464,36 +406,6 @@ if (!Math.log2) {
                     xPos += actives[i].width;
                 }
             }),
-            fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
-                var clr0 = reverse ? "black" : "darkOrange",
-                    clr1 = reverse ? "darkOrange" : "black",
-                    offset = offsetAmt || 1;
-                ctx.fillStyle = clr0;
-                ctx.fillText(text, x, y);
-                ctx.fillStyle = clr1;
-                ctx.fillText(text, x + offset, y - offset);
-            },
-            circle = function (ctx, x, y, radius, color, fillOrStroke) {
-                ctx.beginPath();
-                ctx[fillOrStroke + "Style"] = color;
-                ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
-                ctx[fillOrStroke]();
-            },
-            circleAt = function (ctx, x, y, radius) {
-                ctx.moveTo(x + radius, y); // A line is always drawn from the current position to the start of the drawing of the circle, so the '+ radius' puts the brush at that point on the circle, (x+radius, y), to prevent extraneous lines from being painted.
-                ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
-            },
-            lineFromTo = function (ctx, x0, y0, x1, y1) {
-                ctx.moveTo(x0, y0);
-                ctx.lineTo(x1, y1);
-            },
-            drawMenu = drawer(function (ctx, menu) {
-                drawBackground(ctx);
-                drawFirebits(ctx, menu.firebits);
-                drawFbs(ctx, menu.fbs);
-                drawMenuTitle();
-                drawMenuPlayBtn();
-            }),
             drawMenuTitle = drawer(function (ctx) {
                 ctx.font = "italic bold 170px arial";
                 ctx.textAlign = "center";
@@ -501,55 +413,117 @@ if (!Math.log2) {
                 ctx.font = "italic bold 95px arial";
                 fillShadowyText(ctx, "cyclist", canvasWidth / 2 - 3, 240, true, 2);
             }),
-            roundedRect = function (ctx, x, y, width, height, radius, fillOrStroke) { // Based on function by Juan Mendes at http://stackoverflow.com/questions/1255512/how-to-draw-a-rounded-rectangle-on-html-canvas
-                ctx.beginPath();
-                ctx.moveTo(x + radius, y);
-                ctx.lineTo(x + width - radius, y);
-                ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-                ctx.lineTo(x + width, y + height - radius);
-                ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-                ctx.lineTo(x + radius, y + height);
-                ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-                ctx.lineTo(x, y + radius);
-                ctx.quadraticCurveTo(x, y, x + radius, y);
-                ctx.closePath();
-                ctx[fillOrStroke]();
-            },
             drawMenuPlayBtn = drawer(function (ctx) {
                 ctx.font = "italic bold 54px monospace";
                 ctx.textAlign = "center";
                 ctx.fillStyle = "rgb(150, 140, 130)";
                 ctx.fillText("Play", menuPlayBtnX, menuPlayBtnY, menuPlayBtnW, menuPlayBtnH);
+            }),
+            drawMenu = drawer(function (ctx, menu) {
+                drawBackground(ctx);
+                drawFirebits(ctx, menu.firebits);
+                drawFbs(ctx, menu.fbs);
+                drawMenuTitle();
+                drawMenuPlayBtn();
+            }),
+            drawGame = drawer(function (ctx, game) {
+                drawBackground(ctx);
+                drawPlayerAt(ctx, game.player.x, game.player.y, game.player.wheelAngle);
+                setupGenericPlatfmChars(ctx);
+                game.platfms.forEach(function (platfm) {
+                    drawPlatfm(ctx, platfm);
+                });
+                ctx.globalAlpha = 1; // Changed in platfm drawing, so must be reset
+                if (game.previewPlatfmTouch) {
+                    drawPreviewPlatfm(ctx, game.previewPlatfmTouch);
+                }
+                drawFirebits(ctx, game.firebits);
+                drawFbs(ctx, game.fbs);
+                game.coins.forEach(function (coin) {
+                    drawCoin(ctx, coin);
+                });
+                game.powerups.forEach(function (powerup) {
+                    drawPowerup(powerup.type, powerup.xPos(), powerup.yPos());
+                });
+                drawActivePowerups(game.activePowerups);
+                drawPauseBtn(ctx, game);
+                drawRestartBtn(ctx, game);
+                drawInGamePoints(game.points);
+            }),
+            gameOverlayDrawer = (function () { // Specialized version of 'drawer' for drawing game overlays like the Paused or GameOver screens.
+                var vagueify = drawer(function (ctx) {
+                    ctx.fillStyle = "rgba(200, 200, 200, 0.75)";
+                    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+                });
+                return function (f) {
+                    var overlawDrawer = drawer(f);
+                    return drawer(function (ctx, game) {
+                        var args = [].slice.apply(arguments).slice(1);
+                        drawGame(game);
+                        vagueify();
+                        overlawDrawer.apply(null, args); // 'args' includes 'game'
+                    });
+                };
+            }()),
+            drawGamePaused = gameOverlayDrawer(function (ctx, game) {
+                ctx.fillStyle = "darkOrange";
+                ctx.font = "bold 54px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText("Paused", canvasWidth / 2, canvasHeight / 2 - 12);
+            }),
+            drawGameDead = gameOverlayDrawer(function (ctx, game) {
+                // 'Game Over' text
+                ctx.fillStyle = "darkOrange";
+                ctx.font = "bold italic 90px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText("Game", canvasWidth / 2, 110);
+                ctx.fillText("Over", canvasWidth / 2, 195);
+                
+                // Points big
+                ctx.font = "bold 140px monospace";
+                ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvasHeight * 2 / 3 - 18);
+                
+                // Line separator
+                ctx.beginPath();
+                ctx.strokeStyle = "darkOrange";
+                ctx.moveTo(30, 370);
+                ctx.lineTo(canvasWidth - 30, 370);
+                ctx.moveTo(30, 372);
+                ctx.lineTo(canvasWidth - 30, 372);
+                ctx.stroke();
+                
+                // Highscores
+                ctx.font = "bold italic 28px monospace";
+                ctx.fillText("Highscores", canvasWidth / 2, 410);
+                var scoreFontSize = 24;
+                ctx.font = "bold " + scoreFontSize + "px monospace";
+                var curY = 435;
+                highscores.highest().forEach(function (score) {
+                    if (!score) { return; }
+                    ctx.fillText(score, canvasWidth / 2, curY);
+                    curY += scoreFontSize + 2;
+                });
             });
         return [drawGame, drawGamePaused, drawGameDead, drawMenu];
     }());
     var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawMenu = renderers[3];
     
     // PLAY:
-    var playGame = (function (drawFns) {
+    var playGame = (function () {
         var // MODEL + CALC:
             anglify = function (doCalc, f) {
                 var proto = {
                     angle: function () {
-                        if (doCalc) {
-                            return Math.atan2(this.y1 - this.y0, this.x1 - this.x0);
-                        } else {
-                            return Math.atan2(this.vy, this.vx);
-                        }
+                        return doCalc ? Math.atan2(this.y1 - this.y0, this.x1 - this.x0)
+                                      : Math.atan2(this.vy, this.vx);
                     },
                     magnitude: function () {
-                        if (doCalc) {
-                            return dist(this.x0, this.y0, this.x1, this.y1);
-                        } else {
-                            return pythag(this.vx, this.vy);
-                        }
+                        return doCalc ? dist(this.x0, this.y0, this.x1, this.y1)
+                                      : pythag(this.vx, this.vy);
                     },
                     slope: function () {
-                        if (doCalc) {
-                            return (this.y1 - this.y0) / (this.x1 - this.x0);
-                        } else {
-                            return this.vy / this.vx;
-                        }
+                        return doCalc ? (this.y1 - this.y0) / (this.x1 - this.x0)
+                                      : this.vy / this.vx;
                     }
                 };
                 if (!doCalc) {
@@ -576,9 +550,6 @@ if (!Math.log2) {
             createPlatfm = anglify(true, function (x0, y0, x1, y1) {
                 return {"is": "platfm", "x0": x0, "y0": y0, "x1": x1, "y1": y1, "time_left": 800};
             }),
-            touchToPlatfm = function (touch) {
-                return createPlatfm(touch.x0, touch.y0, touch.x1, touch.y1);
-            },
             copyTouch = function (t) {
                 return {
                     "t0": t.t0,
@@ -590,7 +561,7 @@ if (!Math.log2) {
                 };
             },
             touchIsNaNMaker = function (touch) {
-                return touch.x0 === touch.x1 && touch.y0 === touch.y1
+                return touch.x0 === touch.x1 && touch.y0 === touch.y1;
             },
             createCoin = function (x, y) {
                 return {"is": "coin", "x": x, "y": y};
@@ -696,7 +667,8 @@ if (!Math.log2) {
             playerHittingPowerup = function (player, powerup) {
                 if (powerup.type === "X2") {
                     return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupX2ApproxRadius);
-                } else if (powerup.type === "slow") {
+                }
+                if (powerup.type === "slow") {
                     return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
                 }
             },
@@ -706,7 +678,7 @@ if (!Math.log2) {
             makeFirebitAround = function (fbX, fbY) {
                 var x = fbX + Math.random() * 1.5 * fbRadius - 0.75*fbRadius,
                     y = fbY + Math.random() * fbRadius;
-                return createFirebit(x, fbY);
+                return createFirebit(x, y);
             },
             updateFbsGeneric = function (obj, dt) { // This is used in both playGame and runMenu, and thus must be declared here.
                 var fbArray = Array.isArray(obj) ? obj : obj.fbs,
@@ -739,9 +711,16 @@ if (!Math.log2) {
             },
             
             // PLAY:
-            playGame = function () {
+            play = function () {
                 var
                     game = createGame(),
+                    die = function () {
+                        if (game.dead) { return; }
+                        game.dead = true;
+                        if (game.previewPlatfmTouch) {
+                            game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
+                        }
+                    },
                     handleActivesPoints = function ($$$) {
                         var i;
                         for (i = 0; i < game.activePowerups.length; i += 1) {
@@ -777,7 +756,7 @@ if (!Math.log2) {
                         });
                     },
                     updatePlayer = function (dt) {
-                        var i, platfm, playerAngle = game.player.angle(), platfmAngle, tmpVel, collided = false;
+                        var i, platfm, tmpVel, collided = false;
                         if (game.player.y > canvasHeight + playerRadius) {
                             die();
                             // The frame finishes, with all other components also
@@ -787,11 +766,7 @@ if (!Math.log2) {
                         }
                         for (i = 0; i < game.platfms.length; i += 1) {
                             platfm = game.platfms[i];
-                            platfmAngle = platfm.angle();
                             if (playerIntersectingPlatfm(game.player, platfm)) {
-                                //game.player.setAngle(2 * platfmAngle - playerAngle);
-                                //game.player.scaleMagnitude(Math.sqrt(Math.sqrt(playerAngle / modulo(-1 / platfmAngle, 2 * Math.PI))));
-                                //game.platfms.splice(i, 1);
                                 tmpVel = velFromPlatfm(dt, game.player, platfm);
                                 game.player.vx = tmpVel.x;
                                 game.player.vy = tmpVel.y;
@@ -807,7 +782,6 @@ if (!Math.log2) {
                             }
                         }
                         game.coins.forEach(function (coin, index) {
-                            var i;
                             if (playerHittingCoin(game.player, coin)) {
                                 game.coins.splice(index, 1);
                                 game.points += handleActivesPoints(coinValue);
@@ -824,12 +798,7 @@ if (!Math.log2) {
                             }
                         });
                         var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
-                        if (true){//(game.player.x < canvasWidth / 4 && game.player.vx < 0) || (game.player.x > canvasWidth * 3 / 4 && game.player.vx > 0)) {
-                            shiftAllOtherXs(-dx);
-                        } else {
-                            game.player.x += dx;
-                            game.player.x = modulo(game.player.x, canvasWidth);
-                        }
+                        shiftAllOtherXs(-dx);
                         game.player.y += dy;
                         game.player.wheelAngle += signNum(game.player.vx) * 0.2 * dt;
                     },
@@ -895,22 +864,14 @@ if (!Math.log2) {
                     difficultyCurve = function (x) {
                         return Math.log2(x + 0.1) / 80 + 0.85;
                     },
-                    die = function () {
-                        if (game.dead) { return; }
-                        game.dead = true;
-                        if (game.previewPlatfmTouch) {
-                            game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
-                        }
-                    },
                     restart = function () {
-                        // intervalId isn't cleared because the same interval is
-                        // used for the next game (after the restart).
+                        // The interval isn't cleared because the same interval
+                        // is used for the next game (after the restart).
                         game = createGame();
                     },
-                    prevFrameTime = Date.now(),
-                    intervalId;
+                    prevFrameTime = Date.now();
                 window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
-                intervalId = setInterval(function () {
+                setInterval(function () {
                     // Handle time (necessary, regardless of pausing)
                     var now = Date.now(), realDt = now - prevFrameTime, dt;
                     realDt *= difficultyCurve(game.points);
@@ -953,7 +914,6 @@ if (!Math.log2) {
                     }
                 }, 1000 / framerate);
                 handleTouchend = function (touch) {
-                    var tx0 = touch.x0;
                     if (!game.paused && !game.dead) {
                         tryToAddPlatfmFromTouch(touch);
                     }
@@ -995,9 +955,9 @@ if (!Math.log2) {
                     updateFbs(dt);
                     drawMenu(menu);
                 }, 1000 / framerate);
-                jQuery(document).one("click", function (event) {
+                jQuery(document).one("click", function () {
                     clearInterval(intervalId);
-                    playGame();
+                    play();
                 });
             };
         return runMenu;
