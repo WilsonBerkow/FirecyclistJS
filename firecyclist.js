@@ -315,35 +315,44 @@ if (!Math.log2) {
                 ctx.restore();
             },
             drawFbs = function (ctx, fbs) {
+                var scaleFactor = 10 / 12.6, // To get it to the right size
+                    ctrlX = 0 * scaleFactor,
+                    ctrlY = 19 * scaleFactor,
+                    curveEndY = 19 * scaleFactor - ctrlY,
+                    curveXMiddle = ctrlX,
+                    curveRightestEndX = 11.9 * scaleFactor,
+                    curveLeftestEndX = -11.9 * scaleFactor,
+                    curveTipY = ctrlY + 9 * scaleFactor,
+                    radius = 12.6 * scaleFactor;
+                var triColor = "darkRed", ballColor = "darkRed";
                 ctx.beginPath();
-                ctx.strokeStyle = fireRed;
                 fbs.forEach(function (fb) {
-                    circleAt(ctx, fb.x, fb.y, fbRadius);
+                    ctx.moveTo(fb.x + ctrlX, fb.y + curveTipY);
+                    ctx.quadraticCurveTo(fb.x + ctrlX, fb.y + ctrlY, fb.x + curveRightestEndX, fb.y + curveEndY);
+                    ctx.moveTo(fb.x + ctrlX, fb.y + curveTipY);
+                    ctx.quadraticCurveTo(fb.x + ctrlX, fb.y + ctrlY, fb.x + curveLeftestEndX, fb.y + curveEndY);
                 });
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = triColor;
                 ctx.stroke();
-                // 
                 ctx.beginPath();
-                ctx.fillStyle = fireRed;
                 fbs.forEach(function (fb) {
-                    ctx.moveTo(fb.x - fbRadius + 2, fb.y + fbRadius / 2);
-                    ctx.lineTo(fb.x, fb.y + fbRadius * 2);
-                    ctx.lineTo(fb.x + fbRadius - 2, fb.y + fbRadius / 2);
+                    ctx.moveTo(fb.x + ctrlX, fb.y + curveTipY - 4 * scaleFactor);
+                    ctx.lineTo(fb.x + 9 * scaleFactor, fb.y + curveEndY);
+                    ctx.lineTo(fb.x - 9 * scaleFactor, fb.y + curveEndY);
+                    ctx.closePath();
+                    ctx.arc(fb.x, fb.y, radius, 0, Math.PI * 2, true);
                 });
-                ctx.fill();
-                ctx.beginPath();
-                ctx.fillStyle = "orange";
-                fbs.forEach(function (fb) {
-                    circleAt(ctx, fb.x, fb.y, fbRadius - 1/2);
-                });
+                ctx.fillStyle = triColor;
                 ctx.fill();
             },
             drawFirebits = function (ctx, firebits) {
                 var i;
                 ctx.beginPath();
                 ctx.lineWidth = 1;
-                ctx.strokeStyle = fireRed;
+                ctx.strokeStyle = "darkOrange";
                 for (i = 0; i < firebits.length; i += 1) {
-                    circleAt(ctx, firebits[i].x, firebits[i].y, Math.random());
+                    circleAt(ctx, firebits[i].x, firebits[i].y, Math.random() + 0.3);
                 }
                 ctx.stroke();
             },
@@ -694,8 +703,8 @@ if (!Math.log2) {
                 });
                 console.info("fb.firebits is... " + fbFirebits + JSON.stringify(fbFirebits));
                 (fbFirebits || []).forEach(function (firebit, index) {
-                    firebit.y += Math.random() * 2 + 0.1;
-                    firebit.x += Math.random() * 2 - 1;
+                    firebit.y += Math.random() * 1.5 + 0.1;
+                    firebit.x += Math.random() * 1.5 - 1;
                     firebit.lifetime -= dt;
                     if (firebit.lifetime <= 0 || firebit.y > canvasHeight || firebit.x < 0 || firebit.x > canvasWidth) {
                         fbFirebits.splice(index, 1);
