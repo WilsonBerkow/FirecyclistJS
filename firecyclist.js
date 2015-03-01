@@ -629,9 +629,10 @@ if (typeof Math.log2 !== "function") {
             createActivePowerup = function (type) {
                 return {
                     "type": type,
-                    "width": type === "X2"   ? powerupX2Width :
-                             type === "slow" ? powerupSlowRadius * 2 :
-                             0,
+                    "width": type === "X2"     ? powerupX2Width :
+                             type === "slow"   ? powerupSlowRadius * 2 :
+                             type === "weight" ? 40 :
+                             40,
                     "lifetime": type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan,
                 }; // TODO: INCLUDE srcX, srcY, timeSinceAcquired FOR ANIMATIONS
             },
