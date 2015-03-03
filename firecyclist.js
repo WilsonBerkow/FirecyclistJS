@@ -1003,7 +1003,7 @@ if (typeof Math.log2 !== "function") {
                         if (Math.random() < 1 / 75000 * dt) {
                             game.powerups.push(makePowerupRandom("weight", 25, 145));
                         }
-                        if (Math.random() < 1 / 7500 * dt) {
+                        if (Math.random() < 1 / 75000 * dt) {
                             game.powerups.push(makePowerupRandom("magnet", 25, 145));
                         }
                     },
