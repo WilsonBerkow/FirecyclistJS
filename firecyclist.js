@@ -386,12 +386,12 @@ if (typeof Math.log2 !== "function") {
                     }
                 };
             }()),
-            drawInGamePoints = drawer(function (ctx, points) {
+            drawInGamePoints = function (ctx, points) {
                 ctx.textAlign = "center";
                 ctx.font = "bold " + inGamePointsPxSize + "px Consolas";
                 fillShadowyText(ctx, Math.floor(points), canvasWidth / 2, inGamePointsYPos);
-            }),
-            drawPowerup = drawer(function (ctx, type, x, y) {
+            },
+            drawPowerup = function (ctx, type, x, y) {
                 if (type === "X2") {
                     ctx.fillStyle = "gold";
                     ctx.font = "italic 26px Consolas";
@@ -429,15 +429,27 @@ if (typeof Math.log2 !== "function") {
                     ctx.fillStyle = "lightGrey";
                     ctx.textAlign = "center";
                     ctx.fillText("1000", x, y + 10, 28, 8);
+                } else if (type === "magnet") {
+                    ctx.beginPath();
+                    ctx.arc(x, y, powerupSlowRadius, 0, Math.PI, true);
+                    ctx.strokeStyle = "red";
+                    ctx.lineWidth = 10;
+                    ctx.stroke();
+                    ctx.fillStyle = "red";
+                    ctx.fillRect(x - powerupSlowRadius - 5, y, 10, 5);
+                    ctx.fillRect(x + powerupSlowRadius - 5, y, 10, 5);
+                    ctx.fillStyle = "white";
+                    ctx.fillRect(x - powerupSlowRadius - 5, y + 5, 10, 6);
+                    ctx.fillRect(x + powerupSlowRadius - 5, y + 5, 10, 6);
                 }
-            }),
-            drawActivePowerups = drawer(function (ctx, actives) {
+            },
+            drawActivePowerups = function (ctx, actives) {
                 var xPos = canvasWidth / 2 + inGamePointsPxSize, yPos = inGamePointsYPos, i;
                 for (i = actives.length - 1; i >= 0; i -= 1) { // Start with the last activepowerups, which have been around the longest.
-                    drawPowerup(actives[i].type, xPos, yPos);
+                    drawPowerup(ctx, actives[i].type, xPos, yPos);
                     xPos += actives[i].width;
                 }
-            }),
+            },
             drawMenuTitle = drawer(function (ctx) {
                 ctx.font = "italic bold 170px arial";
                 ctx.textAlign = "center";
@@ -477,24 +489,24 @@ if (typeof Math.log2 !== "function") {
                     drawCoin(ctx, coin);
                 });
                 game.powerups.forEach(function (powerup) {
-                    drawPowerup(powerup.type, powerup.xPos(), powerup.yPos());
+                    drawPowerup(ctx, powerup.type, powerup.xPos(), powerup.yPos());
                 });
-                drawActivePowerups(game.activePowerups);
+                drawActivePowerups(ctx, game.activePowerups);
                 drawPauseBtn(ctx, game);
                 drawRestartBtn(ctx, game);
-                drawInGamePoints(game.points);
+                drawInGamePoints(ctx, game.points);
             }),
             gameOverlayDrawer = (function () { // Specialized version of 'drawer' for drawing game overlays like the Paused or GameOver screens.
-                var vagueify = drawer(function (ctx) {
+                var vagueify = function (ctx) {
                     ctx.fillStyle = "rgba(200, 200, 200, 0.75)";
                     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-                });
+                };
                 return function (f) {
                     var overlawDrawer = drawer(f);
                     return drawer(function (ctx, game) {
                         var args = [].slice.apply(arguments).slice(1);
                         drawGame(game);
-                        vagueify();
+                        vagueify(ctx);
                         overlawDrawer.apply(null, args); // 'args' includes 'game'
                     });
                 };
@@ -578,6 +590,34 @@ if (typeof Math.log2 !== "function") {
                     return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
                 };
             },
+            withAngularCtrls = (function () {
+                var proto = {
+                        "angleTo": function (xy) {
+                            return Math.atan2(xy.y - this.y, xy.x - this.x);
+                        },
+                        "distanceTo": function (xy) {
+                            return dist(this.x, this.y, xy.x, xy.y);
+                        },
+                        "setDistanceTo": function (xy, newd) {
+                            var angleTo = this.angleTo(xy),
+                                distTo = this.distanceTo(xy),
+                                vectorFromPlayer = createVel(this.x - xy.x, this.y - xy.y),
+                                newAbsoluteVector;
+                            if (Number.isNaN(distTo + vectorFromPlayer.vx)) {
+                                throw "YO BITCH ITS NAN";
+                            }
+                            vectorFromPlayer.setMagnitude(newd);
+                            newAbsoluteVector = createVel(xy.x + vectorFromPlayer.vx, xy.y + vectorFromPlayer.vy);
+                            this.x = newAbsoluteVector.vx;
+                            this.y = newAbsoluteVector.vy;
+                        }
+                    };
+                return function (f) {
+                    return function () {
+                        return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
+                    };
+                };
+            }()),
             createPlayer = anglify(false, function (x, y, vx, vy) {
                 return {"x": x, "y": y, "vx": vx, "vy": vy, "wheelAngle": 0};
             }),
@@ -597,9 +637,9 @@ if (typeof Math.log2 !== "function") {
             touchIsNaNMaker = function (touch) { // Returns whether or not `touch` will cause NaN to appear.
                 return touch.x0 === touch.x1 && touch.y0 === touch.y1;
             },
-            createCoin = function (x, y) {
+            createCoin = withAngularCtrls(function (x, y) {
                 return {"x": x, "y": y};
-            },
+            }),
             createFb = function (x, y) {
                 return {"x": x, "y": y};
             },
@@ -632,6 +672,7 @@ if (typeof Math.log2 !== "function") {
                     "width": type === "X2"     ? powerupX2Width :
                              type === "slow"   ? powerupSlowRadius * 2 :
                              type === "weight" ? 40 :
+                             type === "magnet" ? powerupSlowRadius * 2 + 15 :
                              40,
                     "lifetime": type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan,
                 }; // TODO: INCLUDE srcX, srcY, timeSinceAcquired FOR ANIMATIONS
@@ -709,6 +750,9 @@ if (typeof Math.log2 !== "function") {
                 if (powerup.type === "weight") {
                     return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), 15); // TODO: MAKE PLAYER_HITTING_RECT FUNCTION
                 }
+                if (powerup.type === "magnet") {
+                    return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
+                }
             },
             randomXPosition = function () {
                 return Math.random() * canvasWidth * 7 - canvasWidth * 3;
@@ -755,8 +799,8 @@ if (typeof Math.log2 !== "function") {
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                        //fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
+                        //fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
@@ -823,6 +867,15 @@ if (typeof Math.log2 !== "function") {
                             obj.x += dx;
                         };
                     },
+                    magnetObtained = function () {
+                        var i;
+                        for (i = 0; i < game.activePowerups.length; i += 1) {
+                            if (game.activePowerups[i].type === "magnet") {
+                                return true;
+                            }
+                        }
+                        return false;
+                    },
                     shiftAllOtherXs = function (dx) {
                         var shift = xShifter(dx);
                         game.fbs.forEach(shift);
@@ -877,13 +930,7 @@ if (typeof Math.log2 !== "function") {
                         game.powerups.forEach(function (powerup, index) {
                             if (playerHittingPowerup(game.player, powerup)) {
                                 game.powerups.splice(index, 1);
-                                if (powerup.type === "X2") {
-                                    game.activePowerups.push(createActivePowerup("X2"));
-                                } else if (powerup.type === "slow") {
-                                    game.activePowerups.push(createActivePowerup("slow"));
-                                } else if (powerup.type === "weight") {
-                                    game.activePowerups.push(createActivePowerup("weight"));
-                                }
+                                game.activePowerups.push(createActivePowerup(powerup.type));
                             }
                         });
                         var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
@@ -895,14 +942,26 @@ if (typeof Math.log2 !== "function") {
                         updateFbsGeneric(game, dt);
                     },
                     updateCoins = function (dt) {
+                        var magnetOn = magnetObtained(), dist;
                         game.coins.forEach(function (coin, index) {
                             coin.y -= coinFallRate * dt;
+                            if (magnetOn) {
+                                dist = coin.distanceTo(game.player);
+                                if (dist < 100 && dist !== 0) {
+                                    coin.setDistanceTo(game.player, dist - (100 / dist));
+                                }
+                            }
                             if (coin.y < -2 * coinRadius) {
                                 game.coins.splice(index, 1);
                             }
                         });
                         if (Math.random() < 1 / (1000 * 10/4) * 4 * dt) { // The '* 10/4' is drawn from the use of the 'likelihood' argument in 'randomly_create_x'
-                            game.coins.push(createCoin(randomXPosition(), canvasHeight + coinRadius));
+                            game.coins.push(
+                                createCoin(
+                                    randomXPosition(),
+                                    canvasHeight + coinRadius
+                                )
+                            );
                         }
                     },
                     updatePlatfms = function (dt) {
@@ -943,6 +1002,9 @@ if (typeof Math.log2 !== "function") {
                         }
                         if (Math.random() < 1 / 75000 * dt) {
                             game.powerups.push(makePowerupRandom("weight", 25, 145));
+                        }
+                        if (Math.random() < 1 / 7500 * dt) {
+                            game.powerups.push(makePowerupRandom("magnet", 25, 145));
                         }
                     },
                     updateActivePowerups = function (dt) {
