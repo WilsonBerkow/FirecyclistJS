@@ -358,6 +358,8 @@ if (typeof Math.log2 !== "function") {
                 ctx.arc(pauseBtnCenterX, pauseBtnCenterY, pauseBtnRadius, 0, 2 * Math.PI, true);
                 ctx.fill();
                 ctx.font = "bold " + pxSize + "px arial";
+                ctx.textAlign = "left";
+                console.log(ctx);
                 fillShadowyText(ctx, "II", 15, 15 + pxSize / 2, colory);
             },
             offCanvImg = function (w, h, src) {
@@ -417,6 +419,7 @@ if (typeof Math.log2 !== "function") {
                     ctx.lineTo(x - 20, y + 12);
                     ctx.fillStyle = "black";
                     ctx.fill();
+                    
                     ctx.beginPath();
                     ctx.moveTo(x - 10, y - 12);
                     ctx.lineTo(x - 6, y - 17);
@@ -425,6 +428,7 @@ if (typeof Math.log2 !== "function") {
                     ctx.lineWidth = 2;
                     ctx.strokeStyle = "black";
                     ctx.stroke();
+                    
                     ctx.font = "bold 30px Courier New";
                     ctx.fillStyle = "lightGrey";
                     ctx.textAlign = "center";
@@ -677,22 +681,41 @@ if (typeof Math.log2 !== "function") {
                     "lifetime": type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan,
                 }; // TODO: INCLUDE srcX, srcY, timeSinceAcquired FOR ANIMATIONS
             },
-            createGame = function () {
-                return {
-                    "player": createPlayer(canvasWidth / 2, 50, 0, 0),
-                    "platfms": [],
-                    "previewPlatfmTouch": null,
-                    "fbs": [],
-                    "firebitsRed": [],
-                    "firebitsOrg": [],
-                    "coins": [],
-                    "powerups": [],
-                    "activePowerups": [],
-                    "points": 0,
-                    "paused": false,
-                    "dead": false
+            simpleIterable = function (propsToIter) {
+                var proto = {
+                    "forEach": function (f) {
+                        var obj = this;
+                        propsToIter.forEach(function (prop) {
+                            var val = obj[prop];
+                            if (val !== undefined && val !== null) {
+                                f(val, prop);
+                            }
+                        });
+                    }
+                };
+                return function (props) {
+                    return makeObject(proto, props);
                 };
             },
+            createGame = (function () {
+                var mkPowerupsObj = simpleIterable(["X2", "slow", "weight", "magnet"]);
+                return function () {
+                    return {
+                        "player": createPlayer(canvasWidth / 2, 50, 0, 0),
+                        "platfms": [],
+                        "previewPlatfmTouch": null,
+                        "fbs": [],
+                        "firebitsRed": [],
+                        "firebitsOrg": [],
+                        "coins": [],
+                        "powerups": mkPowerupsObj({}),
+                        "activePowerups": [],
+                        "points": 0,
+                        "paused": false,
+                        "dead": false
+                    };
+                };
+            }()),
             signNum = function (num) {
                 return num > 0 ? 1 :
                        num < 0 ? -1 :
@@ -927,9 +950,9 @@ if (typeof Math.log2 !== "function") {
                                 game.points += handleActivesPoints(coinValue);
                             }
                         });
-                        game.powerups.forEach(function (powerup, index) {
+                        game.powerups.forEach(function (powerup, key) {
                             if (playerHittingPowerup(game.player, powerup)) {
-                                game.powerups.splice(index, 1);
+                                game.powerups[key] = null;
                                 game.activePowerups.push(createActivePowerup(powerup.type));
                             }
                         });
@@ -988,23 +1011,23 @@ if (typeof Math.log2 !== "function") {
                         return createPowerup(Math.random() * range + start, type);
                     },
                     updatePowerups = function (dt) {
-                        game.powerups.forEach(function (powerup, index) {
+                        game.powerups.forEach(function (powerup, key) {
                             powerup.lifetime += dt;
                             if (powerup.xPos() > canvasWidth + 20) { // 20 is just a random margin to be safe
-                                game.powerups.splice(index, 1);
+                                game.powerups[key] = null;
                             }
                         });
-                        if (Math.random() < 1 / 75000 * dt) { // 100 times less frequent than fireballs
-                            game.powerups.push(makePowerupRandom("X2", 25, 145));
+                        if (!game.powerups.X2 && Math.random() < 1 / 75000 * dt) { // 100 times less frequent than fireballs
+                            game.powerups.X2 = makePowerupRandom("X2", 25, 145);
                         }
-                        if (Math.random() < 1 / 75000 * dt) {
-                            game.powerups.push(makePowerupRandom("slow", 25, 145));
+                        if (!game.powerups.slow && Math.random() < 1 / 75000 * dt) {
+                            game.powerups.slow = makePowerupRandom("slow", 25, 145);
                         }
-                        if (Math.random() < 1 / 75000 * dt) {
-                            game.powerups.push(makePowerupRandom("weight", 25, 145));
+                        if (!game.powerups.weight && game.points > 50 && Math.random() < 1 / 75000 * dt) {
+                            game.powerups.weight = makePowerupRandom("weight", 25, 145);
                         }
-                        if (Math.random() < 1 / 75000 * dt) {
-                            game.powerups.push(makePowerupRandom("magnet", 25, 145));
+                        if (!game.powerups.magnet && Math.random() < 1 / 75000 * dt) {
+                            game.powerups.magnet = makePowerupRandom("magnet", 25, 145);
                         }
                     },
                     updateActivePowerups = function (dt) {
