@@ -173,6 +173,10 @@ if (typeof Math.log2 !== "function") {
         powerupX2Height = 30,
         powerupX2ApproxRadius = avg(powerupX2Height / 2, pythag(powerupX2Width, powerupX2Height) / 2), // Average of the short and long radii.
         powerupSlowRadius = 10,
+        powerupWeightScaleUnit = 0.8,
+        powerupWeightUpperWidth = 30 * powerupWeightScaleUnit,
+        powerupWeightLowerWidth = 40 * powerupWeightScaleUnit,
+        powerupWeightHeight = 24 * powerupWeightScaleUnit,
         activePowerupLifespan = 10000,
         // More util:
         isOverPauseBtn = function (xy) {
@@ -265,37 +269,6 @@ if (typeof Math.log2 !== "function") {
                 ctx.stroke();
             },
             drawFbs = function (ctx, fbs) {
-                /*var scaleFactor = 10 / 12.6, // To get it to the right size
-                    ctrlX = 0,
-                    ctrlY = 19 * scaleFactor,
-                    curveEndY = 19 * scaleFactor - ctrlY,
-                    curveRightestEndX = 11.9 * scaleFactor,
-                    curveLeftestEndX = -11.9 * scaleFactor,
-                    curveTipY = ctrlY + 9 * scaleFactor,
-                    radius = 12.6 * scaleFactor;
-                var triColor = "darkRed";
-                ctx.beginPath();
-                fbs.forEach(function (fb) {
-                    if (!objIsVisible(2 * fbRadius, fb)) { return; }
-                    ctx.moveTo(fb.x + ctrlX, fb.y + curveTipY);
-                    ctx.quadraticCurveTo(fb.x + ctrlX, fb.y + ctrlY, fb.x + curveRightestEndX, fb.y + curveEndY);
-                    ctx.moveTo(fb.x + ctrlX, fb.y + curveTipY);
-                    ctx.quadraticCurveTo(fb.x + ctrlX, fb.y + ctrlY, fb.x + curveLeftestEndX, fb.y + curveEndY);
-                });
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = triColor;
-                ctx.stroke();
-                ctx.beginPath();
-                fbs.forEach(function (fb) {
-                    if (!objIsVisible(2 * fbRadius, fb)) { return; }
-                    ctx.moveTo(fb.x + ctrlX, fb.y + curveTipY - 4 * scaleFactor);
-                    ctx.lineTo(fb.x + 9 * scaleFactor, fb.y + curveEndY);
-                    ctx.lineTo(fb.x - 9 * scaleFactor, fb.y + curveEndY);
-                    ctx.closePath();
-                    ctx.arc(fb.x, fb.y, radius, 0, Math.PI * 2, true);
-                });
-                ctx.fillStyle = triColor;
-                ctx.fill();*/
                 ctx.beginPath();
                 fbs.forEach(function (fb) {
                     if (objIsVisible(2 * fbRadius, fb)) {
@@ -359,7 +332,6 @@ if (typeof Math.log2 !== "function") {
                 ctx.fill();
                 ctx.font = "bold " + pxSize + "px arial";
                 ctx.textAlign = "left";
-                console.log(ctx);
                 fillShadowyText(ctx, "II", 15, 15 + pxSize / 2, colory);
             },
             offCanvImg = function (w, h, src) {
@@ -394,13 +366,14 @@ if (typeof Math.log2 !== "function") {
                 fillShadowyText(ctx, Math.floor(points), canvasWidth / 2, inGamePointsYPos);
             },
             drawPowerup = function (ctx, type, x, y) {
+                var unit = powerupWeightScaleUnit;
                 if (type === "X2") {
                     ctx.fillStyle = "gold";
                     ctx.font = "italic 26px Consolas";
                     ctx.lineWidth = 2;
-                    ctx.fillText("X2", x, y, powerupX2Width, powerupX2Height);
+                    ctx.fillText("X2", x - powerupX2Width / 2 + 5, y + powerupX2Height / 4, powerupX2Width, powerupX2Height);
                     ctx.strokeStyle = "orange";
-                    ctx.strokeText("X2", x, y, powerupX2Width, powerupX2Width);
+                    ctx.strokeText("X2", x - powerupX2Width / 2 + 5, y + powerupX2Height / 4, powerupX2Width, powerupX2Height);
                 } else if (type === "slow") {
                     ctx.globalAlpha = 0.7;
                     circle(ctx, x, y, powerupSlowRadius, "silver", "fill");
@@ -413,26 +386,26 @@ if (typeof Math.log2 !== "function") {
                     ctx.stroke();
                 } else if (type === "weight") {
                     ctx.beginPath();
-                    ctx.moveTo(x - 15, y - 12);
-                    ctx.lineTo(x + 15, y - 12);
-                    ctx.lineTo(x + 20, y + 12);
-                    ctx.lineTo(x - 20, y + 12);
+                    ctx.moveTo(x - powerupWeightUpperWidth / 2, y - powerupWeightHeight / 2);
+                    ctx.lineTo(x + powerupWeightUpperWidth / 2, y - powerupWeightHeight / 2);
+                    ctx.lineTo(x + powerupWeightLowerWidth / 2, y + powerupWeightHeight / 2);
+                    ctx.lineTo(x - powerupWeightLowerWidth / 2, y + powerupWeightHeight / 2);
                     ctx.fillStyle = "black";
                     ctx.fill();
                     
                     ctx.beginPath();
-                    ctx.moveTo(x - 10, y - 12);
-                    ctx.lineTo(x - 6, y - 17);
-                    ctx.lineTo(x + 6, y - 17);
-                    ctx.lineTo(x + 10, y - 12);
+                    ctx.moveTo(x - 10 * unit, y - powerupWeightHeight / 2);
+                    ctx.lineTo(x - 6 * unit, y - powerupWeightHeight / 2 - 4 * unit);
+                    ctx.lineTo(x + 6 * unit, y - powerupWeightHeight / 2 - 4 * unit);
+                    ctx.lineTo(x + 10 * unit, y - powerupWeightHeight / 2);
                     ctx.lineWidth = 2;
                     ctx.strokeStyle = "black";
                     ctx.stroke();
                     
-                    ctx.font = "bold 30px Courier New";
+                    ctx.font = "bold 28px Courier New";
                     ctx.fillStyle = "lightGrey";
                     ctx.textAlign = "center";
-                    ctx.fillText("1000", x, y + 10, 28, 8);
+                    ctx.fillText("1000", x, y + 11 * unit, 30 * unit);
                 } else if (type === "magnet") {
                     ctx.beginPath();
                     ctx.arc(x, y, powerupSlowRadius, 0, Math.PI, true);
@@ -447,9 +420,32 @@ if (typeof Math.log2 !== "function") {
                     ctx.fillRect(x + powerupSlowRadius - 5, y + 5, 10, 6);
                 }
             },
+            drawActivePowerupBackground = function (ctx, lifeleft, totalLifetime, x, y) {
+                var fractionLifeLeft = lifeleft / totalLifetime,
+                    nearDeath = fractionLifeLeft < 0.25,
+                    roundAmt = nearDeath ? 120 : 60,
+                    roundedFrac = /*nearDeath ? fractionLifeLeft : */Math.ceil(fractionLifeLeft * roundAmt) / roundAmt,
+                    angleOfGrayArc = 2 * Math.PI * roundedFrac;
+                if (angleOfGrayArc <= 0) {
+                    return;
+                }
+                // Fill in the correct portion of the circle with gray;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.arc(x, y, 18, 0, angleOfGrayArc, false);
+                ctx.fillStyle = nearDeath ? "rgba(200, 0, 0, 1)" : "rgba(150, 150, 150, 0.65)";
+                ctx.fill();
+                // Fill in the rest of the circle with a ghosted gray;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.arc(x, y, 18, 0, angleOfGrayArc, true);
+                ctx.fillStyle = "rgba(150, 150, 150, 0.25)";
+                ctx.fill();
+            },
             drawActivePowerups = function (ctx, actives) {
                 var xPos = canvasWidth / 2 + inGamePointsPxSize, yPos = inGamePointsYPos, i;
                 for (i = actives.length - 1; i >= 0; i -= 1) { // Start with the last activepowerups, which have been around the longest.
+                    drawActivePowerupBackground(ctx, actives[i].lifetime, actives[i].totalLifetime, xPos, yPos);
                     drawPowerup(ctx, actives[i].type, xPos, yPos);
                     xPos += actives[i].width;
                 }
@@ -671,6 +667,7 @@ if (typeof Math.log2 !== "function") {
                 };
             }()),
             createActivePowerup = function (type) {
+                var lifetime = type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan;
                 return {
                     "type": type,
                     "width": type === "X2"     ? powerupX2Width :
@@ -678,7 +675,8 @@ if (typeof Math.log2 !== "function") {
                              type === "weight" ? 40 :
                              type === "magnet" ? powerupSlowRadius * 2 + 15 :
                              40,
-                    "lifetime": type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan,
+                    "totalLifetime": lifetime,
+                    "lifetime": lifetime
                 }; // TODO: INCLUDE srcX, srcY, timeSinceAcquired FOR ANIMATIONS
             },
             simpleIterable = function (propsToIter) {
@@ -757,6 +755,25 @@ if (typeof Math.log2 !== "function") {
                 return dist(player.x, player.y, x, y) < playerRadius + circleRadius
                     || dist(player.x, player.y - playerRadius - playerTorsoLen - playerHeadRadius, x, y) < playerHeadRadius + circleRadius;
             },
+            circleHittingRect = function (circX, circY, radius, rectX, rectY, rectWidth, rectHeight) { // Adapted from StackOverflow answer by 'e. James': http://stackoverflow.com/a/402010
+                var distX = Math.abs(circX - rectX),
+                    distY = Math.abs(circY - rectY),
+                    cornerDist_squared;
+                if (distX > (rectWidth/2 + radius) || distY > (rectHeight/2 + radius)) {
+                    return false;
+                }
+                if (distX <= (rectWidth/2) || distY <= (rectHeight/2)) {
+                    return true;
+                }
+                cornerDist_squared = Math.pow(distX - rectWidth/2, 2) +
+                                     Math.pow(distY - rectHeight/2, 2);
+                return cornerDist_squared <= (radius * radius);
+            },
+            playerHittingRect = function (player, x, y, w, h) {
+                var headY = player.y - playerTorsoLen - playerRadius - playerHeadRadius;
+                return circleHittingRect(player.x, player.y, playerRadius, x, y, w, h) ||
+                       circleHittingRect(player.x, headY, playerHeadRadius, x, y, w, h);
+            },
             playerHittingFb = function (player, fb) {
                 return playerHittingCircle(player, fb.x, fb.y, fbRadius);
             },
@@ -765,13 +782,13 @@ if (typeof Math.log2 !== "function") {
             },
             playerHittingPowerup = function (player, powerup) {
                 if (powerup.type === "X2") {
-                    return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupX2ApproxRadius);
+                    return playerHittingRect(player, powerup.xPos(), powerup.yPos(), powerupX2Width, powerupX2Height);
                 }
                 if (powerup.type === "slow") {
                     return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
                 }
                 if (powerup.type === "weight") {
-                    return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), 15); // TODO: MAKE PLAYER_HITTING_RECT FUNCTION
+                    return playerHittingRect(player, powerup.xPos(), powerup.yPos(), powerupWeightLowerWidth, powerupWeightHeight); // TODO: MAKE PLAYER_HITTING_RECT FUNCTION
                 }
                 if (powerup.type === "magnet") {
                     return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
