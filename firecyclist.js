@@ -171,7 +171,6 @@ if (typeof Math.log2 !== "function") {
         menuPlayBtnH = 44,
         powerupX2Width = 36,
         powerupX2Height = 30,
-        powerupX2ApproxRadius = avg(powerupX2Height / 2, pythag(powerupX2Width, powerupX2Height) / 2), // Average of the short and long radii.
         powerupSlowRadius = 10,
         powerupWeightScaleUnit = 0.8,
         powerupWeightUpperWidth = 30 * powerupWeightScaleUnit,
@@ -606,22 +605,20 @@ if (typeof Math.log2 !== "function") {
                     return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
                 };
             },
+            createVel = anglify(false, function (vx, vy) {
+                return {"vx": vx, "vy": vy};
+            }),
             withAngularCtrls = (function () {
                 var proto = {
-                        "angleTo": function (xy) {
+                        "angleTo": function (xy) { // Currently unused, but as definition adds only constant time and may be useful in future, I'll leave it.
                             return Math.atan2(xy.y - this.y, xy.x - this.x);
                         },
                         "distanceTo": function (xy) {
                             return dist(this.x, this.y, xy.x, xy.y);
                         },
                         "setDistanceTo": function (xy, newd) {
-                            var angleTo = this.angleTo(xy),
-                                distTo = this.distanceTo(xy),
-                                vectorFromPlayer = createVel(this.x - xy.x, this.y - xy.y),
+                            var vectorFromPlayer = createVel(this.x - xy.x, this.y - xy.y),
                                 newAbsoluteVector;
-                            if (Number.isNaN(distTo + vectorFromPlayer.vx)) {
-                                throw "YO BITCH ITS NAN";
-                            }
                             vectorFromPlayer.setMagnitude(newd);
                             newAbsoluteVector = createVel(xy.x + vectorFromPlayer.vx, xy.y + vectorFromPlayer.vy);
                             this.x = newAbsoluteVector.vx;
@@ -662,9 +659,6 @@ if (typeof Math.log2 !== "function") {
             createFirebit = function (x, y) {
                 return {"x": x, "y": y, "lifespan": 0};
             },
-            createVel = anglify(false, function (vx, vy) {
-                return {"vx": vx, "vy": vy};
-            }),
             createPowerup = (function () {
                 var proto = {
                     xDistanceTravelled: function () {
@@ -804,7 +798,7 @@ if (typeof Math.log2 !== "function") {
                     return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
                 }
                 if (powerup.type === "weight") {
-                    return playerHittingRect(player, powerup.xPos(), powerup.yPos(), powerupWeightLowerWidth, powerupWeightHeight); // TODO: MAKE PLAYER_HITTING_RECT FUNCTION
+                    return playerHittingRect(player, powerup.xPos(), powerup.yPos(), powerupWeightLowerWidth, powerupWeightHeight);
                 }
                 if (powerup.type === "magnet") {
                     return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
@@ -999,13 +993,13 @@ if (typeof Math.log2 !== "function") {
                         updateFbsGeneric(game, dt);
                     },
                     updateCoins = function (dt) {
-                        var magnetOn = magnetObtained(), dist;
+                        var magnetOn = magnetObtained(), distance;
                         game.coins.forEach(function (coin, index) {
                             coin.y -= coinFallRate * dt;
                             if (magnetOn) {
-                                dist = coin.distanceTo(game.player);
-                                if (dist < 100 && dist !== 0) {
-                                    coin.setDistanceTo(game.player, dist - (100 / dist));
+                                distance = coin.distanceTo(game.player);
+                                if (distance < 100 && distance !== 0) {
+                                    coin.setDistanceTo(game.player, distance - (100 / distance));
                                 }
                             }
                             if (coin.y < -2 * coinRadius) {
@@ -1159,17 +1153,16 @@ if (typeof Math.log2 !== "function") {
             createMenu = function () { return {fbs: [], firebitsRed: [], firebitsOrg: []}; },
             runMenu = function () {
                 var menu = createMenu(),
-                    updateButtons = function () {},
                     updateFbs = function (dt) {
                         updateFbsGeneric(menu, dt);
                     },
                     intervalId,
                     prevTime = Date.now();
                 window.menu = menu;
+                drawBackground();
                 intervalId = setInterval(function () {
                     var now = Date.now(), dt = now - prevTime;
                     prevTime = now;
-                    updateButtons();
                     updateFbs(dt);
                     drawMenu(menu);
                 }, 1000 / framerate);
@@ -1178,7 +1171,6 @@ if (typeof Math.log2 !== "function") {
                     play();
                 });
             };
-        drawBackground();
         return runMenu;
     }());
     start();
