@@ -424,7 +424,7 @@ if (typeof Math.log2 !== "function") {
                 var fractionLifeLeft = lifeleft / totalLifetime,
                     nearDeath = fractionLifeLeft < 0.25,
                     roundAmt = nearDeath ? 120 : 60,
-                    roundedFrac = /*nearDeath ? fractionLifeLeft : */Math.ceil(fractionLifeLeft * roundAmt) / roundAmt,
+                    roundedFrac = Math.ceil(fractionLifeLeft * roundAmt) / roundAmt,
                     angleOfGrayArc = 2 * Math.PI * roundedFrac;
                 if (angleOfGrayArc <= 0) {
                     return;
@@ -435,12 +435,14 @@ if (typeof Math.log2 !== "function") {
                 ctx.arc(x, y, 18, 0, angleOfGrayArc, false);
                 ctx.fillStyle = nearDeath ? "rgba(200, 0, 0, 1)" : "rgba(150, 150, 150, 0.65)";
                 ctx.fill();
-                // Fill in the rest of the circle with a ghosted gray;
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-                ctx.arc(x, y, 18, 0, angleOfGrayArc, true);
-                ctx.fillStyle = "rgba(150, 150, 150, 0.25)";
-                ctx.fill();
+                if (angleOfGrayArc < 2 * Math.PI) { // To prevent the entire circle from being filled when really none should be filled. This condition can happen due to rounding in 'roundedFrac'.
+                    // Fill in the rest of the circle with a ghosted gray;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.arc(x, y, 18, 0, angleOfGrayArc, true);
+                    ctx.fillStyle = "rgba(150, 150, 150, 0.25)";
+                    ctx.fill();
+                }
             },
             drawActivePowerups = function (ctx, actives) {
                 var xPos = canvasWidth / 2 + inGamePointsPxSize, yPos = inGamePointsYPos, i;
