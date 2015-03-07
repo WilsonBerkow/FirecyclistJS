@@ -11,7 +11,7 @@ if (typeof Math.log2 !== "function") {
 (function () {
     "use strict";
     // Screen-resizing code:
-    var htmlModule = document.getElementById("canvas"),
+    var htmlModule = document.getElementById("Main"),
         htmlBody = document.querySelector("body"),
         windowDims = {
             "width": window.innerWidth || document.documentElement.clientWidth, // The defaulting expression (.documentElement....) is for IE
@@ -200,6 +200,16 @@ if (typeof Math.log2 !== "function") {
                     };
                 };
             }()),
+            ctxWither = function (ctx) {
+                return function (f) {
+                    return function () {
+                        f.apply(null, [ctx].concat([].slice.apply(arguments)));
+                    };
+                };
+            },
+            withBgCtx = ctxWither(document.getElementById("bgCanvas").getContext("2d")),
+            withBtnCtx = ctxWither(document.getElementById("btnCanvas").getContext("2d")),
+            overlayCtx = document.getElementById("overlayCanvas").getContext("2d"), // TODO: screw all these wrapper functions, and make each context be declared and used like this one.
             fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
                 var clr0 = reverse ? "black" : "darkOrange",
                     clr1 = reverse ? "darkOrange" : "black",
@@ -223,11 +233,11 @@ if (typeof Math.log2 !== "function") {
                 ctx.moveTo(x0, y0);
                 ctx.lineTo(x1, y1);
             },
-            drawBackground = function (ctx) {
+            drawBackground = withBgCtx(function (ctx) {
                 ctx.clearRect(0, 0, canvasWidth, canvasHeight);
                 ctx.fillStyle = "rgba(175, 175, 255, 0.75)";
                 ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-            },
+            }),
             oneArm = function (ctx, reverse) {
                 if (reverse) {
                     ctx.scale(-1, -1);
@@ -360,6 +370,11 @@ if (typeof Math.log2 !== "function") {
                     }
                 };
             }()),
+            redrawBtnLayer = withBtnCtx(function (ctx, game) {
+                ctx.clearRect(0, 0, canvasWidth, 100);
+                drawPauseBtn(ctx, game);
+                drawRestartBtn(ctx, game);
+            }),
             drawInGamePoints = function (ctx, points) {
                 ctx.textAlign = "center";
                 ctx.font = "bold " + inGamePointsPxSize + "px Consolas";
@@ -466,7 +481,7 @@ if (typeof Math.log2 !== "function") {
                 ctx.fillText("Play", menuPlayBtnX, menuPlayBtnY, menuPlayBtnW, menuPlayBtnH);
             }),
             drawMenu = drawer(function (ctx, menu) {
-                drawBackground(ctx);
+                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
                 drawFbs(ctx, menu.fbs);
                 drawFirebits(ctx, menu.firebitsRed, "red");
                 drawFirebits(ctx, menu.firebitsOrg, "darkOrange");
@@ -474,7 +489,8 @@ if (typeof Math.log2 !== "function") {
                 drawMenuPlayBtn();
             }),
             drawGame = drawer(function (ctx, game) {
-                drawBackground(ctx);
+                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+                overlayCtx.clearRect(0, 0, canvasWidth, canvasHeight);
                 drawPlayerAt(ctx, game.player.x, game.player.y, game.player.wheelAngle);
                 setupGenericPlatfmChars(ctx);
                 game.platfms.forEach(function (platfm) {
@@ -494,22 +510,20 @@ if (typeof Math.log2 !== "function") {
                     drawPowerup(ctx, powerup.type, powerup.xPos(), powerup.yPos());
                 });
                 drawActivePowerups(ctx, game.activePowerups);
-                drawPauseBtn(ctx, game);
-                drawRestartBtn(ctx, game);
                 drawInGamePoints(ctx, game.points);
             }),
             gameOverlayDrawer = (function () { // Specialized version of 'drawer' for drawing game overlays like the Paused or GameOver screens.
                 var vagueify = function (ctx) {
-                    ctx.fillStyle = "rgba(200, 200, 200, 0.75)";
-                    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-                };
+                        ctx.fillStyle = "rgba(200, 200, 200, 0.75)";
+                        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+                    };
                 return function (f) {
-                    var overlawDrawer = drawer(f);
                     return drawer(function (ctx, game) {
                         var args = [].slice.apply(arguments).slice(1);
+                        document.getElementById("overlayCanvas").visibility = "visible";
                         drawGame(game);
-                        vagueify(ctx);
-                        overlawDrawer.apply(null, args); // 'args' includes 'game'
+                        vagueify(overlayCtx);
+                        f.apply(null, [overlayCtx].concat(args)); // 'args' includes 'game'
                     });
                 };
             }()),
@@ -552,12 +566,12 @@ if (typeof Math.log2 !== "function") {
                     curY += scoreFontSize + 2;
                 });
             });
-        return [drawGame, drawGamePaused, drawGameDead, drawMenu];
+        return [drawGame, drawGamePaused, drawGameDead, drawMenu, drawBackground, redrawBtnLayer];
     }());
-    var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawMenu = renderers[3];
+    var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawMenu = renderers[3], drawBackground = renderers[4], redrawBtnLayer = renderers[5];
     
     // PLAY:
-    var playGame = (function () {
+    var start = (function () {
         var // MODEL + CALC:
             anglify = function (doCalc, f) {
                 var proto = {
@@ -806,7 +820,7 @@ if (typeof Math.log2 !== "function") {
                     absoluteY = fbY + Math.random() * maxRelY - 3;
                 return createFirebit(absoluteX, absoluteY);
             },
-            updateFbsGeneric = function (obj, dt) { // This is used in both playGame and runMenu, and thus must be declared here.
+            updateFbsGeneric = function (obj, dt) { // This is used in both play and runMenu, and thus must be declared here.
                 var fbArray = Array.isArray(obj) ? obj : obj.fbs,
                     fbFirebitsRed = Array.isArray(obj) ? null : obj.firebitsRed,
                     fbFirebitsOrg = Array.isArray(obj) ? null : obj.firebitsOrg,
@@ -876,6 +890,7 @@ if (typeof Math.log2 !== "function") {
                         if (game.previewPlatfmTouch) {
                             game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
                         }
+                        redrawBtnLayer(game);
                     },
                     handleActivesPoints = function ($$$) {
                         var i;
@@ -1114,6 +1129,7 @@ if (typeof Math.log2 !== "function") {
                         tryToAddPlatfmFromTouch(touch);
                     }
                 };
+                redrawBtnLayer(game);
                 jQuery(document).on("click", function (event) {
                     var q, p;
                     if (game.paused) { // Tap *anywhere* to unpause
@@ -1131,6 +1147,12 @@ if (typeof Math.log2 !== "function") {
                         } else if (isOverRestartBtn(p)) {
                             restart();
                         }
+                    }
+                    redrawBtnLayer(game);
+                });
+                jQuery(document).on("touchmove touchstart touchend", function (event) {
+                    if (event.originalEvent.pageY < 100) { // With a safe margin
+                        redrawBtnLayer(game);
                     }
                 });
             },
@@ -1156,7 +1178,8 @@ if (typeof Math.log2 !== "function") {
                     play();
                 });
             };
+        drawBackground();
         return runMenu;
     }());
-    playGame();
+    start();
 }());

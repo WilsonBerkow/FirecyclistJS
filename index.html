@@ -12,11 +12,16 @@
                 background: black;
                 width: 288px;
             }
-            #Main, canvas {
-                background: white;
+            #Main {
                 position: fixed;
                 top: 0;
                 left: 0;
+            }
+            canvas {
+                position: absolute;
+            }
+            #bgCanvas {
+                background: white;
             }
         </style>
     </head>
@@ -26,7 +31,10 @@
             <img src="img/restart-arrow-orange.png" id="restart-arrow-orange" />
         </div>
         <div id="Main">
+            <canvas id="bgCanvas" width="288" height="512"></canvas>
             <canvas id="canvas" width="288" height="512"></canvas>
+            <canvas id="btnCanvas" width="288" height="512"></canvas>
+            <canvas id="overlayCanvas" width="288" height="512"></canvas>
         </div>
         <script src="jquery-1.11.2.min.js"></script>
         <script src="firecyclist.js"></script>
