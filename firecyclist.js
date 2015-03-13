@@ -206,10 +206,7 @@ if (typeof Math.log2 !== "function") {
                     };
                 };
             },
-            withBgCtx = ctxWither(document.getElementById("bgCanvas").getContext("2d")),
-            withBtnCtx = ctxWither(document.getElementById("btnCanvas").getContext("2d")),
             mainCtx = document.getElementById("canvas").getContext("2d"),
-            bgCtx = document.getElementById("bgCanvas").getContext("2d"),
             btnCtx = document.getElementById("btnCanvas").getContext("2d"),
             overlayCtx = document.getElementById("overlayCanvas").getContext("2d"), // TODO: screw all these wrapper functions, and make each context be declared and used like this one.
             fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
@@ -234,11 +231,6 @@ if (typeof Math.log2 !== "function") {
             lineFromTo = function (ctx, x0, y0, x1, y1) {
                 ctx.moveTo(x0, y0);
                 ctx.lineTo(x1, y1);
-            },
-            drawBackground = function () {
-                bgCtx.clearRect(0, 0, canvasWidth, canvasHeight);
-                bgCtx.fillStyle = "rgba(175, 175, 255, 0.75)";
-                bgCtx.fillRect(0, 0, canvasWidth, canvasHeight);
             },
             oneArm = function (ctx, reverse) {
                 if (reverse) {
@@ -584,9 +576,9 @@ if (typeof Math.log2 !== "function") {
                     curY += scoreFontSize + 2;
                 });
             });
-        return [drawGame, drawGamePaused, drawGameDead, drawMenu, drawBackground, redrawBtnLayer];
+        return [drawGame, drawGamePaused, drawGameDead, drawMenu, redrawBtnLayer];
     }());
-    var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawMenu = renderers[3], drawBackground = renderers[4], redrawBtnLayer = renderers[5];
+    var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawMenu = renderers[3], redrawBtnLayer = renderers[4];
     
     // PLAY:
     var start = (function () {
@@ -1189,7 +1181,6 @@ if (typeof Math.log2 !== "function") {
                     intervalId,
                     prevTime = Date.now();
                 window.menu = menu;
-                drawBackground();
                 intervalId = setInterval(function () {
                     var now = Date.now(), dt = now - prevTime;
                     prevTime = now;
