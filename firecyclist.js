@@ -245,22 +245,39 @@ if (typeof Math.log2 !== "function") {
                 ctx.lineTo(-playerElbowXDiff, -playerElbowYDiff);
                 ctx.lineTo(-2 * playerElbowXDiff, playerElbowYDiff);
             },
-            wheelAt = function (ctx, x, y, angle) {
-                var i;
-                circleAt(ctx, x, y, playerRadius, 0, 2 * Math.PI, true);
-                
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.rotate(angle * Math.PI / 180);
-                for (i = 0; i < 6; i += 1) {
-                    ctx.moveTo(-playerRadius, 0);
-                    ctx.lineTo(playerRadius, 0);
-                    if (i !== 5) {
-                        ctx.rotate(1/3 * Math.PI); // Rotate a sixth of a turn
-                    }
+            wheelAt = (function () {
+                var sines = [],   // Sine and cosine tables are used so that the approximation work doesn't
+                    cosines = [], // have to be done more than once for any given angle. The angles of the
+                                  // spokes are rounded down to the nearest degree.
+                                  // TODO: Extract these tables and use them for as many other uses of
+                                  //  Math.sin and Math.cos as possible.
+                    oneDegree = Math.PI / 180,
+                    i,
+                    getSin = function (radians) {
+                        return sines[modulo(Math.floor(radians / oneDegree), 360)];
+                    },
+                    getCos = function (radians) {
+                        return cosines[modulo(Math.floor(radians / oneDegree), 360)];
+                    };
+                for (i = 0; i < 360; i += 1) {
+                    sines[i] = Math.sin(i * oneDegree);
+                    cosines[i] = Math.cos(i * oneDegree);
                 }
-                ctx.restore();
-            },
+                return function (ctx, x, y, angle) {
+                    var i;
+                    circleAt(ctx, x, y, playerRadius, 0, 2 * Math.PI, true);
+                    var spokeAngle = 0, spinOffset = angle * oneDegree, relX, relY;
+                    for (i = 0; i < 6; i += 1) {
+                        relX = getCos(spinOffset + spokeAngle) * playerRadius;
+                        relY = getSin(spinOffset + spokeAngle) * playerRadius;
+                        ctx.moveTo(x + relX, y + relY);
+                        ctx.lineTo(x - relX, y - relY);
+                        if (i !== 5) {
+                            spokeAngle += 1/3 * Math.PI;
+                        }
+                    }
+                };
+            }()),
             drawPlayerAt = function (ctx, x, y, angle) {
                 ctx.beginPath();
                 circleAt(ctx, x, y - playerTorsoLen - playerRadius - playerHeadRadius, playerHeadRadius, 0, 2 * Math.PI, true);
