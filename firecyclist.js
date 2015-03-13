@@ -11,6 +11,19 @@ if (typeof Math.log2 !== "function") {
 (function () {
     "use strict";
     // Screen-resizing code:
+    // These manual-set titles are not related to the game, they are here
+    // so I can fuck around with my friend without committing private
+    // information.
+    var menuTitleTopWord = localStorage.getItem("ttl0") || (function () {
+        var ttl0 = prompt("Title:");
+        localStorage.setItem("ttl0", ttl0);
+        return ttl0;
+    }());
+    var menuTitleLowerWord = localStorage.getItem("ttl1") || (function () {
+        var ttl1 = prompt("Subtitle:");
+        localStorage.setItem("ttl1", ttl1);
+        return ttl1;
+    }());
     var htmlModule = document.getElementById("Main"),
         htmlBody = document.querySelector("body"),
         windowDims = {
@@ -209,14 +222,23 @@ if (typeof Math.log2 !== "function") {
             mainCtx = document.getElementById("canvas").getContext("2d"),
             btnCtx = document.getElementById("btnCanvas").getContext("2d"),
             overlayCtx = document.getElementById("overlayCanvas").getContext("2d"), // TODO: screw all these wrapper functions, and make each context be declared and used like this one.
-            fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
+            fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
                 var clr0 = reverse ? "black" : "darkOrange",
                     clr1 = reverse ? "darkOrange" : "black",
-                    offset = offsetAmt || 1;
+                    offset = offsetAmt || 1,
+                    setW = w !== undefined;
                 ctx.fillStyle = clr0;
-                ctx.fillText(text, x, y);
+                if (setW) {
+                    ctx.fillText(text, x, y, w, h);
+                } else {
+                    ctx.fillText(text, x, y);
+                }
                 ctx.fillStyle = clr1;
-                ctx.fillText(text, x + offset, y - offset);
+                if (setW) {
+                    ctx.fillText(text, x + offset, y - offset, w, h);
+                } else {
+                    ctx.fillText(text, x + offset, y - offset);
+                }
             },
             circle = function (ctx, x, y, radius, color, fillOrStroke) {
                 ctx.beginPath();
@@ -479,11 +501,11 @@ if (typeof Math.log2 !== "function") {
                 }
             },
             drawMenuTitle = drawer(function (ctx) {
-                ctx.font = "italic bold 170px arial";
+                ctx.font = "italic bold 150px arial";
                 ctx.textAlign = "center";
-                fillShadowyText(ctx, "Fire", canvasWidth / 2 - 3, 190, true, 3);
-                ctx.font = "italic bold 95px arial";
-                fillShadowyText(ctx, "cyclist", canvasWidth / 2 - 3, 240, true, 2);
+                fillShadowyText(ctx, menuTitleTopWord, canvasWidth / 2 - 3, 190, true, 3, canvasWidth + 15);
+                ctx.font = "bold 75px arial";
+                fillShadowyText(ctx, menuTitleLowerWord, canvasWidth / 2 - 3, 240, true, 2);
             }),
             drawMenuPlayBtn = drawer(function (ctx) {
                 ctx.font = "italic bold 54px Consolas";
