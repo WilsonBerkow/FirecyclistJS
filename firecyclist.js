@@ -14,16 +14,6 @@ if (typeof Math.log2 !== "function") {
     // These manual-set titles are not related to the game, they are here
     // so I can fuck around with my friend without committing private
     // information.
-    var menuTitleTopWord = localStorage.getItem("ttl0") || (function () {
-        var ttl0 = prompt("Title:");
-        localStorage.setItem("ttl0", ttl0);
-        return ttl0;
-    }());
-    var menuTitleLowerWord = localStorage.getItem("ttl1") || (function () {
-        var ttl1 = prompt("Subtitle:");
-        localStorage.setItem("ttl1", ttl1);
-        return ttl1;
-    }());
     var htmlModule = document.getElementById("Main"),
         htmlBody = document.querySelector("body"),
         windowDims = {
@@ -202,26 +192,18 @@ if (typeof Math.log2 !== "function") {
         };
     // RENDER:
     var renderers = (function () {
-        var drawer = (function () {
-                var ctx = document.getElementById("canvas").getContext("2d");
+        var mainCtx = document.getElementById("canvas").getContext("2d"),
+            btnCtx = document.getElementById("btnCanvas").getContext("2d"),
+            overlayCtx = document.getElementById("overlayCanvas").getContext("2d"), // TODO: screw all these wrapper functions, and make each context be declared and used like this one.
+            drawer = (function () {
                 return function (draw) { // Opens a "drawing session"
                     return function () {
-                        ctx.save();
-                        draw.apply(null, [ctx].concat([].slice.apply(arguments)));
-                        ctx.restore();
+                        mainCtx.save();
+                        draw.apply(null, [mainCtx].concat([].slice.apply(arguments)));
+                        mainCtx.restore();
                     };
                 };
             }()),
-            ctxWither = function (ctx) {
-                return function (f) {
-                    return function () {
-                        f.apply(null, [ctx].concat([].slice.apply(arguments)));
-                    };
-                };
-            },
-            mainCtx = document.getElementById("canvas").getContext("2d"),
-            btnCtx = document.getElementById("btnCanvas").getContext("2d"),
-            overlayCtx = document.getElementById("overlayCanvas").getContext("2d"), // TODO: screw all these wrapper functions, and make each context be declared and used like this one.
             fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
                 var clr0 = reverse ? "black" : "darkOrange",
                     clr1 = reverse ? "darkOrange" : "black",
@@ -501,11 +483,11 @@ if (typeof Math.log2 !== "function") {
                 }
             },
             drawMenuTitle = drawer(function (ctx) {
-                ctx.font = "italic bold 150px arial";
+                ctx.font = "italic bold 170px arial";
                 ctx.textAlign = "center";
-                fillShadowyText(ctx, menuTitleTopWord, canvasWidth / 2 - 3, 190, true, 3, canvasWidth + 15);
-                ctx.font = "bold 75px arial";
-                fillShadowyText(ctx, menuTitleLowerWord, canvasWidth / 2 - 3, 240, true, 2);
+                fillShadowyText(ctx, "Fire", canvasWidth / 2 - 3, 190, true, 3);
+                ctx.font = "italic bold 95px arial";
+                fillShadowyText(ctx, "cyclist", canvasWidth / 2 - 3, 240, true, 2);
             }),
             drawMenuPlayBtn = drawer(function (ctx) {
                 ctx.font = "italic bold 54px Consolas";
