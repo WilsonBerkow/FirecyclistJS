@@ -208,6 +208,9 @@ if (typeof Math.log2 !== "function") {
             },
             withBgCtx = ctxWither(document.getElementById("bgCanvas").getContext("2d")),
             withBtnCtx = ctxWither(document.getElementById("btnCanvas").getContext("2d")),
+            mainCtx = document.getElementById("canvas").getContext("2d"),
+            bgCtx = document.getElementById("bgCanvas").getContext("2d"),
+            btnCtx = document.getElementById("btnCanvas").getContext("2d"),
             overlayCtx = document.getElementById("overlayCanvas").getContext("2d"), // TODO: screw all these wrapper functions, and make each context be declared and used like this one.
             fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
                 var clr0 = reverse ? "black" : "darkOrange",
@@ -232,11 +235,11 @@ if (typeof Math.log2 !== "function") {
                 ctx.moveTo(x0, y0);
                 ctx.lineTo(x1, y1);
             },
-            drawBackground = withBgCtx(function (ctx) {
-                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-                ctx.fillStyle = "rgba(175, 175, 255, 0.75)";
-                ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-            }),
+            drawBackground = function () {
+                bgCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+                bgCtx.fillStyle = "rgba(175, 175, 255, 0.75)";
+                bgCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+            },
             oneArm = function (ctx, reverse) {
                 if (reverse) {
                     ctx.scale(-1, -1);
@@ -386,11 +389,11 @@ if (typeof Math.log2 !== "function") {
                     }
                 };
             }()),
-            redrawBtnLayer = withBtnCtx(function (ctx, game) {
-                ctx.clearRect(0, 0, canvasWidth, 100);
-                drawPauseBtn(ctx, game);
-                drawRestartBtn(ctx, game);
-            }),
+            redrawBtnLayer = function (game) {
+                btnCtx.clearRect(0, 0, canvasWidth, 100);
+                drawPauseBtn(btnCtx, game);
+                drawRestartBtn(btnCtx, game);
+            },
             drawInGamePoints = function (ctx, points) {
                 ctx.textAlign = "center";
                 ctx.font = "bold " + inGamePointsPxSize + "px Consolas";
@@ -536,7 +539,6 @@ if (typeof Math.log2 !== "function") {
                 return function (f) {
                     return drawer(function (ctx, game) {
                         var args = [].slice.apply(arguments).slice(1);
-                        document.getElementById("overlayCanvas").visibility = "visible";
                         drawGame(game);
                         vagueify(overlayCtx);
                         f.apply(null, [overlayCtx].concat(args)); // 'args' includes 'game'
@@ -1161,11 +1163,22 @@ if (typeof Math.log2 !== "function") {
                     }
                     redrawBtnLayer(game);
                 });
-                jQuery(document).on("touchmove touchstart touchend", function (event) {
-                    if (event.originalEvent.pageY < 100) { // With a safe margin
-                        redrawBtnLayer(game);
-                    }
-                });
+                (function () {
+                    var lastRedraw,
+                        pauseBtnSensitivityRadius = pauseBtnRadius * 1.2, // The '* 1.2's are present to ensure that when someone drags their finger off the btn, as the finger leaves the btn, the btn will get redrawn (in the inactive state).
+                        restartBtnSensitivityRadius = restartBtnRadius * 1.2;
+                    jQuery(document).on("touchmove touchstart touchend", function (event) {
+                        var now = Date.now(),
+                            dt = lastRedraw === undefined ? 1000 : now - lastRedraw, // The defaulting to 1000 just allows the 'dt > 30' test below to definitely pass even on the first draw.
+                            touch = calcTouchPos(event.originalEvent.changedTouches[0]);
+                        if (dt > 30 && // This ensures that it won't render WAY too often when the finger is over the button, which would slow the game down.
+                                (dist(pauseBtnCenterX, pauseBtnCenterY, touch.x, touch.y) < pauseBtnSensitivityRadius ||
+                                 dist(restartBtnCenterX, restartBtnCenterY, touch.x, touch.y) < restartBtnSensitivityRadius)) {
+                            redrawBtnLayer(game);
+                            lastRedraw = now;
+                        }
+                    });
+                }());
             },
             createMenu = function () { return {fbs: [], firebitsRed: [], firebitsOrg: []}; },
             runMenu = function () {
