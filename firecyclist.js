@@ -137,7 +137,7 @@ if (typeof Math.log2 !== "function") {
         pythag = function (a, b) { return Math.sqrt(a*a + b*b); },
         dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
         // CONFIG:
-        framerate = 50,
+        framerate = 40,
         canvasWidth = 576 / 2,
         canvasHeight = 1024 / 2,
         playerGrav = 0.3 / 28,
