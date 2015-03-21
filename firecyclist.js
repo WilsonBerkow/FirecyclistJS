@@ -14,7 +14,8 @@ if (typeof Math.log2 !== "function") {
     // These manual-set titles are not related to the game, they are here
     // so I can fuck around with my friend without committing private
     // information.
-    var htmlModule = document.getElementById("Main"),
+    var scrolling_on = false,
+        htmlModule = document.getElementById("Main"),
         htmlBody = document.querySelector("body"),
         windowDims = {
             "width": window.innerWidth || document.documentElement.clientWidth, // The defaulting expression (.documentElement....) is for IE
@@ -143,7 +144,7 @@ if (typeof Math.log2 !== "function") {
         framerate = 40,
         canvasWidth = 576 / 2,
         canvasHeight = 1024 / 2,
-        playerGrav = 0.3 / 28,
+        playerGrav = 0.32 / 28,
         fbFallRate = 2 / 20,
         fbRadius = 10,
         coinFallRate = 2 / 20,
@@ -820,7 +821,10 @@ if (typeof Math.log2 !== "function") {
                 }
             },
             randomXPosition = function () {
-                return Math.random() * canvasWidth * 7 - canvasWidth * 3;
+                var rand = Math.random();
+                return scrolling_on ? rand * canvasWidth * 7 - canvasWidth * 3
+                                    : rand * canvasWidth;
+                //return Math.random() * canvasWidth;// * 7 - canvasWidth * 3;
             },
             makeFirebitAround = function (fbX, fbY) {
                 var relX = Math.random() * 2 * fbRadius - fbRadius,
@@ -831,6 +835,16 @@ if (typeof Math.log2 !== "function") {
             },
             updateFbsGeneric = function (obj, dt) { // This is used in both play and runMenu, and thus must be declared here.
                 var fbArray = Array.isArray(obj) ? obj : obj.fbs,
+                    fewInLowerPortion = function () {
+                        var count = 0, i, fb;
+                        for (i = 0; i < fbArray.length; i += 1) {
+                            fb = fbArray[i]
+                            if (fb.y > canvasHeight * 3 / 4 && fb.x >= 0 && fb.x <= canvasWidth) { // The tests on x are for scrolling_on mode, in which it is the density *per viewport-width*  that matters, not the total
+                                return false;
+                            }
+                        }
+                        return true;
+                    },
                     fbFirebitsRed = Array.isArray(obj) ? null : obj.firebitsRed,
                     fbFirebitsOrg = Array.isArray(obj) ? null : obj.firebitsOrg,
                     firebitBeyondVisibility = function (firebit) { // So that when one moves left, to make a fb on the right side go offscreen, and then quickly goes back, the user doesn't notice that the firebits are temporarily depleted.
@@ -882,7 +896,8 @@ if (typeof Math.log2 !== "function") {
                 });
                 updateFirebits(fbFirebitsRed);
                 updateFirebits(fbFirebitsOrg);
-                if (Math.random() < 1 / 1000 * 4 * dt) {
+                var chanceFactor = scrolling_on ? (9 / 7) : (1 / 7)
+                if (Math.random() < 1 / 1000 * 4 * chanceFactor * dt || fewInLowerPortion()) {
                     x = randomXPosition();
                     y = canvasHeight + fbRadius;
                     fbArray.push(createFb(x, y));
@@ -1000,7 +1015,11 @@ if (typeof Math.log2 !== "function") {
                             }
                         });
                         var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
-                        shiftAllOtherXs(-dx);
+                        if (scrolling_on) {
+                            shiftAllOtherXs(-dx);
+                        } else {
+                            game.player.x = modulo(game.player.x + dx, canvasWidth);
+                        }
                         game.player.y += dy;
                         game.player.wheelAngle += signNum(game.player.vx) * 0.2 * dt;
                     },
@@ -1021,7 +1040,8 @@ if (typeof Math.log2 !== "function") {
                                 game.coins.splice(index, 1);
                             }
                         });
-                        if (Math.random() < 1 / (1000 * 10/4) * 4 * dt) { // The '* 10/4' is drawn from the use of the 'likelihood' argument in 'randomly_create_x'
+                        var chanceFactor = scrolling_on ? (8 / 7) : (1 / 14)
+                        if (Math.random() < 1 / (1000 * 10/4) * chanceFactor * 4 * dt) { // The '* 10/4' is drawn from the use of the 'likelihood' argument in 'randomly_create_x'
                             game.coins.push(
                                 createCoin(
                                     randomXPosition(),
@@ -1083,6 +1103,7 @@ if (typeof Math.log2 !== "function") {
                     },
                     difficultyCurve = function (x) {
                         return Math.log2(x + 100) / 37 + 0.67;
+                        //return Math.sqrt(Math.sqrt(x)) / 5 + 0.6
                     },
                     restart = function () {
                         // The interval isn't cleared because the same interval
@@ -1191,9 +1212,15 @@ if (typeof Math.log2 !== "function") {
                     updateFbs(dt);
                     drawMenu(menu);
                 }, 1000 / framerate);
-                jQuery(document).one("click", function () {
-                    clearInterval(intervalId);
-                    play();
+                jQuery(document).on("click.menuHandler", function (event) {
+                    var pos = calcTouchPos(event);
+                    if (pos.x < 50 && pos.y < 50) {
+                        scrolling_on = !scrolling_on;
+                    } else {
+                        clearInterval(intervalId);
+                        jQuery(document).off(".menuHandler");
+                        play();
+                    }
                 });
             };
         return runMenu;
