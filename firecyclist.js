@@ -400,6 +400,7 @@ if (typeof Math.log2 !== "function") {
                 var unit = powerupWeightScaleUnit;
                 if (type === "X2") {
                     ctx.fillStyle = "gold";
+                    ctx.textAlign = "left";
                     ctx.font = "italic 26px Consolas";
                     ctx.lineWidth = 2;
                     ctx.fillText("X2", x - powerupX2Width / 2 + 5, y + powerupX2Height / 4, powerupX2Width, powerupX2Height);
@@ -1040,7 +1041,7 @@ if (typeof Math.log2 !== "function") {
                                 game.coins.splice(index, 1);
                             }
                         });
-                        var chanceFactor = scrolling_on ? (8 / 7) : (1 / 14)
+                        var chanceFactor = scrolling_on ? (8 / 7) : (1 / 7)
                         if (Math.random() < 1 / (1000 * 10/4) * chanceFactor * 4 * dt) { // The '* 10/4' is drawn from the use of the 'likelihood' argument in 'randomly_create_x'
                             game.coins.push(
                                 createCoin(
@@ -1060,7 +1061,7 @@ if (typeof Math.log2 !== "function") {
                             }
                         });
                     },
-                    tryToAddPlatfmFromTouch = function (touch) {
+                    tryToAddPlatfmFromTouch = function (touch, resolver) {
                         var tx0 = touch.x0;
                         if (touchIsNaNMaker(touch)) {
                             return;
@@ -1069,6 +1070,9 @@ if (typeof Math.log2 !== "function") {
                             tx0 -= 1;
                         }
                         game.platfms.push(createPlatfm(tx0, touch.y0, touch.x1, touch.y1));
+                        if (typeof resolver === "function") {
+                            resolver();
+                        }
                     },
                     makePowerupRandom = function (type, start, range) {
                         return createPowerup(Math.random() * range + start, type);
@@ -1131,8 +1135,7 @@ if (typeof Math.log2 !== "function") {
                     } else {
                         // Update state
                         if (curTouch && playerIntersectingPlatfm(game.player, curTouch)) {
-                            tryToAddPlatfmFromTouch(curTouch);
-                            curTouch = null;
+                            tryToAddPlatfmFromTouch(curTouch, function () { curTouch = null; });
                         }
                         updatePlayer(dt);
                         updateCoins(dt);
