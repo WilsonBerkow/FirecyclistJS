@@ -14,8 +14,7 @@ if (typeof Math.log2 !== "function") {
     // These manual-set titles are not related to the game, they are here
     // so I can fuck around with my friend without committing private
     // information.
-    var scrolling_on = false,
-        htmlModule = document.getElementById("Main"),
+    var htmlModule = document.getElementById("Main"),
         htmlBody = document.querySelector("body"),
         windowDims = {
             "width": window.innerWidth || document.documentElement.clientWidth, // The defaulting expression (.documentElement....) is for IE
@@ -50,9 +49,30 @@ if (typeof Math.log2 !== "function") {
         },
         handleTouchend,
         curTouch = null,
+        loop_unlocked = (function () {
+            var item = localStorage.getItem("loop_unlocked");
+            if (item === null) {
+                localStorage.setItem("loop_unlocked", "false");
+                return false;
+            }
+            if (item === "false") {
+                return false;
+            }
+            return true;
+        }()),
         highscores = (function () {
             var scores = [null, null, null], // Highest scores are at the beginning, null represents an empty slot.
-                fromLocal = localStorage.getItem("highscores");
+                fromLocal = localStorage.getItem("highscores"),
+                sendToUnlockingStuff = (function () {
+                    return function (score) {
+                        if (score >= 100) {
+                            if (!loop_unlocked) {
+                                localStorage.setItem("loop_unlocked", "true");
+                                loop_unlocked = true;
+                            }
+                        }
+                    };
+                }());
             if (fromLocal !== null) {
                 fromLocal = JSON.parse(fromLocal);
                 if (fromLocal) {
@@ -70,6 +90,7 @@ if (typeof Math.log2 !== "function") {
                 },
                 sendScore: function (score) {
                     var i, result = false;
+                    sendToUnlockingStuff(score);
                     for (i = 0; i < scores.length; i += 1) {
                         if (score > scores[i] || scores[i] === null) {
                             scores.splice(i, 0, score);
@@ -170,9 +191,11 @@ if (typeof Math.log2 !== "function") {
         inGamePointsPxSize = 30,
         inGamePointsYPos = 30,
         menuPlayBtnX = canvasWidth / 2,
-        menuPlayBtnY = 310,
+        menuPlayBtnY = 280,
         menuPlayBtnW = 121,
         menuPlayBtnH = 44,
+        menuScrollingBtnY = 280,
+        menuLoopBtnY = 340,
         powerupX2Width = 36,
         powerupX2Height = 30,
         powerupSlowRadius = 10,
@@ -187,6 +210,15 @@ if (typeof Math.log2 !== "function") {
         },
         isOverRestartBtn = function (xy) {
             return dist(xy.x1, xy.y1, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
+        },
+        isOverPlayBtn = function (xy) {
+            return xy.y1 >= menuPlayBtnY - 5 && xy.y1 <= menuPlayBtnY + menuPlayBtnH + 5;
+        },
+        isOverScrollBtn = function (xy) {
+            return xy.y1 >= menuScrollingBtnY - 5 && xy.y1 <= menuScrollingBtnY + menuPlayBtnH + 5;
+        },
+        isOverLoopBtn = function (xy) {
+            return xy.y1 >= menuLoopBtnY - 5 && xy.y1 <= menuLoopBtnY + menuPlayBtnH + 5;
         },
         objIsVisible = function (width, obj) {
             return obj.x > -width && obj.x < canvasWidth + width;
@@ -491,11 +523,37 @@ if (typeof Math.log2 !== "function") {
                 ctx.font = "italic bold 95px arial";
                 fillShadowyText(ctx, "cyclist", canvasWidth / 2 - 3, 240, true, 2);
             }),
+            drawButtonBandAt = function (ctx, y) {
+                ctx.fillStyle = "rgba(170, 170, 170, 0.5)";
+                ctx.fillRect(0, y - 5, canvasWidth, 54 + 12);
+            },
+            // TODO: FACTOR COMMONALITIES OF BUTTONS
             drawMenuPlayBtn = drawer(function (ctx) {
+                if (curTouch && isOverPlayBtn(curTouch)) {
+                    drawButtonBandAt(ctx, menuPlayBtnY);
+                }
                 ctx.font = "italic bold 54px Consolas";
                 ctx.textAlign = "center";
                 ctx.fillStyle = "rgb(150, 140, 130)";
-                ctx.fillText("Play", menuPlayBtnX, menuPlayBtnY, menuPlayBtnW, menuPlayBtnH);
+                ctx.fillText("Play", menuPlayBtnX, menuPlayBtnY + menuPlayBtnH, menuPlayBtnW, menuPlayBtnH);
+            }),
+            drawMenuPlayScrollBtn = drawer(function (ctx) {
+                if (curTouch && isOverScrollBtn(curTouch)) {
+                    drawButtonBandAt(ctx, menuScrollingBtnY);
+                }
+                ctx.font = "italic bold 54px corbel";
+                ctx.textAlign = "center";
+                ctx.fillStyle = "rgb(150, 140, 130)";
+                ctx.fillText("Free", menuPlayBtnX, menuScrollingBtnY + menuPlayBtnH, menuPlayBtnW, menuPlayBtnH);
+            }),
+            drawMenuPlayLoopBtn = drawer(function (ctx) {
+                if (curTouch && isOverLoopBtn(curTouch)) {
+                    drawButtonBandAt(ctx, menuLoopBtnY);
+                }
+                ctx.font = "italic bold 54px corbel";
+                ctx.textAlign = "center";
+                ctx.fillStyle = "rgb(150, 140, 130)";
+                ctx.fillText("Confined", menuPlayBtnX, menuLoopBtnY + menuPlayBtnH, menuPlayBtnW * 1.4, menuPlayBtnH);
             }),
             drawMenu = drawer(function (ctx, menu) {
                 ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -503,7 +561,12 @@ if (typeof Math.log2 !== "function") {
                 drawFirebits(ctx, menu.firebitsRed, "red");
                 drawFirebits(ctx, menu.firebitsOrg, "darkOrange");
                 drawMenuTitle();
-                drawMenuPlayBtn();
+                if (loop_unlocked) {
+                    drawMenuPlayScrollBtn();
+                    drawMenuPlayLoopBtn();
+                } else {
+                    drawMenuPlayBtn();
+                }
             }),
             drawGame = drawer(function (ctx, game) {
                 ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -724,8 +787,9 @@ if (typeof Math.log2 !== "function") {
             },
             createGame = (function () {
                 var mkPowerupsObj = simpleIterable(["X2", "slow", "weight", "magnet"]);
-                return function () {
+                return function (mode) {
                     return {
+                        "mode": mode,
                         "player": createPlayer(canvasWidth / 2, 50, 0, 0),
                         "platfms": [],
                         "previewPlatfmTouch": null,
@@ -821,8 +885,8 @@ if (typeof Math.log2 !== "function") {
                     return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
                 }
             },
-            randomXPosition = function () {
-                var rand = Math.random();
+            randomXPosition = function (mode) {
+                var rand = Math.random(), scrolling_on = !mode || mode === "scroll";
                 return scrolling_on ? rand * canvasWidth * 7 - canvasWidth * 3
                                     : rand * canvasWidth;
                 //return Math.random() * canvasWidth;// * 7 - canvasWidth * 3;
@@ -835,11 +899,12 @@ if (typeof Math.log2 !== "function") {
                 return createFirebit(absoluteX, absoluteY);
             },
             updateFbsGeneric = function (obj, dt) { // This is used in both play and runMenu, and thus must be declared here.
-                var fbArray = Array.isArray(obj) ? obj : obj.fbs,
+                var mode = Array.isArray(obj) ? "scroll" : obj.mode,
+                    fbArray = Array.isArray(obj) ? obj : obj.fbs,
                     fewInLowerPortion = function () {
-                        var count = 0, i, fb;
+                        var i, fb;
                         for (i = 0; i < fbArray.length; i += 1) {
-                            fb = fbArray[i]
+                            fb = fbArray[i];
                             if (fb.y > canvasHeight * 3 / 4 && fb.x >= 0 && fb.x <= canvasWidth) { // The tests on x are for scrolling_on mode, in which it is the density *per viewport-width*  that matters, not the total
                                 return false;
                             }
@@ -897,18 +962,18 @@ if (typeof Math.log2 !== "function") {
                 });
                 updateFirebits(fbFirebitsRed);
                 updateFirebits(fbFirebitsOrg);
-                var chanceFactor = scrolling_on ? (9 / 7) : (1 / 7)
+                var chanceFactor = mode === "scroll" ? (9 / 7) : (1 / 7);
                 if (Math.random() < 1 / 1000 * 4 * chanceFactor * dt || fewInLowerPortion()) {
-                    x = randomXPosition();
+                    x = randomXPosition(mode);
                     y = canvasHeight + fbRadius;
                     fbArray.push(createFb(x, y));
                 }
             },
             
             // PLAY:
-            play = function () {
+            play = function (mode) {
                 var
-                    game = createGame(),
+                    game = createGame(mode),
                     die = function () {
                         if (game.dead) { return; }
                         game.dead = true;
@@ -1016,7 +1081,7 @@ if (typeof Math.log2 !== "function") {
                             }
                         });
                         var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
-                        if (scrolling_on) {
+                        if (game.mode === "scroll") {
                             shiftAllOtherXs(-dx);
                         } else {
                             game.player.x = modulo(game.player.x + dx, canvasWidth);
@@ -1041,11 +1106,11 @@ if (typeof Math.log2 !== "function") {
                                 game.coins.splice(index, 1);
                             }
                         });
-                        var chanceFactor = scrolling_on ? (8 / 7) : (1 / 7)
+                        var chanceFactor = game.mode === "scroll" ? (8 / 7) : (1 / 7);
                         if (Math.random() < 1 / (1000 * 10/4) * chanceFactor * 4 * dt) { // The '* 10/4' is drawn from the use of the 'likelihood' argument in 'randomly_create_x'
                             game.coins.push(
                                 createCoin(
-                                    randomXPosition(),
+                                    randomXPosition(game.mode),
                                     canvasHeight + coinRadius
                                 )
                             );
@@ -1107,12 +1172,11 @@ if (typeof Math.log2 !== "function") {
                     },
                     difficultyCurve = function (x) {
                         return Math.log2(x + 100) / 37 + 0.67;
-                        //return Math.sqrt(Math.sqrt(x)) / 5 + 0.6
                     },
                     restart = function () {
                         // The interval isn't cleared because the same interval
                         // is used for the next game (after the restart).
-                        game = createGame();
+                        game = createGame(game.mode);
                     },
                     prevFrameTime = Date.now();
                 setInterval(function () {
@@ -1216,13 +1280,19 @@ if (typeof Math.log2 !== "function") {
                     drawMenu(menu);
                 }, 1000 / framerate);
                 jQuery(document).on("click.menuHandler", function (event) {
-                    var pos = calcTouchPos(event);
-                    if (pos.x < 50 && pos.y < 50) {
-                        scrolling_on = !scrolling_on;
-                    } else {
+                    var pos = calcTouchPos(event), tpos = {"x1": pos.x, "y1": pos.y};
+                    if (!loop_unlocked && isOverPlayBtn(tpos)) {
                         clearInterval(intervalId);
                         jQuery(document).off(".menuHandler");
-                        play();
+                        play("scroll");
+                    } else if (loop_unlocked && isOverScrollBtn(tpos)) {
+                        clearInterval(intervalId);
+                        jQuery(document).off(".menuHandler");
+                        play("scroll");
+                    } else if (loop_unlocked && isOverLoopBtn(tpos)) {
+                        clearInterval(intervalId);
+                        jQuery(document).off(".menuHandler");
+                        play("loop");
                     }
                 });
             };
