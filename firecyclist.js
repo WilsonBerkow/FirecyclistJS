@@ -60,19 +60,17 @@ if (typeof Math.log2 !== "function") {
             }
             return true;
         }()),
-        highscores = (function () {
+        mkHighscores = function (identifier, handleUnlockingStuff) {
             var scores = [null, null, null], // Highest scores are at the beginning, null represents an empty slot.
-                fromLocal = localStorage.getItem("highscores"),
-                sendToUnlockingStuff = (function () {
-                    return function (score) {
-                        if (score >= 100) {
-                            if (!loop_unlocked) {
-                                localStorage.setItem("loop_unlocked", "true");
-                                loop_unlocked = true;
-                            }
+                fromLocal = localStorage.getItem(identifier),
+                sendToUnlockingStuff = function (score) {
+                    if (handleUnlockingStuff && score >= 100) {
+                        if (!loop_unlocked) {
+                            localStorage.setItem("loop_unlocked", "true");
+                            loop_unlocked = true;
                         }
-                    };
-                }());
+                    }
+                };
             if (fromLocal !== null) {
                 fromLocal = JSON.parse(fromLocal);
                 if (fromLocal) {
@@ -99,11 +97,16 @@ if (typeof Math.log2 !== "function") {
                             break;
                         }
                     }
-                    localStorage.setItem("highscores", JSON.stringify(scores));
+                    localStorage.setItem(identifier, JSON.stringify(scores));
                     return result;
                 }
             };
-        }());
+        },
+        scrollHighscores = mkHighscores("free_highscores", true),
+        loopHighscores = mkHighscores("confined_highscores", false),
+        highscoresOf = function (game) {
+            return game.mode == "scroll" ? scrollHighscores : loopHighscores;
+        };
     resize();
     (function () { // Simple Touch system, similar to Elm's but compatible with the Platfm interface
         var touchesCount = 0;
@@ -220,8 +223,8 @@ if (typeof Math.log2 !== "function") {
         isOverLoopBtn = function (xy) {
             return xy.y1 >= menuLoopBtnY - 5 && xy.y1 <= menuLoopBtnY + menuPlayBtnH + 5;
         },
-        objIsVisible = function (width, obj) {
-            return obj.x > -width && obj.x < canvasWidth + width;
+        objIsVisible = function (hradius, obj) {
+            return obj.x > -hradius && obj.x < canvasWidth + hradius;
         };
     // RENDER:
     var renderers = (function () {
@@ -382,15 +385,25 @@ if (typeof Math.log2 !== "function") {
                 ctx.stroke();
             },
             pxSize = 36,
-            drawPauseBtn = function (ctx, game) {
+            drawTLBtnOutline = function (ctx, game) {
                 var colory = !game.dead && (game.paused || (curTouch && isOverPauseBtn(curTouch)));
                 ctx.beginPath();
                 ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)";
                 ctx.arc(pauseBtnCenterX, pauseBtnCenterY, pauseBtnRadius, 0, 2 * Math.PI, true);
                 ctx.fill();
+                return colory;
+            },
+            drawPauseBtn = function (ctx, game) {
+                var colory = drawTLBtnOutline(ctx, game);
                 ctx.font = "bold " + pxSize + "px arial";
                 ctx.textAlign = "left";
                 fillShadowyText(ctx, "II", 15, 15 + pxSize / 2, colory);
+            },
+            drawBackBtn = function (ctx, game) {
+                var colory = drawTLBtnOutline(ctx, game);
+                ctx.font = "bold " + 1.5 * pxSize + "px arial";
+                ctx.textAlign = "left";
+                fillShadowyText(ctx, "↩", 5, (15 + pxSize / 2) * 1.2, colory);
             },
             offCanvImg = function (w, h, src) {
                 var offCanvas = document.createElement('canvas'),
@@ -418,9 +431,16 @@ if (typeof Math.log2 !== "function") {
                     }
                 };
             }()),
-            redrawBtnLayer = function (game) {
+            clearBtnLayer = function () {
                 btnCtx.clearRect(0, 0, canvasWidth, 100);
-                drawPauseBtn(btnCtx, game);
+            },
+            redrawBtnLayer = function (game) {
+                clearBtnLayer();
+                //if (game.dead && loop_unlocked) {
+                //    drawBackBtn(btnCtx, game);
+                //} else {
+                    drawPauseBtn(btnCtx, game);
+                //}
                 drawRestartBtn(btnCtx, game);
             },
             drawInGamePoints = function (ctx, points) {
@@ -639,15 +659,15 @@ if (typeof Math.log2 !== "function") {
                 var scoreFontSize = 24;
                 ctx.font = "bold " + scoreFontSize + "px Consolas";
                 var curY = 435;
-                highscores.highest().forEach(function (score) {
+                highscoresOf(game).highest().forEach(function (score) {
                     if (!score) { return; }
                     ctx.fillText(score, canvasWidth / 2, curY);
                     curY += scoreFontSize + 2;
                 });
             });
-        return [drawGame, drawGamePaused, drawGameDead, drawMenu, redrawBtnLayer];
+        return [drawGame, drawGamePaused, drawGameDead, drawMenu, redrawBtnLayer, clearBtnLayer];
     }());
-    var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawMenu = renderers[3], redrawBtnLayer = renderers[4];
+    var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawMenu = renderers[3], redrawBtnLayer = renderers[4], clearBtnLayer = renderers[5];
     
     // PLAY:
     var start = (function () {
@@ -937,7 +957,7 @@ if (typeof Math.log2 !== "function") {
                     if (fb.y < -totalFbHeight) {
                         fbArray.splice(index, 1);
                     }
-                    if (!objIsVisible(2 * fbRadius, fb)) { return; }
+                    if (!objIsVisible(2 * fbRadius, fb)) { return; } // The '2 *' is so that when the user moves left/right, edge-fbs will already have firebits around them
                     if (fbFirebitsRed) {
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
@@ -981,6 +1001,7 @@ if (typeof Math.log2 !== "function") {
                             game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
                         }
                         redrawBtnLayer(game);
+                        //clearBtnLayer();
                     },
                     handleActivesPoints = function ($$$) {
                         var i;
@@ -1216,7 +1237,7 @@ if (typeof Math.log2 !== "function") {
                             game.previewPlatfmTouch = curTouch;
                         }
                         if (game.dead) {
-                            highscores.sendScore(Math.floor(game.points));
+                            highscoresOf(game).sendScore(Math.floor(game.points));
                         }
                         drawGame(game);
                     }
