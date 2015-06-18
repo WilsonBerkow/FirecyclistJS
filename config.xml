@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget id="com.wilsonberkow.www" version="0.0.1"> <!-- THE ID MUST BE CHANGED, THIS IS ONLY TEMPORARY -->
+    <name>Firecyclist</name>
+    <description>
+        Maneuver around fireballs and capture coins as unicyclist falling from the sky! 
+    </description>
+    <author email="wilsonberkow@gmail.com">
+        Wilson Berkow
+    </author>
+    <content src="index.html" />
+    <access origin="*" />
+    <preference name="Fullscreen" value="true" />
+    <preference name="Orientation" value="portrait" />
+    <icon src="img/icon.png" />
+    <preference name="permissions" value="none"/>
+</widget>
