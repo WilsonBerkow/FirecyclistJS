@@ -650,8 +650,8 @@ if (typeof Math.log2 !== "function") {
                 ctx.fillStyle = "darkOrange";
                 ctx.font = "bold italic 90px standardi0";
                 ctx.textAlign = "center";
-                ctx.fillText("Game", canvasWidth / 2, 110);
-                ctx.fillText("Over", canvasWidth / 2, 195);
+                ctx.fillText("Game", canvasWidth / 2 - 5, 120);
+                ctx.fillText("Over", canvasWidth / 2 - 5, 195);
                 
                 // Points big
                 ctx.font = "bold 140px standardi0";
