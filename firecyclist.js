@@ -140,7 +140,10 @@ if (typeof Math.log2 !== "function") {
         },
         pythag = function (a, b) { return Math.sqrt(a*a + b*b); },
         dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
+        sqrt2 = Math.sqrt(2),
+        sqrt3 = Math.sqrt(3),
         // CONFIG:
+        canvasBackground = "rgb(185, 185, 255)", // Used in CSS
         framerate = 40,
         canvasWidth = 576 / 2,
         canvasHeight = 1024 / 2,
@@ -195,6 +198,9 @@ if (typeof Math.log2 !== "function") {
         },
         objIsVisible = function (hradius, obj) {
             return obj.x > -hradius && obj.x < canvasWidth + hradius;
+        },
+        playerYToStdHeadCenterY = function (y) { // 'Std' because it assumes player is not ducking.
+            return y - playerTorsoLen - playerRadius - playerHeadRadius;
         };
     // RENDER:
     var renderers = (function () {
@@ -283,9 +289,56 @@ if (typeof Math.log2 !== "function") {
                     }
                 };
             }()),
-            drawPlayerAt = function (ctx, x, y, angle) {
+            drawPlayerDuckingAt = function (ctx, x, y, wheelAngle) {
                 ctx.beginPath();
-                circleAt(ctx, x, y - playerTorsoLen - playerRadius - playerHeadRadius, playerHeadRadius, 0, 2 * Math.PI, true);
+                
+                var playerHeadX = x - 3;
+                var playerHeadY = y - 10;
+                
+                // Torso:
+                var torsoStartX = playerHeadX + sqrt3 / 2 * playerHeadRadius;
+                var torsoStartY = playerHeadY + 0.5 * playerHeadRadius;
+                var torsoMidX = torsoStartX + 5;
+                var torsoMidY = torsoStartY + 2;
+                ctx.moveTo(torsoStartX, torsoStartY);
+                ctx.lineTo(torsoMidX, torsoMidY);
+                ctx.lineTo(x, y);
+                
+                // One arm (shadowed by head):
+                ctx.moveTo(torsoMidX, torsoMidY);
+                ctx.lineTo(torsoMidX - 1, playerHeadY - playerHeadRadius * 0.65);
+                ctx.lineTo(playerHeadX - playerHeadRadius * 1.4, playerHeadY - playerHeadRadius + 4);
+                
+                wheelAt(ctx, x, y, wheelAngle);
+                
+                ctx.stroke();
+                
+                // Solid body of head, with slight extra radius for outline:
+                var style = ctx.fillStyle;
+                ctx.beginPath();
+                ctx.fillStyle = canvasBackground;
+                circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius + ctx.lineWidth / 2);
+                ctx.fill();
+                ctx.fillStyle = style;
+                
+                //
+                // Now for the lines to appear on top of the head:
+                
+                ctx.beginPath();
+                
+                // Outline of head:
+                circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius);
+                
+                // Final arm (not shadowed by head):
+                ctx.moveTo(torsoMidX, torsoMidY);
+                ctx.lineTo(x, playerHeadY);
+                ctx.lineTo(x - playerHeadRadius - 3, playerHeadY + 3);
+                
+                ctx.stroke();
+            },
+            drawPlayerAt = function (ctx, x, y, wheelAngle) {
+                ctx.beginPath();
+                circleAt(ctx, x, playerYToStdHeadCenterY(y), playerHeadRadius);
                 ctx.moveTo(x, y - playerTorsoLen - playerRadius);
                 ctx.lineTo(x, y); // (x, y) is the center of the wheel
                 
@@ -295,7 +348,7 @@ if (typeof Math.log2 !== "function") {
                 oneArm(ctx, true);
                 ctx.restore();
                 
-                wheelAt(ctx, x, y, angle);
+                wheelAt(ctx, x, y, wheelAngle);
                 
                 ctx.stroke();
             },
@@ -546,7 +599,12 @@ if (typeof Math.log2 !== "function") {
             drawGame = drawer(function (ctx, game) {
                 ctx.clearRect(0, 0, canvasWidth, canvasHeight);
                 overlayCtx.clearRect(0, 0, canvasWidth, canvasHeight);
-                drawPlayerAt(ctx, game.player.x, game.player.y, game.player.wheelAngle);
+                if (game.player.ducking) {
+                    drawPlayerDuckingAt(ctx, game.player.x, game.player.y, game.player.wheelAngle);
+                } else {
+                    drawPlayerAt(ctx, game.player.x, game.player.y, game.player.wheelAngle);
+                    
+                }
                 setupGenericPlatfmChars(ctx);
                 game.platfms.forEach(function (platfm) {
                     drawPlatfm(ctx, platfm);
@@ -687,7 +745,7 @@ if (typeof Math.log2 !== "function") {
                 };
             }()),
             createPlayer = anglify(false, function (x, y, vx, vy) {
-                return {"x": x, "y": y, "vx": vx, "vy": vy, "wheelAngle": 0};
+                return {"x": x, "y": y, "vx": vx, "vy": vy, "wheelAngle": 0, "ducking": false};
             }),
             createPlatfm = anglify(true, function (x0, y0, x1, y1) {
                 return {"x0": x0, "y0": y0, "x1": x1, "y1": y1, "time_left": 800};
@@ -815,9 +873,12 @@ if (typeof Math.log2 !== "function") {
                     bigD = offsetStartX * offsetEndY - offsetEndX * offsetStartY;
                 return Math.pow(rad * platLength, 2) >= bigD * bigD;
             },
+            playerWheelHittingCircle = function (player, x, y, circleRadius) {
+                return dist(player.x, player.y, x, y) < playerRadius + circleRadius;
+            },
             playerHittingCircle = function (player, x, y, circleRadius) {
-                return dist(player.x, player.y, x, y) < playerRadius + circleRadius
-                    || dist(player.x, player.y - playerRadius - playerTorsoLen - playerHeadRadius, x, y) < playerHeadRadius + circleRadius;
+                return playerWheelHittingCircle(player, x, y, circleRadius)
+                    || dist(player.x, playerYToStdHeadCenterY(player.y), x, y) < playerHeadRadius + circleRadius;
             },
             circleHittingRect = function (circX, circY, radius, rectX, rectY, rectWidth, rectHeight) { // Adapted from StackOverflow answer by 'e. James': http://stackoverflow.com/a/402010
                 var distX = Math.abs(circX - rectX),
@@ -834,12 +895,17 @@ if (typeof Math.log2 !== "function") {
                 return cornerDist_squared <= (radius * radius);
             },
             playerHittingRect = function (player, x, y, w, h) {
-                var headY = player.y - playerTorsoLen - playerRadius - playerHeadRadius;
+                var headY = playerYToStdHeadCenterY(player.y);
                 return circleHittingRect(player.x, player.y, playerRadius, x, y, w, h) ||
                        circleHittingRect(player.x, headY, playerHeadRadius, x, y, w, h);
             },
+            playerHeadNearFb = function (player, fb) {
+                var headWithMargin = playerHeadRadius + 5;
+                // Add a margin of 5 so he ducks a little early.
+                return dist(player.x, playerYToStdHeadCenterY(player.y), fb.x, fb.y) < headWithMargin + fbRadius;
+            },
             playerHittingFb = function (player, fb) {
-                return playerHittingCircle(player, fb.x, fb.y, fbRadius);
+                return playerWheelHittingCircle(player, fb.x, fb.y, fbRadius);
             },
             playerHittingCoin = function (player, coin) {
                 return playerHittingCircle(player, coin.x, coin.y, coinRadius);
@@ -1031,7 +1097,11 @@ if (typeof Math.log2 !== "function") {
                                 game.player.vy += playerGrav * dt;
                             }
                         }
+                        game.player.ducking = false;
                         for (i = 0; i < game.fbs.length; i += 1) {
+                            if (game.player.ducking === false && playerHeadNearFb(game.player, game.fbs[i])) {
+                                game.player.ducking = true;
+                            }
                             if (playerHittingFb(game.player, game.fbs[i])) {
                                 die();
                             }
