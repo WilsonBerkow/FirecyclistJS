@@ -82,7 +82,7 @@ if (typeof Math.log2 !== "function") {
                 }
             };
         },
-        highscores = mkHighscores("confined_highscores");
+        highscores = mkHighscores("highscores");
     resize();
     (function () { // Simple Touch system, similar to Elm's but compatible with the Platfm interface
         var touchesCount = 0;
@@ -466,7 +466,7 @@ if (typeof Math.log2 !== "function") {
                 if (type === "X2") {
                     ctx.fillStyle = "gold";
                     ctx.textAlign = "left";
-                    ctx.font = "italic 26px standardi0";
+                    ctx.font = "italic 24px standardi1";
                     ctx.lineWidth = 2;
                     ctx.fillText("X2", x - powerupX2Width / 2 + 5, y + powerupX2Height / 4, powerupX2Width, powerupX2Height);
                     ctx.strokeStyle = "orange";
@@ -1072,7 +1072,7 @@ if (typeof Math.log2 !== "function") {
                         }
                         return false;
                     },
-                    updatePlayer = function (dt) {
+                    updatePlayer = function (dt, totalPoints) {
                         var i, platfm, tmpVel, collided = false;
                         if (game.player.y > canvasHeight + playerRadius) {
                             die();
@@ -1109,7 +1109,9 @@ if (typeof Math.log2 !== "function") {
                         game.coins.forEach(function (coin, index) {
                             if (playerHittingCoin(game.player, coin)) {
                                 game.coins.splice(index, 1);
-                                game.points += handleActivesPoints(coinValue);
+                                var s = difficultyCurve(totalPoints);
+                                console.log(coinValue, "*", s, "=", coinValue * s);
+                                game.points += handleActivesPoints(coinValue * s);
                             }
                         });
                         game.powerups.forEach(function (powerup, key) {
@@ -1255,13 +1257,13 @@ if (typeof Math.log2 !== "function") {
                         if (curTouch && playerIntersectingPlatfm(game.player, curTouch)) {
                             tryToAddPlatfmFromTouch(curTouch, function () { curTouch = null; });
                         }
-                        updatePlayer(dt);
+                        updatePlayer(dt, game.points);
                         updateCoins(dt);
                         updateFbs(dt);
                         updatePlatfms(dt);
                         updatePowerups(dt);
                         updateActivePowerups(dt);
-                        game.points += handleActivesPoints(4 * (realDt / 1000) * Math.sqrt(Math.max(0, game.player.y / canvasHeight))); // The use of realDt here means that when you get the slow powerup, you still get points at normal speed.
+                        game.points += handleActivesPoints(7 * (realDt / 1000) * Math.sqrt(Math.max(0, game.player.y / canvasHeight))); // The use of realDt (rather than dt) here means that when you get the slow powerup, you still get points at normal speed.
                         // Point logic from Elm:
                         //  points <- g.points + 2 * (Time.inSeconds dt) * (1 + g.player.pos.y / toFloat game_total_height) + points_from_coins
                         
