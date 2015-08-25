@@ -1126,10 +1126,25 @@ if (typeof Math.log2 !== "function") {
                     updateFbs = function (dt) {
                         updateFbsGeneric(game, dt);
                     },
+                    addDiagPattern = function (do_rtl) {
+                        // If do_rtl is truthy, the diag pattern
+                        // will go down-and-left from the right.
+                        var amt = 11;
+                        var i, xPos;
+                        for (i = 0; i < amt; i += 1) {
+                            xPos = (i + 1) * canvasWidth / (amt + 1);
+                            if (do_rtl) { xPos = canvasWidth - xPos; }
+                            game.coins.push(createCoin(
+                                xPos,
+                                i * 20 + canvasHeight + coinRadius
+                            ));
+                        }
+                    },
                     updateCoins = function (dt) {
-                        var magnetOn = magnetObtained(), distance;
+                        var magnetOn = magnetObtained();
                         game.coins.forEach(function (coin, index) {
                             coin.y -= coinFallRate * dt;
+                            var distance;
                             if (magnetOn) {
                                 distance = coin.distanceTo(game.player);
                                 if (distance < 100 && distance !== 0) {
@@ -1140,14 +1155,19 @@ if (typeof Math.log2 !== "function") {
                                 game.coins.splice(index, 1);
                             }
                         });
-                        var chanceFactor = 1 / 7;
-                        if (Math.random() < 1 / (1000 * 10/4) * chanceFactor * 4 * dt) { // The '* 10/4' is drawn from the use of the 'likelihood' argument in 'randomly_create_x'
-                            game.coins.push(
-                                createCoin(
-                                    randomXPosition(),
-                                    canvasHeight + coinRadius
-                                )
-                            );
+                        var chanceFactor;
+                        if (Math.random() < 1 / (1000 * 25) * dt) {
+                            addDiagPattern(Math.random() < 0.5);
+                        } else {
+                            chanceFactor = 1 / 7;
+                            if (Math.random() < 1 / (1000 * 10/4) * chanceFactor * 4 * dt) {
+                                game.coins.push(
+                                    createCoin(
+                                        randomXPosition(),
+                                        canvasHeight + coinRadius
+                                    )
+                                );
+                            }
                         }
                     },
                     updatePlatfms = function (dt) {
