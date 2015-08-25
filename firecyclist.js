@@ -458,7 +458,7 @@ if (typeof Math.log2 !== "function") {
             },
             drawInGamePoints = function (ctx, points) {
                 ctx.textAlign = "center";
-                ctx.font = "bold " + inGamePointsPxSize + "px Consolas";
+                ctx.font = "bold " + inGamePointsPxSize + "px standardi0";
                 fillShadowyText(ctx, Math.floor(points), canvasWidth / 2, inGamePointsYPos);
             },
             drawPowerup = function (ctx, type, x, y) {
@@ -466,7 +466,7 @@ if (typeof Math.log2 !== "function") {
                 if (type === "X2") {
                     ctx.fillStyle = "gold";
                     ctx.textAlign = "left";
-                    ctx.font = "italic 26px Consolas";
+                    ctx.font = "italic 26px standardi0";
                     ctx.lineWidth = 2;
                     ctx.fillText("X2", x - powerupX2Width / 2 + 5, y + powerupX2Height / 4, powerupX2Width, powerupX2Height);
                     ctx.strokeStyle = "orange";
@@ -565,7 +565,7 @@ if (typeof Math.log2 !== "function") {
                 if (curTouch && isOverPlayBtn(curTouch)) {
                     drawButtonBandAt(ctx, menuPlayBtnY);
                 }
-                ctx.font = "italic bold 54px Consolas";
+                ctx.font = "italic bold 54px standardi0";
                 ctx.textAlign = "center";
                 ctx.fillStyle = "rgb(150, 140, 130)";
                 ctx.fillText("Play", menuPlayBtnX, menuPlayBtnY + menuPlayBtnH, menuPlayBtnW, menuPlayBtnH);
@@ -641,20 +641,20 @@ if (typeof Math.log2 !== "function") {
             }()),
             drawGamePaused = gameOverlayDrawer(function (ctx, game) {
                 ctx.fillStyle = "darkOrange";
-                ctx.font = "bold 54px Consolas";
+                ctx.font = "bold 54px standardi0";
                 ctx.textAlign = "center";
                 ctx.fillText("Paused", canvasWidth / 2, canvasHeight / 2 - 12);
             }),
             drawGameDead = gameOverlayDrawer(function (ctx, game) {
                 // 'Game Over' text
                 ctx.fillStyle = "darkOrange";
-                ctx.font = "bold italic 90px Consolas";
+                ctx.font = "bold italic 90px standardi0";
                 ctx.textAlign = "center";
                 ctx.fillText("Game", canvasWidth / 2, 110);
                 ctx.fillText("Over", canvasWidth / 2, 195);
                 
                 // Points big
-                ctx.font = "bold 140px Consolas";
+                ctx.font = "bold 140px standardi0";
                 ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvasHeight * 2 / 3 - 18);
                 
                 // Line separator
@@ -667,10 +667,10 @@ if (typeof Math.log2 !== "function") {
                 ctx.stroke();
                 
                 // Highscores
-                ctx.font = "bold italic 28px Consolas";
+                ctx.font = "bold italic 28px standardi0";
                 ctx.fillText("Highscores", canvasWidth / 2, 410);
                 var scoreFontSize = 24;
-                ctx.font = "bold " + scoreFontSize + "px Consolas";
+                ctx.font = "bold " + scoreFontSize + "px standardi0";
                 var curY = 435;
                 highscores.highest().forEach(function (score) {
                     if (!score) { return; }
