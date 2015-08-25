@@ -954,14 +954,25 @@ if (typeof Math.log2 !== "function") {
                         redrawBtnLayer(game);
                         //clearBtnLayer();
                     },
-                    handleActivesPoints = function ($$$) {
+                    addToActivePowerups = function (type) {
+                        var newActive = createActivePowerup(type);
                         var i;
                         for (i = 0; i < game.activePowerups.length; i += 1) {
-                            if (game.activePowerups[i].type === "X2") { // These powerups don't stack. TODO: Consider changing rendering to reflect this.
-                                return $$$ * 2;
+                            if (game.activePowerups[i].type === type) {
+                                game.activePowerups[i] = newActive;
+                                return;
                             }
                         }
-                        return $$$;
+                        game.activePowerups.push(newActive);
+                    },
+                    handleActivesPoints = function (pointsReceived) {
+                        var i;
+                        for (i = 0; i < game.activePowerups.length; i += 1) {
+                            if (game.activePowerups[i].type === "X2") {
+                                return pointsReceived * 2;
+                            }
+                        }
+                        return pointsReceived;
                     },
                     slowPowerupObtained = function () {
                         var i;
@@ -1034,7 +1045,7 @@ if (typeof Math.log2 !== "function") {
                         game.powerups.forEach(function (powerup, key) {
                             if (playerHittingPowerup(game.player, powerup)) {
                                 game.powerups[key] = null;
-                                game.activePowerups.push(createActivePowerup(powerup.type));
+                                addToActivePowerups(powerup.type);
                             }
                         });
                         var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
