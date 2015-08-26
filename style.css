@@ -1,0 +1,23 @@
+@font-face {
+    font-family: 'standardi0';
+    src: url('fonts/ComicNeue-Angular_Bold.otf');
+}
+html, body {
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    cursor: default;
+    background: black;
+    width: 288px;
+}
+#Main {
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+canvas {
+    position: absolute;
+}
+#canvas {
+    background: rgb(185, 185, 255);
+}
