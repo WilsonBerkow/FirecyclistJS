@@ -452,13 +452,17 @@ if (typeof Math.log2 !== "function") {
             },
             redrawBtnLayer = function (game) {
                 clearBtnLayer();
-                drawPauseBtn(btnCtx, game);
-                drawRestartBtn(btnCtx, game);
+                if (!game.paused && !game.dead) {
+                    drawPauseBtn(btnCtx, game);
+                    drawRestartBtn(btnCtx, game);
+                }
             },
-            drawInGamePoints = function (ctx, points) {
-                ctx.textAlign = "center";
-                ctx.font = "bold " + inGamePointsPxSize + "px standardi0";
-                fillShadowyText(ctx, Math.floor(points), canvasWidth / 2, inGamePointsYPos);
+            drawInGamePoints = function (ctx, game) {
+                if (!game.dead) {
+                    ctx.textAlign = "center";
+                    ctx.font = "bold " + inGamePointsPxSize + "px standardi0";
+                    fillShadowyText(ctx, Math.floor(game.points), canvasWidth / 2, inGamePointsYPos);
+                }
             },
             drawPowerup = function (ctx, type, x, y) {
                 var unit = powerupWeightScaleUnit;
@@ -622,7 +626,7 @@ if (typeof Math.log2 !== "function") {
                     drawPowerup(ctx, powerup.type, powerup.xPos(), powerup.yPos());
                 });
                 drawActivePowerups(ctx, game.activePowerups);
-                drawInGamePoints(ctx, game.points);
+                drawInGamePoints(ctx, game);
             }),
             gameOverlayDrawer = (function () { // Specialized version of 'drawer' for drawing game overlays like the Paused or GameOver screens.
                 var vagueify = function (ctx) {
@@ -645,32 +649,34 @@ if (typeof Math.log2 !== "function") {
                 ctx.fillText("Paused", canvasWidth / 2, canvasHeight / 2 - 12);
             }),
             drawGameDead = gameOverlayDrawer(function (ctx, game) {
+                var startY = 100;
+                
                 // 'Game Over' text
                 ctx.fillStyle = "darkOrange";
                 ctx.font = "bold italic 90px standardi0";
                 ctx.textAlign = "center";
-                ctx.fillText("Game", canvasWidth / 2 - 5, 120);
-                ctx.fillText("Over", canvasWidth / 2 - 5, 195);
+                ctx.fillText("Game", canvasWidth / 2 - 5, startY);
+                ctx.fillText("Over", canvasWidth / 2 - 5, startY + 75);
                 
                 // Points big
                 ctx.font = "bold 140px standardi0";
-                ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvasHeight * 2 / 3 - 18);
+                ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvasHeight * 2 / 3 - 28);
                 
                 // Line separator
                 ctx.beginPath();
                 ctx.strokeStyle = "darkOrange";
-                ctx.moveTo(30, 370);
-                ctx.lineTo(canvasWidth - 30, 370);
-                ctx.moveTo(30, 372);
-                ctx.lineTo(canvasWidth - 30, 372);
+                ctx.moveTo(30, startY + 260);
+                ctx.lineTo(canvasWidth - 30, startY + 260);
+                ctx.moveTo(30, startY + 262);
+                ctx.lineTo(canvasWidth - 30, startY + 262);
                 ctx.stroke();
                 
                 // Highscores
                 ctx.font = "bold italic 28px standardi0";
-                ctx.fillText("Highscores", canvasWidth / 2, 410);
+                ctx.fillText("Highscores", canvasWidth / 2, startY + 300);
                 var scoreFontSize = 24;
                 ctx.font = "bold " + scoreFontSize + "px standardi0";
-                var curY = 435;
+                var curY = startY + 325;
                 highscores.highest().forEach(function (score) {
                     if (!score) { return; }
                     ctx.fillText(score, canvasWidth / 2, curY);
