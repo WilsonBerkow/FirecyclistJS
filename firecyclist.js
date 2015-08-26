@@ -649,7 +649,7 @@ if (typeof Math.log2 !== "function") {
                 ctx.fillText("Paused", canvasWidth / 2, canvasHeight / 2 - 12);
             }),
             drawGameDead = gameOverlayDrawer(function (ctx, game) {
-                var startY = 100;
+                var startY = 105;
                 
                 // 'Game Over' text
                 ctx.fillStyle = "darkOrange";
