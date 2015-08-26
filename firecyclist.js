@@ -687,6 +687,25 @@ if (typeof Math.log2 !== "function") {
     }());
     var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawMenu = renderers[3], redrawBtnLayer = renderers[4], clearBtnLayer = renderers[5];
     
+    // Handle device events:
+    var setCurGame = (function () {
+        var curGame = null;
+        document.addEventListener("pause", function () {
+            localStorage.setItem("halted_game", JSON.stringify(curGame));
+        }, false);
+        document.addEventListener("resume", function () {
+            var storedGameText = localStorage.getItem("halted_game");
+            if (typeof storedGameText === "string") {
+                var storedGame = JSON.parse(storedGameText);
+                storedGame.paused = true;
+                start.play(storedGame);
+            }
+        }, false);
+        return function (game) {
+            curGame = game;
+        };
+    }());
+    
     // PLAY:
     var start = (function () {
         var // MODEL + CALC:
@@ -1240,6 +1259,7 @@ if (typeof Math.log2 !== "function") {
                         game = createGame();
                     },
                     prevFrameTime = Date.now();
+                setCurGame(game);
                 setInterval(function () {
                     window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
                     // Handle time (necessary, regardless of pausing)
@@ -1349,7 +1369,7 @@ if (typeof Math.log2 !== "function") {
                     }
                 });
             };
-        return runMenu;
+        return {runMenu: runMenu, play: play};
     }());
-    start();
+    start.runMenu();
 }());
