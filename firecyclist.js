@@ -275,9 +275,8 @@ if (typeof Math.log2 !== "function") {
                     cosines[i] = Math.cos(i * oneDegree);
                 }
                 return function (ctx, x, y, angle) {
-                    var i;
-                    circleAt(ctx, x, y, playerRadius, 0, 2 * Math.PI, true);
-                    var spokeAngle = 0, spinOffset = angle * oneDegree, relX, relY;
+                    circleAt(ctx, x, y, playerRadius);
+                    var spokeAngle = 0, spinOffset = angle * oneDegree, relX, relY, i;
                     for (i = 0; i < 6; i += 1) {
                         relX = getCos(spinOffset + spokeAngle) * playerRadius;
                         relY = getSin(spinOffset + spokeAngle) * playerRadius;
@@ -342,13 +341,13 @@ if (typeof Math.log2 !== "function") {
                 ctx.moveTo(x, y - playerTorsoLen - playerRadius);
                 ctx.lineTo(x, y); // (x, y) is the center of the wheel
                 
+                wheelAt(ctx, x, y, wheelAngle);
+                
                 ctx.save();
                 ctx.translate(x, y - playerRadius - playerTorsoLen / 2);
                 oneArm(ctx);
                 oneArm(ctx, true);
                 ctx.restore();
-                
-                wheelAt(ctx, x, y, wheelAngle);
                 
                 ctx.stroke();
             },
@@ -878,7 +877,7 @@ if (typeof Math.log2 !== "function") {
             },
             playerHittingCircle = function (player, x, y, circleRadius) {
                 return playerWheelHittingCircle(player, x, y, circleRadius)
-                    || dist(player.x, playerYToStdHeadCenterY(player.y), x, y) < playerHeadRadius + circleRadius;
+                    || (!player.ducking && dist(player.x, playerYToStdHeadCenterY(player.y), x, y) < playerHeadRadius + circleRadius);
             },
             circleHittingRect = function (circX, circY, radius, rectX, rectY, rectWidth, rectHeight) { // Adapted from StackOverflow answer by 'e. James': http://stackoverflow.com/a/402010
                 var distX = Math.abs(circX - rectX),
@@ -897,7 +896,7 @@ if (typeof Math.log2 !== "function") {
             playerHittingRect = function (player, x, y, w, h) {
                 var headY = playerYToStdHeadCenterY(player.y);
                 return circleHittingRect(player.x, player.y, playerRadius, x, y, w, h) ||
-                       circleHittingRect(player.x, headY, playerHeadRadius, x, y, w, h);
+                       (!player.ducking && circleHittingRect(player.x, headY, playerHeadRadius, x, y, w, h));
             },
             playerHeadNearFb = function (player, fb) {
                 var headWithMargin = playerHeadRadius + 5;
