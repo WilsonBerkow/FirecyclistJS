@@ -899,8 +899,8 @@ if (typeof Math.log2 !== "function") {
                        (!player.ducking && circleHittingRect(player.x, headY, playerHeadRadius, x, y, w, h));
             },
             playerHeadNearFb = function (player, fb) {
-                var headWithMargin = playerHeadRadius + 5;
-                // Add a margin of 5 so he ducks a little early.
+                var headWithMargin = playerHeadRadius + 10;
+                // Add a margin of 10 so he ducks a little early.
                 return dist(player.x, playerYToStdHeadCenterY(player.y), fb.x, fb.y) < headWithMargin + fbRadius;
             },
             playerHittingFb = function (player, fb) {
