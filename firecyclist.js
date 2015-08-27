@@ -460,7 +460,7 @@ if (typeof Math.log2 !== "function") {
             drawInGamePoints = function (ctx, game) {
                 if (!game.dead) {
                     ctx.textAlign = "center";
-                    ctx.font = "bold " + inGamePointsPxSize + "px standardi0";
+                    ctx.font = "bold " + inGamePointsPxSize + "px r0";
                     fillShadowyText(ctx, Math.floor(game.points), canvasWidth / 2, inGamePointsYPos);
                 }
             },
@@ -469,8 +469,8 @@ if (typeof Math.log2 !== "function") {
                 if (type === "X2") {
                     ctx.fillStyle = "gold";
                     ctx.textAlign = "left";
-                    ctx.font = "italic 24px standardi1";
-                    ctx.lineWidth = 2;
+                    ctx.font = "bold italic 22px arial";
+                    ctx.lineWidth = 1;
                     ctx.fillText("X2", x - powerupX2Width / 2 + 5, y + powerupX2Height / 4, powerupX2Width, powerupX2Height);
                     ctx.strokeStyle = "orange";
                     ctx.strokeText("X2", x - powerupX2Width / 2 + 5, y + powerupX2Height / 4, powerupX2Width, powerupX2Height);
@@ -568,7 +568,7 @@ if (typeof Math.log2 !== "function") {
                 if (curTouch && isOverPlayBtn(curTouch)) {
                     drawButtonBandAt(ctx, menuPlayBtnY);
                 }
-                ctx.font = "italic bold 54px standardi0";
+                ctx.font = "italic bold 54px i0";
                 ctx.textAlign = "center";
                 ctx.fillStyle = "rgb(150, 140, 130)";
                 ctx.fillText("Play", menuPlayBtnX, menuPlayBtnY + menuPlayBtnH, menuPlayBtnW, menuPlayBtnH);
@@ -644,7 +644,7 @@ if (typeof Math.log2 !== "function") {
             }()),
             drawGamePaused = gameOverlayDrawer(function (ctx, game) {
                 ctx.fillStyle = "darkOrange";
-                ctx.font = "bold 54px standardi0";
+                ctx.font = "54px r0";
                 ctx.textAlign = "center";
                 ctx.fillText("Paused", canvasWidth / 2, canvasHeight / 2 - 12);
             }),
@@ -653,13 +653,13 @@ if (typeof Math.log2 !== "function") {
                 
                 // 'Game Over' text
                 ctx.fillStyle = "darkOrange";
-                ctx.font = "bold italic 90px standardi0";
+                ctx.font = "bold italic 90px i0";
                 ctx.textAlign = "center";
-                ctx.fillText("Game", canvasWidth / 2 - 5, startY);
-                ctx.fillText("Over", canvasWidth / 2 - 5, startY + 75);
+                ctx.fillText("Game", canvasWidth / 2 - 4, startY);
+                ctx.fillText("Over", canvasWidth / 2 - 4, startY + 75);
                 
                 // Points big
-                ctx.font = "bold 140px standardi0";
+                ctx.font = "140px r0";
                 ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvasHeight * 2 / 3 - 28);
                 
                 // Line separator
@@ -672,10 +672,10 @@ if (typeof Math.log2 !== "function") {
                 ctx.stroke();
                 
                 // Highscores
-                ctx.font = "bold italic 28px standardi0";
+                ctx.font = "bold italic 28px i0";
                 ctx.fillText("Highscores", canvasWidth / 2, startY + 300);
                 var scoreFontSize = 24;
-                ctx.font = "bold " + scoreFontSize + "px standardi0";
+                ctx.font = scoreFontSize + "px r0";
                 var curY = startY + 325;
                 highscores.highest().forEach(function (score) {
                     if (!score) { return; }

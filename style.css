@@ -1,6 +1,18 @@
 @font-face {
-    font-family: 'standardi0';
+    font-family: 'i0';
+    src: url('fonts/ComicNeue-Angular_Oblique.otf');
+    font-style: italic;
+}
+@font-face {
+    font-family: 'b0';
     src: url('fonts/ComicNeue-Angular_Bold.otf');
+    font-weight: bold;
+}
+@font-face {
+    font-family: 'r0';
+    src: url('fonts/ComicNeue-Angular_Regular.otf');
+    font-style: normal;
+    font-weight: normal;
 }
 html, body {
     margin: 0;
