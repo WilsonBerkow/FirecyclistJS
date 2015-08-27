@@ -275,7 +275,6 @@ if (typeof Math.log2 !== "function") {
                     cosines[i] = Math.cos(i * oneDegree);
                 }
                 return function (ctx, x, y, angle) {
-                    circleAt(ctx, x, y, playerRadius);
                     var spokeAngle = 0, spinOffset = angle * oneDegree, relX, relY, i;
                     for (i = 0; i < 6; i += 1) {
                         relX = getCos(spinOffset + spokeAngle) * playerRadius;
@@ -286,6 +285,7 @@ if (typeof Math.log2 !== "function") {
                             spokeAngle += 1/3 * Math.PI;
                         }
                     }
+                    circleAt(ctx, x, y, playerRadius);
                 };
             }()),
             drawPlayerDuckingAt = function (ctx, x, y, wheelAngle) {
