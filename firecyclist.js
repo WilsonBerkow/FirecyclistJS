@@ -311,6 +311,7 @@ if (typeof Math.log2 !== "function") {
                 ctx.stroke();
                 
                 ctx.beginPath();
+                ctx.lineWidth = 1;
                 wheelAt(ctx, x, y, wheelAngle);
                 ctx.stroke();
                 
@@ -352,6 +353,7 @@ if (typeof Math.log2 !== "function") {
                 ctx.stroke();
                 
                 ctx.beginPath();
+                ctx.lineWidth = 1;
                 wheelAt(ctx, x, y, wheelAngle);
                 ctx.stroke();
             },
