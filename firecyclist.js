@@ -312,10 +312,10 @@ if (typeof Math.log2 !== "function") {
                 
                 ctx.stroke();
                 
-                ctx.beginPath();
-                ctx.lineWidth = 1;
-                wheelAt(ctx, x, y, wheelAngle);
-                ctx.stroke();
+                //ctx.beginPath();
+                //ctx.lineWidth = 1;
+                //wheelAt(ctx, x, y, wheelAngle);
+                //ctx.stroke();
                 
                 // Solid body of head, with slight extra radius for outline:
                 var style = ctx.fillStyle;
@@ -343,6 +343,8 @@ if (typeof Math.log2 !== "function") {
             drawPlayerAt = function (ctx, x, y, wheelAngle) {
                 ctx.beginPath();
                 circleAt(ctx, x, playerYToStdHeadCenterY(y), playerHeadRadius);
+                circleAt(ctx, x, y, playerRadius);
+                circleAt(ctx, x + 1, y + 20, playerRadius + 1);
                 ctx.moveTo(x, y - playerTorsoLen - playerRadius);
                 ctx.lineTo(x, y); // (x, y) is the center of the wheel
                 
@@ -354,10 +356,10 @@ if (typeof Math.log2 !== "function") {
                 
                 ctx.stroke();
                 
-                ctx.beginPath();
-                ctx.lineWidth = 1;
-                wheelAt(ctx, x, y, wheelAngle);
-                ctx.stroke();
+                //ctx.beginPath();
+                //ctx.lineWidth = 1;
+                //wheelAt(ctx, x, y, wheelAngle);
+                //ctx.stroke();
             },
             drawFbs = function (ctx, fbs) {
                 ctx.beginPath();
