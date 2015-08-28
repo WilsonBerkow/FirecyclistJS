@@ -257,35 +257,37 @@ if (typeof Math.log2 !== "function") {
                 ctx.lineTo(-2 * playerElbowXDiff, playerElbowYDiff);
             },
             wheelAt = (function () {
-                var sines = [],   // Sine and cosine tables are used so that the approximation work doesn't
-                    cosines = [], // have to be done more than once for any given angle. The angles of the
-                                  // spokes are rounded down to the nearest degree.
-                                  // TODO: Extract these tables and use them for as many other uses of
-                                  //  Math.sin and Math.cos as possible.
-                    oneDegree = Math.PI / 180,
-                    i,
-                    getSin = function (radians) {
-                        return sines[modulo(Math.floor(radians / oneDegree), 360)];
-                    },
-                    getCos = function (radians) {
-                        return cosines[modulo(Math.floor(radians / oneDegree), 360)];
-                    };
-                for (i = 0; i < 360; i += 1) {
-                    sines[i] = Math.sin(i * oneDegree);
-                    cosines[i] = Math.cos(i * oneDegree);
-                }
+                //var sines = [],   // Sine and cosine tables are used so that the approximation work doesn't
+                //    cosines = [], // have to be done more than once for any given angle. The angles of the
+                //                  // spokes are rounded down to the nearest degree.
+                //                  // TODO: Extract these tables and use them for as many other uses of
+                //                  //  Math.sin and Math.cos as possible.
+                //    oneDegree = Math.PI / 180,
+                //    i,
+                //    getSin = function (radians) {
+                //        return sines[modulo(Math.floor(radians / oneDegree), 360)];
+                //    },
+                //    getCos = function (radians) {
+                //        return cosines[modulo(Math.floor(radians / oneDegree), 360)];
+                //    };
+                //for (i = 0; i < 360; i += 1) {
+                //    sines[i] = Math.sin(i * oneDegree);
+                //    cosines[i] = Math.cos(i * oneDegree);
+                //}
                 return function (ctx, x, y, angle) {
-                    var spokeAngle = 0, spinOffset = angle * oneDegree, relX, relY, i;
-                    for (i = 0; i < 6; i += 1) {
-                        relX = getCos(spinOffset + spokeAngle) * playerRadius;
-                        relY = getSin(spinOffset + spokeAngle) * playerRadius;
-                        ctx.moveTo(x + relX, y + relY);
-                        ctx.lineTo(x - relX, y - relY);
-                        if (i !== 5) {
-                            spokeAngle += 1/3 * Math.PI;
-                        }
-                    }
+                    //var spokeAngle = 0, spinOffset = angle * oneDegree, relX, relY, i;
+                    //for (i = 0; i < 6; i += 1) {
+                    //    relX = getCos(spinOffset + spokeAngle) * playerRadius;
+                    //    relY = getSin(spinOffset + spokeAngle) * playerRadius;
+                    //    ctx.moveTo(x + relX, y + relY);
+                    //    ctx.lineTo(x - relX, y - relY);
+                    //    if (i !== 5) {
+                    //        spokeAngle += 1/3 * Math.PI;
+                    //    }
+                    //}
                     circleAt(ctx, x, y, playerRadius);
+                    circleAt(ctx, x + 20, y, playerRadius);
+                    circleAt(ctx, x, y, playerRadius + 10);
                 };
             }()),
             drawPlayerDuckingAt = function (ctx, x, y, wheelAngle) {
