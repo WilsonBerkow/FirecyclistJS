@@ -342,9 +342,9 @@ if (typeof Math.log2 !== "function") {
             },
             drawPlayerAt = function (ctx, x, y, wheelAngle) {
                 ctx.beginPath();
-                circleAt(ctx, x, playerYToStdHeadCenterY(y), playerHeadRadius);
                 circleAt(ctx, x, y, playerRadius);
                 circleAt(ctx, x + 1, y + 20, playerRadius + 1);
+                circleAt(ctx, x, playerYToStdHeadCenterY(y), playerHeadRadius);
                 ctx.moveTo(x, y - playerTorsoLen - playerRadius);
                 ctx.lineTo(x, y); // (x, y) is the center of the wheel
                 
