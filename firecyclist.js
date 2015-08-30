@@ -154,6 +154,7 @@ if (typeof Math.log2 !== "function") {
         coinRadius = 10,
         coinSquareLen = 8.5,
         coinValue = 11,
+        coinStartingY = canvasHeight + coinRadius,
         platfmFallRate = 3 / 20,
         totalFbHeight = 10,
         platfmBounciness = 0.75,
@@ -877,6 +878,8 @@ if (typeof Math.log2 !== "function") {
                         "firebitsRed": [],
                         "firebitsOrg": [],
                         "coins": [],
+                        "coinColumnsLowest": [],
+                        "coinGridOffset": 0,
                         "powerups": mkPowerupsObj({}),
                         "activePowerups": [],
                         "points": 0,
@@ -1158,9 +1161,7 @@ if (typeof Math.log2 !== "function") {
                         game.coins.forEach(function (coin, index) {
                             if (playerHittingCoin(game.player, coin)) {
                                 game.coins.splice(index, 1);
-                                var s = difficultyCurve(totalPoints);
-                                console.log(coinValue, "*", s, "=", coinValue * s);
-                                game.points += handleActivesPoints(coinValue * s);
+                                game.points += handleActivesPoints(coinValue * difficultyCurve(totalPoints));
                             }
                         });
                         game.powerups.forEach(function (powerup, key) {
@@ -1180,21 +1181,23 @@ if (typeof Math.log2 !== "function") {
                     addDiagPattern = function (do_rtl) {
                         // If do_rtl is truthy, the diag pattern
                         // will go down-and-left from the right.
-                        var amt = 11;
-                        var i, xPos;
-                        for (i = 0; i < amt; i += 1) {
-                            xPos = (i + 1) * canvasWidth / (amt + 1);
+                        var columns = 8;
+                        var column, xPos, newcoin;
+                        for (column = 0; column < columns; column += 1) {
+                            xPos = (column + 0.5) * 35;
                             if (do_rtl) { xPos = canvasWidth - xPos; }
-                            game.coins.push(createCoin(
-                                xPos,
-                                i * 20 + canvasHeight + coinRadius
-                            ));
+                            newcoin = createCoin(xPos, coinStartingY + column * 35);
+                            game.coins.push(newcoin);
+                            game.coinColumnsLowest[column] = newcoin;
                         }
                     },
                     updateCoins = function (dt) {
                         var magnetOn = magnetObtained();
+                        var dy = coinFallRate * dt;
+                        game.coinGridOffset += dy;
+                        game.coinGridOffset = game.coinGridOffset % 35;
                         game.coins.forEach(function (coin, index) {
-                            coin.y -= coinFallRate * dt;
+                            coin.y -= dy;
                             var distance;
                             if (magnetOn) {
                                 distance = coin.distanceTo(game.player);
@@ -1206,18 +1209,20 @@ if (typeof Math.log2 !== "function") {
                                 game.coins.splice(index, 1);
                             }
                         });
-                        var chanceFactor;
+                        var chanceFactor = 1 / 7;
                         if (Math.random() < 1 / (1000 * 25) * dt) {
                             addDiagPattern(Math.random() < 0.5);
                         } else {
-                            chanceFactor = 1 / 7;
                             if (Math.random() < 1 / (1000 * 10/4) * chanceFactor * 4 * dt) {
-                                game.coins.push(
-                                    createCoin(
-                                        randomXPosition(),
-                                        canvasHeight + coinRadius
-                                    )
-                                );
+                                var column = Math.floor(Math.random() * 8);
+                                var pos = (column + 0.5) * 35;
+                                var newcoin = createCoin(pos, coinStartingY + 35 - game.coinGridOffset);
+                                game.coinColumnsLowest[column] = game.coinColumnsLowest[column] || newcoin;
+                                if (newcoin.y - game.coinColumnsLowest[column].y <= 35) {
+                                    newcoin.y += 35;
+                                    game.coinColumnsLowest[column] = newcoin;
+                                }
+                                game.coins.push(newcoin);
                             }
                         }
                     },
