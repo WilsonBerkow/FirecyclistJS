@@ -256,41 +256,56 @@ if (typeof Math.log2 !== "function") {
                 ctx.lineTo(-playerElbowXDiff, -playerElbowYDiff);
                 ctx.lineTo(-2 * playerElbowXDiff, playerElbowYDiff);
             },
-            wheelAt = (function () {
-                //var sines = [],   // Sine and cosine tables are used so that the approximation work doesn't
-                //    cosines = [], // have to be done more than once for any given angle. The angles of the
-                //                  // spokes are rounded down to the nearest degree.
-                //                  // TODO: Extract these tables and use them for as many other uses of
-                //                  //  Math.sin and Math.cos as possible.
-                //    oneDegree = Math.PI / 180,
-                //    i,
-                //    getSin = function (radians) {
-                //        return sines[modulo(Math.floor(radians / oneDegree), 360)];
-                //    },
-                //    getCos = function (radians) {
-                //        return cosines[modulo(Math.floor(radians / oneDegree), 360)];
-                //    };
-                //for (i = 0; i < 360; i += 1) {
-                //    sines[i] = Math.sin(i * oneDegree);
-                //    cosines[i] = Math.cos(i * oneDegree);
-                //}
+            wheelSpokesAt = (function () {
+                var sines = [],   // Sine and cosine tables are used so that the approximation work doesn't
+                    cosines = [], // have to be done more than once for any given angle. The angles of the
+                                  // spokes are rounded down to the nearest degree.
+                                  // TODO: Extract these tables and use them for as many other uses of
+                                  //  Math.sin and Math.cos as possible.
+                    oneDegree = Math.PI / 180,
+                    i,
+                    getSin = function (radians) {
+                        return sines[modulo(Math.floor(radians / oneDegree), 360)];
+                    },
+                    getCos = function (radians) {
+                        return cosines[modulo(Math.floor(radians / oneDegree), 360)];
+                    };
+                for (i = 0; i < 360; i += 1) {
+                    sines[i] = Math.sin(i * oneDegree);
+                    cosines[i] = Math.cos(i * oneDegree);
+                }
                 return function (ctx, x, y, angle) {
-                    //var spokeAngle = 0, spinOffset = angle * oneDegree, relX, relY, i;
-                    //for (i = 0; i < 6; i += 1) {
-                    //    relX = getCos(spinOffset + spokeAngle) * playerRadius;
-                    //    relY = getSin(spinOffset + spokeAngle) * playerRadius;
-                    //    ctx.moveTo(x + relX, y + relY);
-                    //    ctx.lineTo(x - relX, y - relY);
-                    //    if (i !== 5) {
-                    //        spokeAngle += 1/3 * Math.PI;
-                    //    }
-                    //}
-                    circleAt(ctx, x, y, playerRadius);
-                    circleAt(ctx, x + 20, y, playerRadius);
-                    circleAt(ctx, x, y, playerRadius + 10);
+                    var spokeAngle = 0, spinOffset = angle * oneDegree, relX, relY, i;
+                    for (i = 0; i < 6; i += 1) {
+                        relX = getCos(spinOffset + spokeAngle) * playerRadius;
+                        relY = getSin(spinOffset + spokeAngle) * playerRadius;
+                        ctx.moveTo(x + relX, y + relY);
+                        ctx.lineTo(x - relX, y - relY);
+                        if (i !== 5) {
+                            spokeAngle += 1/3 * Math.PI;
+                        }
+                    }
                 };
             }()),
+            wheelOutlineAt = function (ctx, x, y) {
+                // Wheel outline is drawn in two solid parts to get around
+                // Chrome-for-Android rendering bug.
+                var style = ctx.fillStyle;
+                ctx.beginPath();
+                circleAt(ctx, x, y, playerRadius);
+                ctx.fillStyle = "black";
+                ctx.fill();
+                
+                ctx.beginPath();
+                circleAt(ctx, x, y, playerRadius - 1);
+                ctx.fillStyle = canvasBackground;
+                ctx.fill();
+                
+                ctx.fillStyle = style;
+            },
             drawPlayerDuckingAt = function (ctx, x, y, wheelAngle) {
+                wheelOutlineAt(ctx, x, y);
+                
                 ctx.beginPath();
                 
                 var playerHeadX = x - 3;
@@ -310,23 +325,21 @@ if (typeof Math.log2 !== "function") {
                 ctx.lineTo(torsoMidX - 1, playerHeadY - playerHeadRadius * 0.65);
                 ctx.lineTo(playerHeadX - playerHeadRadius * 1.4, playerHeadY - playerHeadRadius + 4);
                 
+                // Spokes of wheel:
+                wheelSpokesAt(ctx, x, y, wheelAngle);
+                
                 ctx.stroke();
                 
-                //ctx.beginPath();
-                //ctx.lineWidth = 1;
-                //wheelAt(ctx, x, y, wheelAngle);
-                //ctx.stroke();
                 
-                // Solid body of head, with slight extra radius for outline:
+                // Solid, background-colored body of head, with slight extra radius for outline:
                 var style = ctx.fillStyle;
                 ctx.beginPath();
                 ctx.fillStyle = canvasBackground;
-                circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius + ctx.lineWidth / 2);
+                circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius + 1);
                 ctx.fill();
                 ctx.fillStyle = style;
                 
-                //
-                // Now for the lines to appear on top of the head:
+                // Now for the lines to appear in front of head:
                 
                 ctx.beginPath();
                 
@@ -341,20 +354,19 @@ if (typeof Math.log2 !== "function") {
                 ctx.stroke();
             },
             drawPlayerAt = function (ctx, x, y, wheelAngle) {
-                ctx.beginPath();
-                //circleAt(ctx, x, y - 8, playerRadius);
-                //circleAt(ctx, x + 1, y + 20, playerRadius + 1);
-                //ctx.moveTo(x + playerRadius, y);
-                ctx.arc(x, y, playerHeadRadius, 0, Math.PI, false);
-                ctx.arc(x, y, playerHeadRadius, Math.PI, Math.PI * 2, false);
-                //ctx.moveTo(x + playerHeadRadius, playerYToStdHeadCenterY(y));
-                ctx.arc(x, playerYToStdHeadCenterY(y), playerHeadRadius, 0, Math.PI * 2, false);
-                //ctx.moveTo(x, y - playerTorsoLen - playerRadius);
-                //ctx.lineTo(x, y); // (x, y) is the center of the wheel
-                
-                ctx.stroke();
+                wheelOutlineAt(ctx, x, y);
                 
                 ctx.beginPath();
+                
+                // Head and torso:
+                circleAt(ctx, x, playerYToStdHeadCenterY(y), playerHeadRadius);
+                ctx.moveTo(x, y - playerTorsoLen - playerRadius);
+                ctx.lineTo(x, y); // (x, y) is the center of the wheel
+                
+                // Wheel spokes:
+                wheelSpokesAt(ctx, x, y, wheelAngle);
+                
+                // Arms:
                 
                 ctx.save();
                 ctx.translate(x, y - playerRadius - playerTorsoLen / 2);
@@ -363,11 +375,6 @@ if (typeof Math.log2 !== "function") {
                 ctx.restore();
                 
                 ctx.stroke();
-                
-                //ctx.beginPath();
-                //ctx.lineWidth = 1;
-                //wheelAt(ctx, x, y, wheelAngle);
-                //ctx.stroke();
             },
             drawFbs = function (ctx, fbs) {
                 ctx.beginPath();
