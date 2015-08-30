@@ -396,15 +396,41 @@ if (typeof Math.log2 !== "function") {
                     }
                 }
             },
-            drawCoin = function (ctx, coin) {
-                if (!objIsVisible(2 * coinRadius, coin)) { return; }
+            drawCoins = function (ctx, coins) {
+                var i;
+                if (coins.length === 0) { return; }
                 ctx.lineWidth = 2;
-                circle(ctx, coin.x, coin.y, coinRadius, "yellow", "fill");
-                circle(ctx, coin.x, coin.y, coinRadius, "orange", "stroke");
-                ctx.fillStyle = "darkOrange";
-                ctx.fillRect(coin.x - coinSquareLen / 2, coin.y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
+                ctx.beginPath();
+                for (i = 0; i < coins.length; i += 1) {
+                    if (objIsVisible(2 * coinRadius, coins[i])) {
+                        circleAt(ctx, coins[i].x, coins[i].y, coinRadius);
+                    }
+                }
+                ctx.fillStyle = "yellow";
+                ctx.fill();
+                
+                ctx.beginPath();
+                for (i = 0; i < coins.length; i += 1) {
+                    if (objIsVisible(2 * coinRadius, coins[i])) {
+                        circleAt(ctx, coins[i].x, coins[i].y, coinRadius);
+                    }
+                }
                 ctx.strokeStyle = "orange";
-                ctx.strokeRect(coin.x - coinSquareLen / 2, coin.y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
+                ctx.stroke();
+                
+                ctx.fillStyle = "darkOrange";
+                for (i = 0; i < coins.length; i += 1) {
+                    if (objIsVisible(2 * coinRadius, coins[i])) {
+                        ctx.fillRect(coins[i].x - coinSquareLen / 2, coins[i].y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
+                    }
+                }
+                
+                for (i = 0; i < coins.length; i += 1) {
+                    if (objIsVisible(2 * coinRadius, coins[i])) {
+                        // strokeStyle is still "orange"
+                        ctx.strokeRect(coins[i].x - coinSquareLen / 2, coins[i].y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
+                    }
+                }
             },
             setupGenericPlatfmChars = function (ctx) {
                 ctx.strokeStyle = "black";
@@ -645,9 +671,7 @@ if (typeof Math.log2 !== "function") {
                 drawFbs(ctx, game.fbs);
                 drawFirebits(ctx, game.firebitsRed, "red");
                 drawFirebits(ctx, game.firebitsOrg, "darkOrange");
-                game.coins.forEach(function (coin) {
-                    drawCoin(ctx, coin);
-                });
+                drawCoins(ctx, game.coins);
                 game.powerups.forEach(function (powerup) {
                     drawPowerup(ctx, powerup.type, powerup.xPos(), powerup.yPos());
                 });
