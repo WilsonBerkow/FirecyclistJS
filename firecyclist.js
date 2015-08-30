@@ -345,8 +345,8 @@ if (typeof Math.log2 !== "function") {
                 //circleAt(ctx, x, y - 8, playerRadius);
                 //circleAt(ctx, x + 1, y + 20, playerRadius + 1);
                 //ctx.moveTo(x + playerRadius, y);
-                ctx.arc(x, y, playerRadius, 0, Math.PI, false);
-                ctx.arc(x, y, playerRadius, Math.PI, Math.PI * 2, false);
+                ctx.arc(x, y, playerHeadRadius, 0, Math.PI, false);
+                ctx.arc(x, y, playerHeadRadius, Math.PI, Math.PI * 2, false);
                 //ctx.moveTo(x + playerHeadRadius, playerYToStdHeadCenterY(y));
                 ctx.arc(x, playerYToStdHeadCenterY(y), playerHeadRadius, 0, Math.PI * 2, false);
                 //ctx.moveTo(x, y - playerTorsoLen - playerRadius);
