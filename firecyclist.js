@@ -208,16 +208,9 @@ if (typeof Math.log2 !== "function") {
         var mainCtx = document.getElementById("canvas").getContext("2d"),
             btnCtx = document.getElementById("btnCanvas").getContext("2d"),
             overlayCtx = document.getElementById("overlayCanvas").getContext("2d"), // TODO: screw all these wrapper functions, and make each context be declared and used like this one.
-            drawer = (function () {
-                return function (draw) { // Opens a "drawing session"
-                    return function () {
-                        mainCtx.save();
-                        draw.apply(null, [mainCtx].concat([].slice.apply(arguments)));
-                        mainCtx.restore();
-                    };
-                };
-            }()),
-            fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) { // Intentionally doesn't open up a new drawing session, so that other styles can be set beforehand.
+            fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) {
+                // Doesn't set things like ctx.font and ctx.textAlign so that they
+                // can be set on ctx by the caller, before invoking.
                 var clr0 = reverse ? "black" : "darkOrange",
                     clr1 = reverse ? "darkOrange" : "black",
                     offset = offsetAmt || 1,
@@ -467,12 +460,6 @@ if (typeof Math.log2 !== "function") {
                 ctx.textAlign = "left";
                 fillShadowyText(ctx, "II", 15, 15 + pxSize / 2, colory);
             },
-            drawBackBtn = function (ctx, game) {
-                var colory = drawTLBtnOutline(ctx, game);
-                ctx.font = "bold " + 1.5 * pxSize + "px arial";
-                ctx.textAlign = "left";
-                fillShadowyText(ctx, "↩", 5, (15 + pxSize / 2) * 1.2, colory);
-            },
             offCanvImg = function (w, h, src) {
                 var offCanvas = document.createElement('canvas'),
                     offCtx,
@@ -604,19 +591,18 @@ if (typeof Math.log2 !== "function") {
                     xPos += actives[i].width;
                 }
             },
-            drawMenuTitle = drawer(function (ctx) {
+            drawMenuTitle = function (ctx) {
                 ctx.font = "italic bold 170px arial";
                 ctx.textAlign = "center";
                 fillShadowyText(ctx, "Fire", canvasWidth / 2 - 3, 190, true, 3);
                 ctx.font = "italic bold 95px arial";
                 fillShadowyText(ctx, "cyclist", canvasWidth / 2 - 3, 240, true, 2);
-            }),
+            },
             drawButtonBandAt = function (ctx, y) {
                 ctx.fillStyle = "rgba(170, 170, 170, 0.5)";
                 ctx.fillRect(0, y - 5, canvasWidth, 54 + 12);
             },
-            // TODO: FACTOR COMMONALITIES OF BUTTONS
-            drawMenuPlayBtn = drawer(function (ctx) {
+            drawMenuPlayBtn = function (ctx) {
                 if (curTouch && isOverPlayBtn(curTouch)) {
                     drawButtonBandAt(ctx, menuPlayBtnY);
                 }
@@ -624,72 +610,57 @@ if (typeof Math.log2 !== "function") {
                 ctx.textAlign = "center";
                 ctx.fillStyle = "rgb(150, 140, 130)";
                 ctx.fillText("Play", menuPlayBtnX, menuPlayBtnY + menuPlayBtnH, menuPlayBtnW, menuPlayBtnH);
-            }),
-            drawMenuPlayScrollBtn = drawer(function (ctx) {
-                if (curTouch && isOverScrollBtn(curTouch)) {
-                    drawButtonBandAt(ctx, menuScrollingBtnY);
-                }
-                ctx.font = "italic bold 54px corbel";
-                ctx.textAlign = "center";
-                ctx.fillStyle = "rgb(150, 140, 130)";
-                ctx.fillText("Free", menuPlayBtnX, menuScrollingBtnY + menuPlayBtnH, menuPlayBtnW, menuPlayBtnH);
-            }),
-            drawMenuPlayLoopBtn = drawer(function (ctx) {
-                if (curTouch && isOverLoopBtn(curTouch)) {
-                    drawButtonBandAt(ctx, menuLoopBtnY);
-                }
-                ctx.font = "italic bold 54px corbel";
-                ctx.textAlign = "center";
-                ctx.fillStyle = "rgb(150, 140, 130)";
-                ctx.fillText("Confined", menuPlayBtnX, menuLoopBtnY + menuPlayBtnH, menuPlayBtnW * 1.4, menuPlayBtnH);
-            }),
-            drawMenu = drawer(function (ctx, menu) {
-                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-                drawFbs(ctx, menu.fbs);
-                drawFirebits(ctx, menu.firebitsRed, "red");
-                drawFirebits(ctx, menu.firebitsOrg, "darkOrange");
-                drawMenuTitle();
-                drawMenuPlayBtn();
-            }),
-            drawGame = drawer(function (ctx, game) {
-                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            },
+            drawMenu = function (menu) {
+                mainCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+                drawFbs(mainCtx, menu.fbs);
+                drawFirebits(mainCtx, menu.firebitsRed, "red");
+                drawFirebits(mainCtx, menu.firebitsOrg, "darkOrange");
+                drawMenuTitle(mainCtx);
+                drawMenuPlayBtn(mainCtx);
+            },
+            drawGame = function (game) {
+                mainCtx.save();
+                mainCtx.clearRect(0, 0, canvasWidth, canvasHeight);
                 overlayCtx.clearRect(0, 0, canvasWidth, canvasHeight);
                 if (game.player.ducking) {
-                    drawPlayerDuckingAt(ctx, game.player.x, game.player.y, game.player.wheelAngle);
+                    drawPlayerDuckingAt(mainCtx, game.player.x, game.player.y, game.player.wheelAngle);
                 } else {
-                    drawPlayerAt(ctx, game.player.x, game.player.y, game.player.wheelAngle);
+                    drawPlayerAt(mainCtx, game.player.x, game.player.y, game.player.wheelAngle);
                     
                 }
-                setupGenericPlatfmChars(ctx);
+                setupGenericPlatfmChars(mainCtx);
                 game.platfms.forEach(function (platfm) {
-                    drawPlatfm(ctx, platfm);
+                    drawPlatfm(mainCtx, platfm);
                 });
-                ctx.globalAlpha = 1; // Changed in platfm drawing, so must be reset
+                mainCtx.globalAlpha = 1; // Changed in platfm drawing, so must be reset
                 if (game.previewPlatfmTouch) {
-                    drawPreviewPlatfm(ctx, game.previewPlatfmTouch);
+                    drawPreviewPlatfm(mainCtx, game.previewPlatfmTouch);
                 }
-                drawFbs(ctx, game.fbs);
-                drawFirebits(ctx, game.firebitsRed, "red");
-                drawFirebits(ctx, game.firebitsOrg, "darkOrange");
-                drawCoins(ctx, game.coins);
+                drawFbs(mainCtx, game.fbs);
+                drawFirebits(mainCtx, game.firebitsRed, "red");
+                drawFirebits(mainCtx, game.firebitsOrg, "darkOrange");
+                drawCoins(mainCtx, game.coins);
                 game.powerups.forEach(function (powerup) {
-                    drawPowerup(ctx, powerup.type, powerup.xPos(), powerup.yPos());
+                    drawPowerup(mainCtx, powerup.type, powerup.xPos(), powerup.yPos());
                 });
-                drawActivePowerups(ctx, game.activePowerups);
-                drawInGamePoints(ctx, game);
-            }),
-            gameOverlayDrawer = (function () { // Specialized version of 'drawer' for drawing game overlays like the Paused or GameOver screens.
+                drawActivePowerups(mainCtx, game.activePowerups);
+                drawInGamePoints(mainCtx, game);
+                mainCtx.restore();
+            },
+            gameOverlayDrawer = (function () {
                 var vagueify = function (ctx) {
-                        ctx.fillStyle = "rgba(200, 200, 200, 0.75)";
-                        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-                    };
+                    ctx.fillStyle = "rgba(200, 200, 200, 0.75)";
+                    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+                };
                 return function (f) {
-                    return drawer(function (ctx, game) {
-                        var args = [].slice.apply(arguments).slice(1);
+                    return function (game) {
                         drawGame(game);
+                        overlayCtx.save();
                         vagueify(overlayCtx);
-                        f.apply(null, [overlayCtx].concat(args)); // 'args' includes 'game'
-                    });
+                        f.apply(null, [overlayCtx].concat([].slice.apply(arguments)));
+                        overlayCtx.restore();
+                    };
                 };
             }()),
             drawGamePaused = gameOverlayDrawer(function (ctx, game) {
