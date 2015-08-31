@@ -620,16 +620,16 @@ if (typeof Math.log2 !== "function") {
                 ctx[style]();
             },
             drawButtonStructureAt = (function () {
-                var greyClrs = {
-                    "shadow": "rgba(160, 160, 160, 0.7)",
-                    "btn": "rgba(180, 180, 180, 1)"
+                var stdClrs = {
+                    "shadow": "rgba(158, 158, 186, 0.7)",
+                    "btn": "rgba(178, 178, 206, 1)"
                 };
                 var tintedClrs = {
                     "shadow": "rgba(190, 180, 160, 0.7)",
                     "btn": "rgba(210, 200, 180, 0.8)"
                 };
-                return function (ctx, edgeX, edgeY, width, height, pressed, tinted) {
-                    var clrs = tinted ? tintedClrs : greyClrs;
+                return function (ctx, edgeX, edgeY, width, height, pressed, reddish) {
+                    var clrs = reddish ? tintedClrs : stdClrs;
                     if (pressed) {
                         ctx.fillStyle = clrs.btn;
                         drawRoundedRect(ctx, edgeX - btnShadowOffset, edgeY + btnShadowOffset, width, height, 8, "fill");
