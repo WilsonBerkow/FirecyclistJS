@@ -176,9 +176,10 @@ if (typeof Math.log2 !== "function") {
         menuPlayBtnX = canvasWidth / 2,
         menuPlayBtnY = 280,
         menuPlayBtnW = 121,
-        menuPlayBtnH = 44,
-        menuScrollingBtnY = 280,
-        menuLoopBtnY = 340,
+        menuPlayBtnTextH = 44,
+        menuPlayBtnH = menuPlayBtnTextH + 13,
+        menuPlayBtnEdgeX = menuPlayBtnX - menuPlayBtnW / 2,
+        btnShadowOffset = 2,
         powerupX2Width = 36,
         powerupX2Height = 30,
         powerupSlowRadius = 10,
@@ -195,7 +196,9 @@ if (typeof Math.log2 !== "function") {
             return dist(xy.x1, xy.y1, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
         },
         isOverPlayBtn = function (xy) {
-            return xy.y1 >= menuPlayBtnY - 5 && xy.y1 <= menuPlayBtnY + menuPlayBtnH + 5;
+            var withinHeight = xy.y1 >= menuPlayBtnY && xy.y1 <= menuPlayBtnY + menuPlayBtnH;
+            var withinWidth = xy.x1 >= menuPlayBtnEdgeX && xy.x1 <= menuPlayBtnEdgeX + menuPlayBtnW;
+            return withinHeight && withinWidth;
         },
         objIsVisible = function (hradius, obj) {
             return obj.x > -hradius && obj.x < canvasWidth + hradius;
@@ -598,18 +601,58 @@ if (typeof Math.log2 !== "function") {
                 ctx.font = "italic bold 95px arial";
                 fillShadowyText(ctx, "cyclist", canvasWidth / 2 - 3, 240, true, 2);
             },
-            drawButtonBandAt = function (ctx, y) {
-                ctx.fillStyle = "rgba(170, 170, 170, 0.5)";
-                ctx.fillRect(0, y - 5, canvasWidth, 54 + 12);
+            drawRoundedRectPath = function (ctx, x, y, width, height, radius) {
+                // Thank you, Juan Mendes (function from <http://js-bits.blogspot.com/2010/07/canvas-rounded-corner-rectangles.html>, with slight modification).
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + width - radius, y);
+                ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+                ctx.lineTo(x + width, y + height - radius);
+                ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+                ctx.lineTo(x + radius, y + height);
+                ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
             },
+            drawRoundedRect = function (ctx, x, y, width, height, radius, style) {
+                ctx.beginPath();
+                drawRoundedRectPath(ctx, x, y, width, height, radius, style);
+                ctx[style]();
+            },
+            drawButtonStructureAt = (function () {
+                var greyClrs = {
+                    "shadow": "rgba(160, 160, 160, 0.7)",
+                    "btn": "rgba(180, 180, 180, 1)"
+                };
+                var tintedClrs = {
+                    "shadow": "rgba(190, 180, 160, 0.7)",
+                    "btn": "rgba(210, 200, 180, 0.8)"
+                };
+                return function (ctx, edgeX, edgeY, width, height, pressed, tinted) {
+                    var clrs = tinted ? tintedClrs : greyClrs;
+                    if (pressed) {
+                        ctx.fillStyle = clrs.btn;
+                        drawRoundedRect(ctx, edgeX - btnShadowOffset, edgeY + btnShadowOffset, width, height, 8, "fill");
+                    } else {
+                        ctx.fillStyle = clrs.shadow;
+                        drawRoundedRect(ctx, edgeX - btnShadowOffset, edgeY + btnShadowOffset, width, height, 8, "fill");
+                        ctx.fillStyle = clrs.btn;
+                        drawRoundedRect(ctx, edgeX, edgeY, width, height, 8, "fill");
+                    }
+                };
+            }()),
             drawMenuPlayBtn = function (ctx) {
-                if (curTouch && isOverPlayBtn(curTouch)) {
-                    drawButtonBandAt(ctx, menuPlayBtnY);
+                var x = menuPlayBtnX, y = menuPlayBtnY;
+                var pressed = curTouch && isOverPlayBtn(curTouch);
+                drawButtonStructureAt(ctx, menuPlayBtnEdgeX, y, menuPlayBtnW, menuPlayBtnH, pressed);
+                if (pressed) {
+                    x -= btnShadowOffset;
+                    y += btnShadowOffset;
                 }
                 ctx.font = "italic bold 54px i0";
                 ctx.textAlign = "center";
                 ctx.fillStyle = "rgb(150, 140, 130)";
-                ctx.fillText("Play", menuPlayBtnX, menuPlayBtnY + menuPlayBtnH, menuPlayBtnW, menuPlayBtnH);
+                ctx.fillText("Play", x, y + menuPlayBtnTextH, menuPlayBtnW, menuPlayBtnTextH);
             },
             drawMenu = function (menu) {
                 mainCtx.clearRect(0, 0, canvasWidth, canvasHeight);
