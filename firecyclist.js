@@ -179,6 +179,11 @@ if (typeof Math.log2 !== "function") {
         menuPlayBtnTextH = 44,
         menuPlayBtnH = menuPlayBtnTextH + 13,
         menuPlayBtnEdgeX = menuPlayBtnX - menuPlayBtnW / 2,
+        replayBtnX = canvasWidth / 2,
+        replayBtnY = 327,
+        replayBtnW = 110,
+        replayBtnH = 45,
+        replayBtnEdgeX = replayBtnX - replayBtnW / 2,
         btnShadowOffset = 2,
         powerupX2Width = 36,
         powerupX2Height = 30,
@@ -193,13 +198,19 @@ if (typeof Math.log2 !== "function") {
             return dist(xy.x1, xy.y1, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
         },
         isOverRestartBtn = function (xy) {
+            // Top-right in-game restart button.
             return dist(xy.x1, xy.y1, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
         },
-        isOverPlayBtn = function (xy) {
-            var withinHeight = xy.y1 >= menuPlayBtnY && xy.y1 <= menuPlayBtnY + menuPlayBtnH;
-            var withinWidth = xy.x1 >= menuPlayBtnEdgeX && xy.x1 <= menuPlayBtnEdgeX + menuPlayBtnW;
-            return withinHeight && withinWidth;
+        isOverRectBtn = function (edgeX, edgeY, w, h) {
+            return function (xy) {
+                var withinHeight = xy.y1 >= edgeY && xy.y1 <= edgeY + h;
+                var withinWidth = xy.x1 >= edgeX && xy.x1 <= edgeX + w;
+                return withinHeight && withinWidth;
+            };
         },
+        isOverPlayBtn = isOverRectBtn(menuPlayBtnEdgeX, menuPlayBtnY, menuPlayBtnW, menuPlayBtnH),
+        // 3D outset button appearing in Game Over screen:
+        isOverReplayBtn = isOverRectBtn(replayBtnEdgeX, replayBtnY, replayBtnW, replayBtnH),
         objIsVisible = function (hradius, obj) {
             return obj.x > -hradius && obj.x < canvasWidth + hradius;
         },
@@ -625,19 +636,22 @@ if (typeof Math.log2 !== "function") {
                     "btn": "rgba(178, 178, 206, 1)"
                 };
                 var tintedClrs = {
-                    "shadow": "rgba(190, 180, 160, 0.7)",
-                    "btn": "rgba(210, 200, 180, 0.8)"
+                    "shadow": "rgba(178, 148, 138, 0.7)",
+                    "btn": "rgba(208, 188, 173, 1)"
+                    //"shadow": "rgba(190, 180, 160, 0.7)",
+                    //"btn": "rgba(210, 200, 180, 0.8)"
                 };
-                return function (ctx, edgeX, edgeY, width, height, pressed, reddish) {
+                return function (ctx, edgeX, edgeY, width, height, pressed, reddish, radius) {
                     var clrs = reddish ? tintedClrs : stdClrs;
+                    radius = radius || 8;
                     if (pressed) {
                         ctx.fillStyle = clrs.btn;
-                        drawRoundedRect(ctx, edgeX - btnShadowOffset, edgeY + btnShadowOffset, width, height, 8, "fill");
+                        drawRoundedRect(ctx, edgeX - btnShadowOffset, edgeY + btnShadowOffset, width, height, radius, "fill");
                     } else {
                         ctx.fillStyle = clrs.shadow;
-                        drawRoundedRect(ctx, edgeX - btnShadowOffset, edgeY + btnShadowOffset, width, height, 8, "fill");
+                        drawRoundedRect(ctx, edgeX - btnShadowOffset, edgeY + btnShadowOffset, width, height, radius, "fill");
                         ctx.fillStyle = clrs.btn;
-                        drawRoundedRect(ctx, edgeX, edgeY, width, height, 8, "fill");
+                        drawRoundedRect(ctx, edgeX, edgeY, width, height, radius, "fill");
                     }
                 };
             }()),
@@ -653,6 +667,19 @@ if (typeof Math.log2 !== "function") {
                 ctx.textAlign = "center";
                 ctx.fillStyle = "rgb(150, 140, 130)";
                 ctx.fillText("Play", x, y + menuPlayBtnTextH, menuPlayBtnW, menuPlayBtnTextH);
+            },
+            drawGameOverReplayBtn = function (ctx) {
+                var x = replayBtnX, y = replayBtnY;
+                var pressed = curTouch && isOverReplayBtn(curTouch);
+                drawButtonStructureAt(ctx, replayBtnEdgeX, y, replayBtnW, replayBtnH, pressed, true);
+                if (pressed) {
+                    x -= btnShadowOffset;
+                    y += btnShadowOffset;
+                }
+                ctx.font = "bold 33px b0";
+                ctx.textAlign = "center";
+                ctx.fillStyle = "rgb(175, 155, 125)";
+                ctx.fillText("Replay", x, y + replayBtnH - 12, replayBtnW - 5, replayBtnH - 15);
             },
             drawMenu = function (menu) {
                 mainCtx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -726,6 +753,8 @@ if (typeof Math.log2 !== "function") {
                 ctx.font = "140px r0";
                 ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvasHeight * 2 / 3 - 28);
                 
+                startY += 18;
+                
                 // Line separator
                 ctx.beginPath();
                 ctx.strokeStyle = "darkOrange";
@@ -746,6 +775,9 @@ if (typeof Math.log2 !== "function") {
                     ctx.fillText(score, canvasWidth / 2, curY);
                     curY += scoreFontSize + 2;
                 });
+                
+                // Replay btn
+                drawGameOverReplayBtn(ctx);
             });
         return [drawGame, drawGamePaused, drawGameDead, drawMenu, redrawBtnLayer, clearBtnLayer];
     }());
@@ -1377,17 +1409,18 @@ if (typeof Math.log2 !== "function") {
                 };
                 redrawBtnLayer(game);
                 jQuery(document).on("click", function (event) {
-                    var q, p;
+                    var q = calcTouchPos(event);
+                    var p = {
+                        "x1": q.x,
+                        "y1": q.y
+                    };
                     if (game.paused) { // Tap *anywhere* to unpause
                         game.paused = false;
                     } else if (game.dead) { // Tap *anywhere* to restart from GameOver screen.
-                        restart();
+                        if (isOverReplayBtn(p)) {
+                            restart();
+                        }
                     } else { // Tap on the pause btn to pause
-                        q = calcTouchPos(event);
-                        p = {
-                            "x1": q.x,
-                            "y1": q.y
-                        };
                         if (isOverPauseBtn(p)) {
                             game.paused = true;
                         } else if (isOverRestartBtn(p)) {
