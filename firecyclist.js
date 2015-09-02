@@ -14,8 +14,8 @@ if (typeof Math.log2 !== "function") {
     var htmlModule = document.getElementById("Main"),
         htmlBody = document.querySelector("body"),
         windowDims = {
-            "width": window.innerWidth || document.documentElement.clientWidth, // The defaulting expression (.documentElement....) is for IE
-            "height": window.innerHeight || document.documentElement.clientHeight
+            width: window.innerWidth || document.documentElement.clientWidth, // The defaulting expression (.documentElement....) is for IE
+            height: window.innerHeight || document.documentElement.clientHeight
         },
         pageScaleFactor = 1,
         moduleOffsetX = 0,
@@ -40,8 +40,8 @@ if (typeof Math.log2 !== "function") {
         },
         calcTouchPos = function (event) {
             return {
-                "x": (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) / pageScaleFactor - moduleOffsetX,
-                "y": (typeof event.clientY === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor
+                x: (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) / pageScaleFactor - moduleOffsetX,
+                y: (typeof event.clientY === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor
             };
         },
         handleTouchend,
@@ -94,12 +94,12 @@ if (typeof Math.log2 !== "function") {
         jQuery(document).on("mousedown touchstart", function (event) {
             var now = Date.now(), xy = calcTouchPos(event);
             curTouch = {
-                "t0": now,
-                "id": touchesCount,
-                "x0": xy.x,
-                "y0": xy.y,
-                "x1":  xy.x,
-                "y1":  xy.y
+                t0: now,
+                id: touchesCount,
+                x0: xy.x,
+                y0: xy.y,
+                x1:  xy.x,
+                y1:  xy.y
             };
             touchesCount += 1;
         });
@@ -661,14 +661,12 @@ if (typeof Math.log2 !== "function") {
             },
             drawButtonStructureAt = (function () {
                 var stdClrs = {
-                    "shadow": "rgba(158, 158, 186, 0.7)",
-                    "btn": "rgba(178, 178, 206, 1)"
+                    shadow: "rgba(158, 158, 186, 0.7)",
+                    btn: "rgba(178, 178, 206, 1)"
                 };
                 var tintedClrs = {
-                    "shadow": "rgba(178, 148, 138, 0.7)",
-                    "btn": "rgba(208, 188, 173, 1)"
-                    //"shadow": "rgba(190, 180, 160, 0.7)",
-                    //"btn": "rgba(210, 200, 180, 0.8)"
+                    shadow: "rgba(178, 148, 138, 0.7)",
+                    btn: "rgba(208, 188, 173, 1)"
                 };
                 return function (ctx, edgeX, edgeY, width, height, pressed, reddish, radius) {
                     var clrs = reddish ? tintedClrs : stdClrs;
@@ -856,17 +854,17 @@ if (typeof Math.log2 !== "function") {
                 };
             },
             createVel = anglify(false, function (vx, vy) {
-                return {"vx": vx, "vy": vy};
+                return {vx: vx, vy: vy};
             }),
             withAngularCtrls = (function () {
                 var proto = {
-                        "angleTo": function (xy) { // Currently unused, but as definition adds only constant time and may be useful in future, I'll leave it.
+                        angleTo: function (xy) { // Currently unused, but as definition adds only constant time and may be useful in future, I'll leave it.
                             return Math.atan2(xy.y - this.y, xy.x - this.x);
                         },
-                        "distanceTo": function (xy) {
+                        distanceTo: function (xy) {
                             return dist(this.x, this.y, xy.x, xy.y);
                         },
-                        "setDistanceTo": function (xy, newd) {
+                        setDistanceTo: function (xy, newd) {
                             var vectorFromPlayer = createVel(this.x - xy.x, this.y - xy.y),
                                 newAbsoluteVector;
                             vectorFromPlayer.setMagnitude(newd);
@@ -882,32 +880,32 @@ if (typeof Math.log2 !== "function") {
                 };
             }()),
             createPlayer = anglify(false, function (x, y, vx, vy) {
-                return {"x": x, "y": y, "vx": vx, "vy": vy, "wheelAngle": 0, "ducking": false};
+                return {x: x, y: y, vx: vx, vy: vy, wheelAngle: 0, ducking: false};
             }),
             createPlatfm = anglify(true, function (x0, y0, x1, y1) {
-                return {"x0": x0, "y0": y0, "x1": x1, "y1": y1, "time_left": 800};
+                return {x0: x0, y0: y0, x1: x1, y1: y1, time_left: 800};
             }),
             copyTouch = function (t) {
                 return {
-                    "t0": t.t0,
-                    "id": t.id,
-                    "x0": t.x0,
-                    "y0": t.y0,
-                    "x1": t.x1,
-                    "y1": t.y1
+                    t0: t.t0,
+                    id: t.id,
+                    x0: t.x0,
+                    y0: t.y0,
+                    x1: t.x1,
+                    y1: t.y1
                 };
             },
             touchIsNaNMaker = function (touch) { // Returns whether or not `touch` will cause NaN to appear.
                 return touch.x0 === touch.x1 && touch.y0 === touch.y1;
             },
             createCoin = withAngularCtrls(function (x, y) {
-                return {"x": x, "y": y};
+                return {x: x, y: y};
             }),
             createFb = function (x, y) {
-                return {"x": x, "y": y};
+                return {x: x, y: y};
             },
             createFirebit = function (x, y) {
-                return {"x": x, "y": y, "lifespan": 0};
+                return {x: x, y: y, lifespan: 0};
             },
             createPowerup = (function () {
                 var proto = {
@@ -922,25 +920,25 @@ if (typeof Math.log2 !== "function") {
                     }
                 };
                 return function (y, powerupType) {
-                    return makeObject(proto, {"offsetY": y, "lifetime": 0, "type": powerupType});
+                    return makeObject(proto, {offsetY: y, lifetime: 0, type: powerupType});
                 };
             }()),
             createActivePowerup = function (type) {
                 var lifetime = type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan;
                 return {
-                    "type": type,
-                    "width": type === "X2"     ? powerupX2Width :
-                             type === "slow"   ? powerupSlowRadius * 2 :
-                             type === "weight" ? 40 :
-                             type === "magnet" ? powerupSlowRadius * 2 + 15 :
-                             40,
-                    "totalLifetime": lifetime,
-                    "lifetime": lifetime
+                    type: type,
+                    width: type === "X2"     ? powerupX2Width :
+                           type === "slow"   ? powerupSlowRadius * 2 :
+                           type === "weight" ? 40 :
+                           type === "magnet" ? powerupSlowRadius * 2 + 15 :
+                           40,
+                    totalLifetime: lifetime,
+                    lifetime: lifetime
                 }; // TODO: INCLUDE srcX, srcY, timeSinceAcquired FOR ANIMATIONS
             },
             simpleIterable = function (propsToIter) {
                 var proto = {
-                    "forEach": function (f) {
+                    forEach: function (f) {
                         var obj = this;
                         propsToIter.forEach(function (prop) {
                             var val = obj[prop];
@@ -958,20 +956,20 @@ if (typeof Math.log2 !== "function") {
                 var mkPowerupsObj = simpleIterable(["X2", "slow", "weight", "magnet"]);
                 return function () {
                     return {
-                        "player": createPlayer(canvasWidth / 2, 50, 0, 0),
-                        "platfms": [],
-                        "previewPlatfmTouch": null,
-                        "fbs": [],
-                        "firebitsRed": [],
-                        "firebitsOrg": [],
-                        "coins": [],
-                        "coinColumnsLowest": [],
-                        "coinGridOffset": 0,
-                        "powerups": mkPowerupsObj({}),
-                        "activePowerups": [],
-                        "points": 0,
-                        "paused": false,
-                        "dead": false
+                        player: createPlayer(canvasWidth / 2, 50, 0, 0),
+                        platfms: [],
+                        previewPlatfmTouch: null,
+                        fbs: [],
+                        firebitsRed: [],
+                        firebitsOrg: [],
+                        coins: [],
+                        coinColumnsLowest: [],
+                        coinGridOffset: 0,
+                        powerups: mkPowerupsObj({}),
+                        activePowerups: [],
+                        points: 0,
+                        paused: false,
+                        dead: false
                     };
                 };
             }()),
@@ -985,8 +983,8 @@ if (typeof Math.log2 !== "function") {
                     cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmFallRate * dt - platfmBounciness);
                 cartesianVel.setMagnitude(Math.min(cartesianVel.magnitude(), player.magnitude()) + playerGrav * dt);
                 return {
-                    "x": cartesianVel.vx,
-                    "y": cartesianVel.vy
+                    x: cartesianVel.vx,
+                    y: cartesianVel.vy
                 };
             },
             playerIntersectingPlatfm = function (player, platfm) {
@@ -1427,8 +1425,8 @@ if (typeof Math.log2 !== "function") {
                 jQuery(document).on("click", function (event) {
                     var q = calcTouchPos(event);
                     var p = {
-                        "x1": q.x,
-                        "y1": q.y
+                        x1: q.x,
+                        y1: q.y
                     };
                     if (game.paused) { // Tap *anywhere* to unpause
                         if (isOverRectBtn(resumeBtn, p)) {
@@ -1480,7 +1478,7 @@ if (typeof Math.log2 !== "function") {
                     drawMenu(menu);
                 }, 1000 / framerate);
                 jQuery(document).on("click.menuHandler", function (event) {
-                    var pos = calcTouchPos(event), tpos = {"x1": pos.x, "y1": pos.y};
+                    var pos = calcTouchPos(event), tpos = {x1: pos.x, y1: pos.y};
                     if (isOverRectBtn(menuPlayBtn, tpos)) {
                         clearInterval(intervalId);
                         jQuery(document).off(".menuHandler");
