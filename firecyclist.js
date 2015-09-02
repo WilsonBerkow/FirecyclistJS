@@ -189,6 +189,8 @@ if (typeof Math.log2 !== "function") {
         restartBtnRadius = 65,
         inGamePointsPxSize = 30,
         inGamePointsYPos = 30,
+        activePowerupLeftmostXPos = canvasWidth / 2 + inGamePointsPxSize,
+        activePowerupTravelTime = 250,
         mkBtn = (function () {
             var proto = {
                 edgeX: function () {
@@ -626,11 +628,19 @@ if (typeof Math.log2 !== "function") {
                 }
             },
             drawActivePowerups = function (ctx, actives) {
-                var xPos = canvasWidth / 2 + inGamePointsPxSize, yPos = inGamePointsYPos, i;
+                var xPos = activePowerupLeftmostXPos, yPos = inGamePointsYPos, i;
+                var tempX, tempY;
                 for (i = actives.length - 1; i >= 0; i -= 1) { // Start with the last activepowerups, which have been around the longest.
-                    drawActivePowerupBackground(ctx, actives[i].lifetime, actives[i].totalLifetime, xPos, yPos);
-                    drawPowerup(ctx, actives[i].type, xPos, yPos);
-                    xPos += actives[i].width;
+                    if (actives[i].timeSinceAcquired < activePowerupTravelTime) {
+                        tempX = (actives[i].timeSinceAcquired / activePowerupTravelTime) * (activePowerupLeftmostXPos - actives[i].srcX) + actives[i].srcX;
+                        tempY = (actives[i].timeSinceAcquired / activePowerupTravelTime) * (inGamePointsYPos - actives[i].srcY) + actives[i].srcY;
+                        drawActivePowerupBackground(ctx, actives[i].lifetime, actives[i].totalLifetime, tempX, tempY);
+                        drawPowerup(ctx, actives[i].type, tempX, tempY);
+                    } else {
+                        drawActivePowerupBackground(ctx, actives[i].lifetime, actives[i].totalLifetime, xPos, yPos);
+                        drawPowerup(ctx, actives[i].type, xPos, yPos);
+                        xPos += actives[i].width;
+                    }
                 }
             },
             drawMenuTitle = function (ctx) {
@@ -922,7 +932,7 @@ if (typeof Math.log2 !== "function") {
                     return makeObject(proto, {offsetY: y, lifetime: 0, type: powerupType});
                 };
             }()),
-            createActivePowerup = function (type) {
+            createActivePowerup = function (type, srcX, srcY) {
                 var lifetime = type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan;
                 return {
                     type: type,
@@ -932,8 +942,11 @@ if (typeof Math.log2 !== "function") {
                            type === "magnet" ? powerupSlowRadius * 2 + 15 :
                            40,
                     totalLifetime: lifetime,
-                    lifetime: lifetime
-                }; // TODO: INCLUDE srcX, srcY, timeSinceAcquired FOR ANIMATIONS
+                    lifetime: lifetime,
+                    srcX: srcX,
+                    srcY: srcY,
+                    timeSinceAcquired: 0
+                };
             },
             simpleIterable = function (propsToIter) {
                 var proto = {
@@ -1159,8 +1172,8 @@ if (typeof Math.log2 !== "function") {
                         }
                         redrawBtnLayer(game);
                     },
-                    addToActivePowerups = function (type) {
-                        var newActive = createActivePowerup(type);
+                    addToActivePowerups = function (type, x, y) {
+                        var newActive = createActivePowerup(type, x, y);
                         var i;
                         for (i = 0; i < game.activePowerups.length; i += 1) {
                             if (game.activePowerups[i].type === type) {
@@ -1254,7 +1267,7 @@ if (typeof Math.log2 !== "function") {
                         game.powerups.forEach(function (powerup, key) {
                             if (playerHittingPowerup(game.player, powerup)) {
                                 game.powerups[key] = null;
-                                addToActivePowerups(powerup.type);
+                                addToActivePowerups(powerup.type, powerup.xPos(), powerup.yPos());
                             }
                         });
                         var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
@@ -1365,6 +1378,9 @@ if (typeof Math.log2 !== "function") {
                                 game.activePowerups.splice(index, 1);
                             }
                             activePowerup.lifetime -= dt;
+                            if (activePowerup.timeSinceAcquired < activePowerupTravelTime) {
+                                activePowerup.timeSinceAcquired += dt;
+                            }
                         });
                     },
                     difficultyCurve = function (x) {
