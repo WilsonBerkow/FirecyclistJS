@@ -140,6 +140,24 @@ if (typeof Math.log2 !== "function") {
         dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
         sqrt2 = Math.sqrt(2),
         sqrt3 = Math.sqrt(3),
+        oneDegree = Math.PI / 180,
+        trig = (function () {
+            var sines = [],   // Sine and cosine tables are used so that the approximation work doesn't
+                cosines = [], // have to be done more than once for any given angle. The angles of the
+                              // spokes are rounded down to the nearest degree.
+                sin = function (radians) {
+                    return sines[modulo(Math.floor(radians / oneDegree), 360)];
+                },
+                cos = function (radians) {
+                    return cosines[modulo(Math.floor(radians / oneDegree), 360)];
+                },
+                i;
+            for (i = 0; i < 360; i += 1) {
+                sines[i] = Math.sin(i * oneDegree);
+                cosines[i] = Math.cos(i * oneDegree);
+            }
+            return {sin: sin, cos: cos};
+        }()),
         // Config:
         canvasBackground = "rgb(185, 185, 255)", // Used in CSS
         framerate = 40,
@@ -293,37 +311,18 @@ if (typeof Math.log2 !== "function") {
                 ctx.lineTo(-playerElbowXDiff, -playerElbowYDiff);
                 ctx.lineTo(-2 * playerElbowXDiff, playerElbowYDiff);
             },
-            wheelSpokesAt = (function () {
-                var sines = [],   // Sine and cosine tables are used so that the approximation work doesn't
-                    cosines = [], // have to be done more than once for any given angle. The angles of the
-                                  // spokes are rounded down to the nearest degree.
-                                  // TODO: Extract these tables and use them for as many other uses of
-                                  //  Math.sin and Math.cos as possible.
-                    oneDegree = Math.PI / 180,
-                    i,
-                    getSin = function (radians) {
-                        return sines[modulo(Math.floor(radians / oneDegree), 360)];
-                    },
-                    getCos = function (radians) {
-                        return cosines[modulo(Math.floor(radians / oneDegree), 360)];
-                    };
-                for (i = 0; i < 360; i += 1) {
-                    sines[i] = Math.sin(i * oneDegree);
-                    cosines[i] = Math.cos(i * oneDegree);
-                }
-                return function (ctx, x, y, angle) {
-                    var spokeAngle = 0, spinOffset = angle * oneDegree, relX, relY, i;
-                    for (i = 0; i < 6; i += 1) {
-                        relX = getCos(spinOffset + spokeAngle) * playerRadius;
-                        relY = getSin(spinOffset + spokeAngle) * playerRadius;
-                        ctx.moveTo(x + relX, y + relY);
-                        ctx.lineTo(x - relX, y - relY);
-                        if (i !== 5) {
-                            spokeAngle += 1/3 * Math.PI;
-                        }
+            wheelSpokesAt = function (ctx, x, y, angle) {
+                var spokeAngle = 0, spinOffset = angle * oneDegree, relX, relY, i;
+                for (i = 0; i < 6; i += 1) {
+                    relX = trig.cos(spinOffset + spokeAngle) * playerRadius;
+                    relY = trig.sin(spinOffset + spokeAngle) * playerRadius;
+                    ctx.moveTo(x + relX, y + relY);
+                    ctx.lineTo(x - relX, y - relY);
+                    if (i !== 5) {
+                        spokeAngle += 1/3 * Math.PI;
                     }
-                };
-            }()),
+                }
+            },
             wheelOutlineAt = function (ctx, x, y) {
                 // Wheel outline is drawn in two solid parts to get around
                 // Chrome-for-Android rendering bug.
@@ -837,12 +836,12 @@ if (typeof Math.log2 !== "function") {
                 };
                 if (!doCalc) {
                     proto.setAngle = function (theta) {
-                        this.vx = Math.cos(theta) * this.magnitude();
-                        this.vy = Math.sin(theta) * this.magnitude();
+                        this.vx = trig.cos(theta) * this.magnitude();
+                        this.vy = trig.sin(theta) * this.magnitude();
                     };
                     proto.setMagnitude = function (mag) {
-                        this.vx = Math.cos(this.angle()) * mag;
-                        this.vy = Math.sin(this.angle()) * mag;
+                        this.vx = trig.cos(this.angle()) * mag;
+                        this.vy = trig.sin(this.angle()) * mag;
                     };
                     proto.scaleMagnitude = function (scaleFactor) {
                         this.vx *= scaleFactor;
@@ -916,7 +915,7 @@ if (typeof Math.log2 !== "function") {
                         return this.xDistanceTravelled();
                     },
                     yPos: function () {
-                        return this.offsetY + Math.sin(this.xDistanceTravelled() / 20) * 40;
+                        return this.offsetY + trig.sin(this.xDistanceTravelled() / 20) * 40;
                     }
                 };
                 return function (y, powerupType) {
