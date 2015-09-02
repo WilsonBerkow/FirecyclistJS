@@ -184,6 +184,11 @@ if (typeof Math.log2 !== "function") {
         replayBtnW = 110,
         replayBtnH = 45,
         replayBtnEdgeX = replayBtnX - replayBtnW / 2,
+        resumeBtnX = canvasWidth / 2,
+        resumeBtnY = replayBtnY - 68,
+        resumeBtnW = replayBtnW + 9,
+        resumeBtnH = replayBtnH - 3,
+        resumeBtnEdgeX = resumeBtnX - resumeBtnW / 2,
         btnShadowOffset = 2,
         powerupX2Width = 36,
         powerupX2Height = 30,
@@ -211,6 +216,7 @@ if (typeof Math.log2 !== "function") {
         isOverPlayBtn = isOverRectBtn(menuPlayBtnEdgeX, menuPlayBtnY, menuPlayBtnW, menuPlayBtnH),
         // 3D outset button appearing in Game Over screen:
         isOverReplayBtn = isOverRectBtn(replayBtnEdgeX, replayBtnY, replayBtnW, replayBtnH),
+        isOverResumeBtn = isOverRectBtn(resumeBtnEdgeX, resumeBtnY, resumeBtnW, resumeBtnH),
         objIsVisible = function (hradius, obj) {
             return obj.x > -hradius && obj.x < canvasWidth + hradius;
         },
@@ -681,6 +687,20 @@ if (typeof Math.log2 !== "function") {
                 ctx.fillStyle = "rgb(175, 155, 125)";
                 ctx.fillText("Replay", x, y + replayBtnH - 12, replayBtnW - 5, replayBtnH - 15);
             },
+            drawResumeBtn = function (ctx) {
+                var x = resumeBtnX, y = resumeBtnY;
+                var pressed = curTouch && isOverResumeBtn(curTouch);
+                drawButtonStructureAt(ctx, resumeBtnEdgeX, y, resumeBtnW, resumeBtnH, pressed, true);
+                if (pressed) {
+                    x -= btnShadowOffset;
+                    y += btnShadowOffset;
+                }
+                ctx.font = "bold 30px b0";
+                ctx.textAlign = "center";
+                ctx.fillStyle = "rgb(175, 155, 125)";
+                ctx.fillText("Resume", x + 1, y + resumeBtnH - 12, resumeBtnW - 5, resumeBtnH - 15);
+                // Add one to `x`, because otherwise the word 'Resume' *looks* off-center.
+            },
             drawMenu = function (menu) {
                 mainCtx.clearRect(0, 0, canvasWidth, canvasHeight);
                 drawFbs(mainCtx, menu.fbs);
@@ -735,9 +755,10 @@ if (typeof Math.log2 !== "function") {
             }()),
             drawGamePaused = gameOverlayDrawer(function (ctx, game) {
                 ctx.fillStyle = "darkOrange";
-                ctx.font = "54px r0";
+                ctx.font = "64px r0";
                 ctx.textAlign = "center";
-                ctx.fillText("Paused", canvasWidth / 2, canvasHeight / 2 - 12);
+                ctx.fillText("Paused", canvasWidth / 2, canvasHeight / 2 - 28);
+                drawResumeBtn(ctx);
             }),
             drawGameDead = gameOverlayDrawer(function (ctx, game) {
                 var startY = 105;
@@ -1415,7 +1436,9 @@ if (typeof Math.log2 !== "function") {
                         "y1": q.y
                     };
                     if (game.paused) { // Tap *anywhere* to unpause
-                        game.paused = false;
+                        if (isOverResumeBtn(p)) {
+                            game.paused = false;
+                        }
                     } else if (game.dead) { // Tap *anywhere* to restart from GameOver screen.
                         if (isOverReplayBtn(p)) {
                             restart();
