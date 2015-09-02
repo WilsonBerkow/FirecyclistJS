@@ -11,9 +11,6 @@ if (typeof Math.log2 !== "function") {
 (function () {
     "use strict";
     // Screen-resizing code:
-    // These manual-set titles are not related to the game, they are here
-    // so I can fuck around with my friend without committing private
-    // information.
     var htmlModule = document.getElementById("Main"),
         htmlBody = document.querySelector("body"),
         windowDims = {
@@ -115,7 +112,8 @@ if (typeof Math.log2 !== "function") {
             // triggering of the 'tap' event.
         });
     }());
-    var // UTIL:
+    // UTIL + CONFIG:
+    var // General util:
         makeObject = function (proto, props) {
             var o = Object.create(proto);
             Object.keys(props).forEach(function (key) {
@@ -142,7 +140,7 @@ if (typeof Math.log2 !== "function") {
         dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
         sqrt2 = Math.sqrt(2),
         sqrt3 = Math.sqrt(3),
-        // CONFIG:
+        // Config:
         canvasBackground = "rgb(185, 185, 255)", // Used in CSS
         framerate = 40,
         canvasWidth = 576 / 2,
@@ -173,22 +171,52 @@ if (typeof Math.log2 !== "function") {
         restartBtnRadius = 65,
         inGamePointsPxSize = 30,
         inGamePointsYPos = 30,
-        menuPlayBtnX = canvasWidth / 2,
-        menuPlayBtnY = 280,
-        menuPlayBtnW = 121,
-        menuPlayBtnTextH = 44,
-        menuPlayBtnH = menuPlayBtnTextH + 13,
-        menuPlayBtnEdgeX = menuPlayBtnX - menuPlayBtnW / 2,
-        replayBtnX = canvasWidth / 2,
-        replayBtnY = 327,
-        replayBtnW = 110,
-        replayBtnH = 45,
-        replayBtnEdgeX = replayBtnX - replayBtnW / 2,
-        resumeBtnX = canvasWidth / 2,
-        resumeBtnY = replayBtnY - 68,
-        resumeBtnW = replayBtnW + 9,
-        resumeBtnH = replayBtnH - 3,
-        resumeBtnEdgeX = resumeBtnX - resumeBtnW / 2,
+        mkBtn = (function () {
+            var proto = {
+                edgeX: function () {
+                    return this.x - this.w / 2;
+                }
+            };
+            return function (o) {
+                o.redTint = !!o.redTint;
+                o.textWDiff = o.textWDiff || 0;
+                o.textHDiff = o.textHDiff || 0;
+                o.textXOffset = o.textXOffset || 0;
+                return makeObject(proto, o);
+            };
+        }()),
+        menuPlayBtn = mkBtn({
+            text: "Play",
+            font: "italic bold 53px i0",
+            x: canvasWidth / 2,
+            y: 280,
+            w: 121,
+            h: 57,
+            textHDiff: -13
+        }),
+        replayBtn = mkBtn({
+            text: "Replay",
+            font: "bold 33px b0",
+            x: canvasWidth / 2,
+            y: 327,
+            w: 110,
+            h: 45,
+            textHDiff: -12,
+            textWDiff: -5,
+            tintedRed: true
+        }),
+        resumeBtn = mkBtn({
+            text: "Resume",
+            font: "bold 30px b0",
+            x: canvasWidth / 2,
+            y: replayBtn.y - 68,
+            w: replayBtn.w + 9,
+            h: replayBtn.h - 3,
+            textXOffset: 1,
+            textHDiff: -12,
+            textWDiff: -5,
+            tintedRed: true
+        }),
         btnShadowOffset = 2,
         powerupX2Width = 36,
         powerupX2Height = 30,
@@ -198,25 +226,20 @@ if (typeof Math.log2 !== "function") {
         powerupWeightLowerWidth = 40 * powerupWeightScaleUnit,
         powerupWeightHeight = 24 * powerupWeightScaleUnit,
         activePowerupLifespan = 10000,
-        // More util:
+        // In-game round corner buttons:
         isOverPauseBtn = function (xy) {
             return dist(xy.x1, xy.y1, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
         },
         isOverRestartBtn = function (xy) {
-            // Top-right in-game restart button.
             return dist(xy.x1, xy.y1, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
         },
-        isOverRectBtn = function (edgeX, edgeY, w, h) {
-            return function (xy) {
-                var withinHeight = xy.y1 >= edgeY && xy.y1 <= edgeY + h;
-                var withinWidth = xy.x1 >= edgeX && xy.x1 <= edgeX + w;
-                return withinHeight && withinWidth;
-            };
+        // For out-of-game control buttons:
+        isOverRectBtn = function (btn, xy) {
+            var withinHeight = xy.y1 >= btn.y && xy.y1 <= btn.y + btn.h;
+            var withinWidth = xy.x1 >= btn.edgeX() && xy.x1 <= btn.edgeX() + btn.w;
+            return withinHeight && withinWidth;
         },
-        isOverPlayBtn = isOverRectBtn(menuPlayBtnEdgeX, menuPlayBtnY, menuPlayBtnW, menuPlayBtnH),
-        // 3D outset button appearing in Game Over screen:
-        isOverReplayBtn = isOverRectBtn(replayBtnEdgeX, replayBtnY, replayBtnW, replayBtnH),
-        isOverResumeBtn = isOverRectBtn(resumeBtnEdgeX, resumeBtnY, resumeBtnW, resumeBtnH),
+        // More util:
         objIsVisible = function (hradius, obj) {
             return obj.x > -hradius && obj.x < canvasWidth + hradius;
         },
@@ -227,7 +250,7 @@ if (typeof Math.log2 !== "function") {
     var renderers = (function () {
         var mainCtx = document.getElementById("canvas").getContext("2d"),
             btnCtx = document.getElementById("btnCanvas").getContext("2d"),
-            overlayCtx = document.getElementById("overlayCanvas").getContext("2d"), // TODO: screw all these wrapper functions, and make each context be declared and used like this one.
+            overlayCtx = document.getElementById("overlayCanvas").getContext("2d"),
             fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) {
                 // Doesn't set things like ctx.font and ctx.textAlign so that they
                 // can be set on ctx by the caller, before invoking.
@@ -661,45 +684,18 @@ if (typeof Math.log2 !== "function") {
                     }
                 };
             }()),
-            drawMenuPlayBtn = function (ctx) {
-                var x = menuPlayBtnX, y = menuPlayBtnY;
-                var pressed = curTouch && isOverPlayBtn(curTouch);
-                drawButtonStructureAt(ctx, menuPlayBtnEdgeX, y, menuPlayBtnW, menuPlayBtnH, pressed);
+            drawBtn = function (ctx, btn) {
+                var pressed = curTouch && isOverRectBtn(btn, curTouch);
+                drawButtonStructureAt(ctx, btn.edgeX(), btn.y, btn.w, btn.h, pressed, btn.tintedRed);
+                var x = btn.x, y = btn.y;
                 if (pressed) {
                     x -= btnShadowOffset;
                     y += btnShadowOffset;
                 }
-                ctx.font = "italic bold 54px i0";
+                ctx.font = btn.font;
                 ctx.textAlign = "center";
-                ctx.fillStyle = "rgb(150, 140, 130)";
-                ctx.fillText("Play", x, y + menuPlayBtnTextH, menuPlayBtnW, menuPlayBtnTextH);
-            },
-            drawGameOverReplayBtn = function (ctx) {
-                var x = replayBtnX, y = replayBtnY;
-                var pressed = curTouch && isOverReplayBtn(curTouch);
-                drawButtonStructureAt(ctx, replayBtnEdgeX, y, replayBtnW, replayBtnH, pressed, true);
-                if (pressed) {
-                    x -= btnShadowOffset;
-                    y += btnShadowOffset;
-                }
-                ctx.font = "bold 33px b0";
-                ctx.textAlign = "center";
-                ctx.fillStyle = "rgb(175, 155, 125)";
-                ctx.fillText("Replay", x, y + replayBtnH - 12, replayBtnW - 5, replayBtnH - 15);
-            },
-            drawResumeBtn = function (ctx) {
-                var x = resumeBtnX, y = resumeBtnY;
-                var pressed = curTouch && isOverResumeBtn(curTouch);
-                drawButtonStructureAt(ctx, resumeBtnEdgeX, y, resumeBtnW, resumeBtnH, pressed, true);
-                if (pressed) {
-                    x -= btnShadowOffset;
-                    y += btnShadowOffset;
-                }
-                ctx.font = "bold 30px b0";
-                ctx.textAlign = "center";
-                ctx.fillStyle = "rgb(175, 155, 125)";
-                ctx.fillText("Resume", x + 1, y + resumeBtnH - 12, resumeBtnW - 5, resumeBtnH - 15);
-                // Add one to `x`, because otherwise the word 'Resume' *looks* off-center.
+                ctx.fillStyle = btn.tintedRed ? "rgb(175, 155, 125)" : "rgb(150, 140, 130)";
+                ctx.fillText(btn.text, x + btn.textXOffset, y + btn.h + btn.textHDiff, btn.w + btn.textWDiff, btn.h + btn.textHDiff);
             },
             drawMenu = function (menu) {
                 mainCtx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -707,7 +703,7 @@ if (typeof Math.log2 !== "function") {
                 drawFirebits(mainCtx, menu.firebitsRed, "red");
                 drawFirebits(mainCtx, menu.firebitsOrg, "darkOrange");
                 drawMenuTitle(mainCtx);
-                drawMenuPlayBtn(mainCtx);
+                drawBtn(mainCtx, menuPlayBtn);
             },
             drawGame = function (game) {
                 mainCtx.save();
@@ -758,7 +754,7 @@ if (typeof Math.log2 !== "function") {
                 ctx.font = "64px r0";
                 ctx.textAlign = "center";
                 ctx.fillText("Paused", canvasWidth / 2, canvasHeight / 2 - 28);
-                drawResumeBtn(ctx);
+                drawBtn(ctx, resumeBtn);
             }),
             drawGameDead = gameOverlayDrawer(function (ctx, game) {
                 var startY = 105;
@@ -798,7 +794,7 @@ if (typeof Math.log2 !== "function") {
                 });
                 
                 // Replay btn
-                drawGameOverReplayBtn(ctx);
+                drawBtn(ctx, replayBtn);
             });
         return [drawGame, drawGamePaused, drawGameDead, drawMenu, redrawBtnLayer, clearBtnLayer];
     }());
@@ -1161,7 +1157,6 @@ if (typeof Math.log2 !== "function") {
                             game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
                         }
                         redrawBtnLayer(game);
-                        //clearBtnLayer();
                     },
                     addToActivePowerups = function (type) {
                         var newActive = createActivePowerup(type);
@@ -1436,11 +1431,11 @@ if (typeof Math.log2 !== "function") {
                         "y1": q.y
                     };
                     if (game.paused) { // Tap *anywhere* to unpause
-                        if (isOverResumeBtn(p)) {
+                        if (isOverRectBtn(resumeBtn, p)) {
                             game.paused = false;
                         }
                     } else if (game.dead) { // Tap *anywhere* to restart from GameOver screen.
-                        if (isOverReplayBtn(p)) {
+                        if (isOverRectBtn(replayBtn, p)) {
                             restart();
                         }
                     } else { // Tap on the pause btn to pause
@@ -1486,7 +1481,7 @@ if (typeof Math.log2 !== "function") {
                 }, 1000 / framerate);
                 jQuery(document).on("click.menuHandler", function (event) {
                     var pos = calcTouchPos(event), tpos = {"x1": pos.x, "y1": pos.y};
-                    if (isOverPlayBtn(tpos)) {
+                    if (isOverRectBtn(menuPlayBtn, tpos)) {
                         clearInterval(intervalId);
                         jQuery(document).off(".menuHandler");
                         play();
