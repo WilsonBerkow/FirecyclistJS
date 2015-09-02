@@ -1067,8 +1067,12 @@ if (typeof Math.log2 !== "function") {
             makeFirebitAround = function (fbX, fbY) {
                 var relX = Math.random() * 2 * fbRadius - fbRadius,
                     absoluteX = fbX + relX,
-                    maxRelY = -Math.sqrt(fbRadius * fbRadius - relX * relX),
-                    absoluteY = fbY + Math.random() * maxRelY - 3;
+                    // Now, place the y close to the top edge of the
+                    // fireball with a quadratic approximation. See graph
+                    // at http://wolfr.am/6LvgDMu~ for what I'm going for.
+                    highestRelY = (fbRadius + 3) - relX * relX / 19,
+                    relY = Math.random() * -highestRelY,
+                    absoluteY = fbY + relY;
                 return createFirebit(absoluteX, absoluteY);
             },
             // 'fb' is short for 'fireball'
