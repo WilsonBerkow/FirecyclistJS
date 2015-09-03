@@ -1404,7 +1404,6 @@ if (typeof Math.log2 !== "function") {
                         dt = realDt;
                     }
                     prevFrameTime = now;
-                    
                     // Handle state changes
                     if (game.paused) {
                         drawGamePaused(game);
@@ -1422,8 +1421,6 @@ if (typeof Math.log2 !== "function") {
                         updatePowerups(dt);
                         updateActivePowerups(dt);
                         game.points += handleActivesPoints(7 * (realDt / 1000) * Math.sqrt(Math.max(0, game.player.y / canvasHeight))); // The use of realDt (rather than dt) here means that when you get the slow powerup, you still get points at normal speed.
-                        // Point logic from Elm:
-                        //  points <- g.points + 2 * (Time.inSeconds dt) * (1 + g.player.pos.y / toFloat game_total_height) + points_from_coins
                         
                         // Render
                         if (!game.dead && !game.paused) { // The paused check is just in case of a bug, or for the future, as now one cannot pause while drawing a platfm
@@ -1447,15 +1444,15 @@ if (typeof Math.log2 !== "function") {
                         x1: q.x,
                         y1: q.y
                     };
-                    if (game.paused) { // Tap *anywhere* to unpause
+                    if (game.paused) {
                         if (isOverRectBtn(resumeBtn, p)) {
                             game.paused = false;
                         }
-                    } else if (game.dead) { // Tap *anywhere* to restart from GameOver screen.
+                    } else if (game.dead) {
                         if (isOverRectBtn(replayBtn, p)) {
                             restart();
                         }
-                    } else { // Tap on the pause btn to pause
+                    } else {
                         if (isOverPauseBtn(p)) {
                             game.paused = true;
                         } else if (isOverRestartBtn(p)) {
