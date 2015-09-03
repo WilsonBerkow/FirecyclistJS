@@ -160,7 +160,7 @@ if (typeof Math.log2 !== "function") {
         }()),
         // Config:
         canvasBackground = "rgb(185, 185, 255)", // Used in CSS
-        framerate = 40,
+        fps = 40,
         canvasWidth = 576 / 2,
         canvasHeight = 1024 / 2,
         playerGrav = 0.32 / 28,
@@ -1377,7 +1377,7 @@ if (typeof Math.log2 !== "function") {
                     // If the frame takes too long, a jump in all of the objects
                     // will be noticable, and more undesirable than the objects
                     // acting as if the jump didn't happen. Thus, cap realDt:
-                    realDt = Math.min(realDt, 1000 / framerate * 3);
+                    realDt = Math.min(realDt, 1000 / fps * 3);
                     realDt *= difficultyCurve(game.points);
                     if (slowPowerupObtained()) {
                         dt = realDt * 2/3; // Sloooooooow
@@ -1412,7 +1412,7 @@ if (typeof Math.log2 !== "function") {
                         }
                         drawGame(game);
                     }
-                }, 1000 / framerate);
+                }, 1000 / fps);
                 handleTouchend = function (touch) {
                     if (!game.paused && !game.dead) {
                         tryToAddPlatfmFromTouch(touch);
@@ -1471,7 +1471,7 @@ if (typeof Math.log2 !== "function") {
                     prevTime = now;
                     updateFbs(dt);
                     drawMenu(menu);
-                }, 1000 / framerate);
+                }, 1000 / fps);
                 jQuery(document).on("click.menuHandler", function (event) {
                     var pos = calcTouchPos(event), tpos = {x1: pos.x, y1: pos.y};
                     if (isOverRectBtn(menuPlayBtn, tpos)) {
