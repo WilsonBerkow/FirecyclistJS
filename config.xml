@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget id="com.wilsonberkow.firecyclist" version="0.0.1"> <!-- THE ID MUST BE CHANGED, THIS IS ONLY TEMPORARY -->
+<widget id="com.wilsonberkow.firecyclist" version="0.0.1">
     <name>Firecyclist</name>
     <description>
         Maneuver around fireballs and capture coins as unicyclist falling from the sky! 
