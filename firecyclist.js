@@ -188,9 +188,10 @@ if (typeof Math.log2 !== "function") {
         restartBtnCenterY = -5,
         restartBtnRadius = 65,
         inGamePointsPxSize = 30,
-        inGamePointsYPos = 30,
-        activePowerupLeftmostXPos = canvasWidth / 2 + inGamePointsPxSize,
+        inGamePointsYPos = 39,
+        activePowerupsStartingXPos = canvasWidth - 78,
         activePowerupTravelTime = 250,
+        activePowerupBubbleRadius = 18,
         mkBtn = (function () {
             var proto = {
                 edgeX: function () {
@@ -237,6 +238,21 @@ if (typeof Math.log2 !== "function") {
             textWDiff: -5,
             tintedRed: true
         }),
+        pauseBtn = (function () {
+            var margin = 30;
+            var s = 40;
+            var fontSize = 22;
+            return mkBtn({
+                text: "▎ ▎",
+                font: "bold " + fontSize + "px arial",
+                x: canvasWidth - margin,
+                y: margin - s / 2,
+                w: s,
+                h: s,
+                textHDiff: -fontSize * 0.6 - 1,
+                textXOffset: -1
+            });
+        }()),
         btnShadowOffset = 2,
         powerupX2Width = 36,
         powerupX2Height = 30,
@@ -246,14 +262,7 @@ if (typeof Math.log2 !== "function") {
         powerupWeightLowerWidth = 40 * powerupWeightScaleUnit,
         powerupWeightHeight = 24 * powerupWeightScaleUnit,
         activePowerupLifespan = 10000,
-        // In-game round corner buttons:
-        isOverPauseBtn = function (xy) {
-            return dist(xy.x1, xy.y1, pauseBtnCenterX, pauseBtnCenterY) < pauseBtnRadius;
-        },
-        isOverRestartBtn = function (xy) {
-            return dist(xy.x1, xy.y1, restartBtnCenterX, restartBtnCenterY) < restartBtnRadius;
-        },
-        // For out-of-game control buttons:
+        // For app control buttons:
         isOverRectBtn = function (btn, xy) {
             var withinHeight = xy.y1 >= btn.y && xy.y1 <= btn.y + btn.h;
             var withinWidth = xy.x1 >= btn.edgeX() && xy.x1 <= btn.edgeX() + btn.w;
@@ -489,21 +498,6 @@ if (typeof Math.log2 !== "function") {
                 ctx.lineTo(touch.x1, touch.y1);
                 ctx.stroke();
             },
-            pxSize = 36,
-            drawTLBtnOutline = function (ctx, game) {
-                var colory = !game.dead && (game.paused || (curTouch && isOverPauseBtn(curTouch)));
-                ctx.beginPath();
-                ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)";
-                ctx.arc(pauseBtnCenterX, pauseBtnCenterY, pauseBtnRadius, 0, 2 * Math.PI, true);
-                ctx.fill();
-                return colory;
-            },
-            drawPauseBtn = function (ctx, game) {
-                var colory = drawTLBtnOutline(ctx, game);
-                ctx.font = "bold " + pxSize + "px arial";
-                ctx.textAlign = "left";
-                fillShadowyText(ctx, "II", 15, 15 + pxSize / 2, colory);
-            },
             offCanvImg = function (w, h, src) {
                 var offCanvas = document.createElement('canvas'),
                     offCtx,
@@ -514,37 +508,20 @@ if (typeof Math.log2 !== "function") {
                 offCtx.drawImage(img, 0, 0, w, h);
                 return offCanvas;
             },
-            drawRestartBtn = (function () {
-                var offCanvasBlack = offCanvImg(pxSize, pxSize, "restart-arrow-black"),
-                    offCanvasOrange = offCanvImg(pxSize, pxSize, "restart-arrow-orange");
-                return function (ctx, game) {
-                    var colory = !game.dead && !game.paused && curTouch && isOverRestartBtn(curTouch);
-                    ctx.beginPath();
-                    ctx.fillStyle = "rgba(" + (colory ? 225 : 150) + ", " + (colory ? 175 : 150) + ", 150, 0.25)";
-                    ctx.arc(restartBtnCenterX, restartBtnCenterY, restartBtnRadius, 0, 2 * Math.PI, true);
-                    ctx.fill();
-                    if (colory) {
-                        ctx.drawImage(offCanvasOrange, canvasWidth - 25 - pxSize / 2, -13 + pxSize / 2, pxSize, pxSize);
-                    } else {
-                        ctx.drawImage(offCanvasBlack, canvasWidth - 25 - pxSize / 2, -13 + pxSize / 2, pxSize, pxSize);
-                    }
-                };
-            }()),
             clearBtnLayer = function () {
                 btnCtx.clearRect(0, 0, canvasWidth, 100);
             },
             redrawBtnLayer = function (game) {
                 clearBtnLayer();
                 if (!game.paused && !game.dead) {
-                    drawPauseBtn(btnCtx, game);
-                    drawRestartBtn(btnCtx, game);
+                    drawBtn(btnCtx, pauseBtn);
                 }
             },
             drawInGamePoints = function (ctx, game) {
                 if (!game.dead) {
-                    ctx.textAlign = "center";
+                    ctx.textAlign = "left";
                     ctx.font = "bold " + inGamePointsPxSize + "px r0";
-                    fillShadowyText(ctx, Math.floor(game.points), canvasWidth / 2, inGamePointsYPos);
+                    fillShadowyText(ctx, Math.floor(game.points), 16, inGamePointsYPos);
                 }
             },
             drawPowerup = function (ctx, type, x, y) {
@@ -615,31 +592,31 @@ if (typeof Math.log2 !== "function") {
                 // Fill in the correct portion of the circle with gray;
                 ctx.beginPath();
                 ctx.moveTo(x, y);
-                ctx.arc(x, y, 18, 0, angleOfGrayArc, false);
+                ctx.arc(x, y, activePowerupBubbleRadius, 0, angleOfGrayArc, false);
                 ctx.fillStyle = nearDeath ? "rgba(200, 0, 0, 1)" : "rgba(150, 150, 150, 0.65)";
                 ctx.fill();
                 if (angleOfGrayArc < 2 * Math.PI) { // To prevent the entire circle from being filled when really none should be filled. This condition can happen due to rounding in 'roundedFrac'.
                     // Fill in the rest of the circle with a ghosted gray;
                     ctx.beginPath();
                     ctx.moveTo(x, y);
-                    ctx.arc(x, y, 18, 0, angleOfGrayArc, true);
+                    ctx.arc(x, y, activePowerupBubbleRadius, 0, angleOfGrayArc, true);
                     ctx.fillStyle = "rgba(150, 150, 150, 0.25)";
                     ctx.fill();
                 }
             },
             drawActivePowerups = function (ctx, actives) {
-                var xPos = activePowerupLeftmostXPos, yPos = inGamePointsYPos, i;
+                var xPos = activePowerupsStartingXPos, yPos = inGamePointsYPos - 9, i;
                 var tempX, tempY;
-                for (i = actives.length - 1; i >= 0; i -= 1) { // Start with the last activepowerups, which have been around the longest.
+                for (i = 0; i < actives.length; i += 1) { // Start with the last activepowerups, which have been around the longest.
                     if (actives[i].timeSinceAcquired < activePowerupTravelTime) {
-                        tempX = (actives[i].timeSinceAcquired / activePowerupTravelTime) * (activePowerupLeftmostXPos - actives[i].srcX) + actives[i].srcX;
-                        tempY = (actives[i].timeSinceAcquired / activePowerupTravelTime) * (inGamePointsYPos - actives[i].srcY) + actives[i].srcY;
+                        tempX = (actives[i].timeSinceAcquired / activePowerupTravelTime) * (xPos - actives[i].srcX) + actives[i].srcX;
+                        tempY = (actives[i].timeSinceAcquired / activePowerupTravelTime) * (yPos - actives[i].srcY) + actives[i].srcY;
                         drawActivePowerupBackground(ctx, actives[i].lifetime, actives[i].totalLifetime, tempX, tempY);
                         drawPowerup(ctx, actives[i].type, tempX, tempY);
                     } else {
                         drawActivePowerupBackground(ctx, actives[i].lifetime, actives[i].totalLifetime, xPos, yPos);
                         drawPowerup(ctx, actives[i].type, xPos, yPos);
-                        xPos += actives[i].width;
+                        xPos -= 2.1 * activePowerupBubbleRadius;
                     }
                 }
             },
@@ -1177,8 +1154,8 @@ if (typeof Math.log2 !== "function") {
                         var i;
                         for (i = 0; i < game.activePowerups.length; i += 1) {
                             if (game.activePowerups[i].type === type) {
-                                game.activePowerups[i] = newActive;
-                                return;
+                                game.activePowerups.splice(i, 1);
+                                break;
                             }
                         }
                         game.activePowerups.push(newActive);
@@ -1453,10 +1430,8 @@ if (typeof Math.log2 !== "function") {
                             restart();
                         }
                     } else {
-                        if (isOverPauseBtn(p)) {
+                        if (isOverRectBtn(pauseBtn, p)) {
                             game.paused = true;
-                        } else if (isOverRestartBtn(p)) {
-                            restart();
                         }
                     }
                     redrawBtnLayer(game);
