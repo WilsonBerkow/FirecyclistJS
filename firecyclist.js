@@ -241,16 +241,13 @@ if (typeof Math.log2 !== "function") {
         pauseBtn = (function () {
             var margin = 30;
             var s = 40;
-            var fontSize = 22;
             return mkBtn({
-                text: "▎ ▎",
-                font: "bold " + fontSize + "px arial",
+                text: ":pause",
                 x: canvasWidth - margin,
                 y: margin - s / 2,
                 w: s,
                 h: s,
-                textHDiff: -fontSize * 0.6 - 1,
-                textXOffset: -1
+                textHDiff: -17
             });
         }()),
         btnShadowOffset = 2,
@@ -668,6 +665,14 @@ if (typeof Math.log2 !== "function") {
                     }
                 };
             }()),
+            drawPauseBars = function (ctx, y, btn) {
+                var leftX = btn.edgeX() + 9 + btn.textXOffset;
+                var barsY = y + 9;
+                var barW = btn.w / 4 - 2 + btn.textWDiff;
+                var barH = btn.h + btn.textHDiff;
+                ctx.fillRect(leftX, barsY, barW, barH);
+                ctx.fillRect(leftX + barW * 5 / 3, barsY, barW, barH);
+            },
             drawBtn = function (ctx, btn) {
                 var pressed = curTouch && isOverRectBtn(btn, curTouch);
                 drawButtonStructureAt(ctx, btn.edgeX(), btn.y, btn.w, btn.h, pressed, btn.tintedRed);
@@ -676,10 +681,14 @@ if (typeof Math.log2 !== "function") {
                     x -= btnShadowOffset;
                     y += btnShadowOffset;
                 }
-                ctx.font = btn.font;
-                ctx.textAlign = "center";
                 ctx.fillStyle = btn.tintedRed ? "rgb(175, 155, 125)" : "rgb(150, 140, 130)";
-                ctx.fillText(btn.text, x + btn.textXOffset, y + btn.h + btn.textHDiff, btn.w + btn.textWDiff, btn.h + btn.textHDiff);
+                if (btn.text === ":pause") {
+                    drawPauseBars(ctx, y, btn);
+                } else {
+                    ctx.font = btn.font;
+                    ctx.textAlign = "center";
+                    ctx.fillText(btn.text, x + btn.textXOffset, y + btn.h + btn.textHDiff, btn.w + btn.textWDiff, btn.h + btn.textHDiff);
+                }
             },
             drawMenu = function (menu) {
                 mainCtx.clearRect(0, 0, canvasWidth, canvasHeight);
