@@ -1374,6 +1374,10 @@ if (typeof Math.log2 !== "function") {
                     window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
                     // Handle time (necessary, regardless of pausing)
                     var now = Date.now(), realDt = now - prevFrameTime, dt;
+                    // If the frame takes too long, a jump in all of the objects
+                    // will be noticable, and more undesirable than the objects
+                    // acting as if the jump didn't happen. Thus, cap realDt:
+                    realDt = Math.min(realDt, 1000 / framerate * 3);
                     realDt *= difficultyCurve(game.points);
                     if (slowPowerupObtained()) {
                         dt = realDt * 2/3; // Sloooooooow
