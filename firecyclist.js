@@ -212,12 +212,14 @@ if (typeof Math.log2 !== "function") {
         }()),
         btnShadowOffset = 2,
         powerupX2Width = 36,
-        powerupX2Height = 30,
+        powerupX2Height = 23,
         powerupSlowRadius = 10,
         powerupWeightScaleUnit = 0.8,
-        powerupWeightUpperWidth = 30 * powerupWeightScaleUnit,
-        powerupWeightLowerWidth = 40 * powerupWeightScaleUnit,
-        powerupWeightHeight = 24 * powerupWeightScaleUnit,
+        powerupWeightHandleHeight = 4,
+        powerupWeightBlockUpperXMargin = 4,
+        powerupWeightBlockLowerWidth = 32,
+        powerupWeightBlockHeight = 20,
+        powerupWeightHeight = powerupWeightBlockHeight + powerupWeightHandleHeight,
         activePowerupLifespan = 10000;
 
     // Specialized util:
@@ -277,6 +279,14 @@ if (typeof Math.log2 !== "function") {
         mainCtx.scale(pageScaleFactor, pageScaleFactor);
         btnCtx.scale(pageScaleFactor, pageScaleFactor);
         overlayCtx.scale(pageScaleFactor, pageScaleFactor);
+        var offScreenRender = function (width, height, render) {
+            var newCanvas = document.createElement('canvas');
+            newCanvas.width = width;
+            newCanvas.height = height;
+            render(newCanvas.getContext('2d'), width, height);
+            return newCanvas;
+        };
+        // Renderers:
         var fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) {
                 // Doesn't set things like ctx.font and ctx.textAlign so that they
                 // can be set on ctx by the caller, before invoking.
@@ -501,62 +511,79 @@ if (typeof Math.log2 !== "function") {
                     fillShadowyText(ctx, Math.floor(game.points), 16, inGamePointsYPos);
                 }
             },
-            drawPowerup = function (ctx, type, x, y) {
-                var unit = powerupWeightScaleUnit;
-                if (type === "X2") {
-                    ctx.fillStyle = "gold";
-                    ctx.textAlign = "left";
-                    ctx.font = "bold italic 22px arial";
-                    ctx.lineWidth = 1;
-                    ctx.fillText("X2", x - powerupX2Width / 2 + 5, y + powerupX2Height / 4, powerupX2Width, powerupX2Height);
-                    ctx.strokeStyle = "orange";
-                    ctx.strokeText("X2", x - powerupX2Width / 2 + 5, y + powerupX2Height / 4, powerupX2Width, powerupX2Height);
-                } else if (type === "slow") {
-                    ctx.globalAlpha = 0.7;
-                    circle(ctx, x, y, powerupSlowRadius, "silver", "fill");
-                    ctx.globalAlpha = 1;
-                    ctx.lineWidth = 3;
-                    circle(ctx, x, y, powerupSlowRadius, "gray", "stroke");
-                    ctx.beginPath();
-                    lineFromTo(ctx, x, y, x, y - powerupSlowRadius * 0.75);
-                    lineFromTo(ctx, x, y, x + powerupSlowRadius * 0.75, y);
-                    ctx.stroke();
-                } else if (type === "weight") {
-                    ctx.beginPath();
-                    ctx.moveTo(x - powerupWeightUpperWidth / 2, y - powerupWeightHeight / 2);
-                    ctx.lineTo(x + powerupWeightUpperWidth / 2, y - powerupWeightHeight / 2);
-                    ctx.lineTo(x + powerupWeightLowerWidth / 2, y + powerupWeightHeight / 2);
-                    ctx.lineTo(x - powerupWeightLowerWidth / 2, y + powerupWeightHeight / 2);
-                    ctx.fillStyle = "black";
-                    ctx.fill();
+            drawPowerup = (function () {
+                var canvases = {
+                    "X2": offScreenRender(powerupX2Width, powerupX2Height, function (ctx, w, h) {
+                        ctx.fillStyle = "gold";
+                        ctx.textAlign = "left";
+                        ctx.font = "bold italic 22px arial";
+                        ctx.lineWidth = 1;
+                        ctx.fillText("X2", 5, h * 0.82, w, h);
+                        ctx.strokeStyle = "orange";
+                        ctx.strokeText("X2", 5, h * 0.82, w, h);
+                    }),
+                    "slow": offScreenRender(powerupSlowRadius * 2 + 5, powerupSlowRadius * 2 + 5, function (ctx, w, h) {
+                        var cx = w / 2, cy = h / 2;
+                        ctx.globalAlpha = 0.7;
+                        circle(ctx, cx, cy, powerupSlowRadius, "silver", "fill");
+                        ctx.globalAlpha = 1;
+                        ctx.lineWidth = 3;
+                        circle(ctx, cx, cy, powerupSlowRadius, "gray", "stroke");
+                        ctx.beginPath();
+                        lineFromTo(ctx, cx, cy, cx, cy - powerupSlowRadius * 0.75);
+                        lineFromTo(ctx, cx, cy, cx + powerupSlowRadius * 0.75, cy);
+                        ctx.stroke();
+                    }),
+                    "weight": offScreenRender(powerupWeightBlockLowerWidth, powerupWeightHeight, function (ctx, w, fullHeight) {
+                        var cx = w / 2, cy = fullHeight / 2;
+                        var blockHeight = powerupWeightBlockHeight;
+                        var handleHeight = powerupWeightHandleHeight;
 
-                    ctx.beginPath();
-                    ctx.moveTo(x - 10 * unit, y - powerupWeightHeight / 2);
-                    ctx.lineTo(x - 6 * unit, y - powerupWeightHeight / 2 - 4 * unit);
-                    ctx.lineTo(x + 6 * unit, y - powerupWeightHeight / 2 - 4 * unit);
-                    ctx.lineTo(x + 10 * unit, y - powerupWeightHeight / 2);
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = "black";
-                    ctx.stroke();
+                        // Solid black block:
+                        ctx.beginPath();
+                        ctx.moveTo(powerupWeightBlockUpperXMargin, handleHeight);
+                        ctx.lineTo(w - powerupWeightBlockUpperXMargin, handleHeight);
+                        ctx.lineTo(w, handleHeight + blockHeight);
+                        ctx.lineTo(0, fullHeight);
+                        ctx.fillStyle = "black";
+                        ctx.fill();
 
-                    ctx.font = "bold 28px Courier New";
-                    ctx.fillStyle = "lightGrey";
-                    ctx.textAlign = "center";
-                    ctx.fillText("1000", x, y + 11 * unit, 30 * unit);
-                } else if (type === "magnet") {
-                    ctx.beginPath();
-                    ctx.arc(x, y, powerupSlowRadius, 0, Math.PI, true);
-                    ctx.strokeStyle = "red";
-                    ctx.lineWidth = 10;
-                    ctx.stroke();
-                    ctx.fillStyle = "red";
-                    ctx.fillRect(x - powerupSlowRadius - 5, y, 10, 5);
-                    ctx.fillRect(x + powerupSlowRadius - 5, y, 10, 5);
-                    ctx.fillStyle = "white";
-                    ctx.fillRect(x - powerupSlowRadius - 5, y + 5, 10, 6);
-                    ctx.fillRect(x + powerupSlowRadius - 5, y + 5, 10, 6);
-                }
-            },
+                        // Weight handle:
+                        ctx.beginPath();
+                        ctx.moveTo(cx - 8, handleHeight);
+                        ctx.lineTo(cx - 5, 0);
+                        ctx.lineTo(cx + 5, 0);
+                        ctx.lineTo(cx + 8, handleHeight);
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = "black";
+                        ctx.stroke();
+
+                        // '1000' weight marker:
+                        ctx.font = "bold 28px Courier New";
+                        ctx.fillStyle = "lightGrey";
+                        ctx.textAlign = "center";
+                        ctx.fillText("1000", cx, fullHeight - 1, 24);
+                    }),
+                    "magnet": offScreenRender(powerupSlowRadius * 3, powerupSlowRadius * 3, function (ctx, w, h) {
+                        var x = w / 2, y = h / 2;
+                        ctx.beginPath();
+                        ctx.arc(x, y, powerupSlowRadius, 0, Math.PI, true);
+                        ctx.strokeStyle = "red";
+                        ctx.lineWidth = 10;
+                        ctx.stroke();
+                        ctx.fillStyle = "red";
+                        ctx.fillRect(x - powerupSlowRadius - 5, y, 10, 5);
+                        ctx.fillRect(x + powerupSlowRadius - 5, y, 10, 5);
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(x - powerupSlowRadius - 5, y + 5, 10, 6);
+                        ctx.fillRect(x + powerupSlowRadius - 5, y + 5, 10, 6);
+                    })
+                };
+                return function (ctx, type, x, y) {
+                    var canvas = canvases[type];
+                    ctx.drawImage(canvas, x - canvas.width / 2, y - canvas.height / 2);
+                };
+            }()),
             drawActivePowerupBackground = function (ctx, lifeleft, totalLifetime, x, y) {
                 var fractionLifeLeft = lifeleft / totalLifetime,
                     nearDeath = fractionLifeLeft < 0.25,
@@ -1046,12 +1073,13 @@ if (typeof Math.log2 !== "function") {
                     return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
                 }
                 if (powerup.type === "weight") {
-                    return playerHittingRect(player, powerup.xPos(), powerup.yPos(), powerupWeightLowerWidth, powerupWeightHeight);
+                    return playerHittingRect(player, powerup.xPos(), powerup.yPos(), powerupWeightBlockLowerWidth, powerupWeightHeight);
                 }
                 if (powerup.type === "magnet") {
                     return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
                 }
             },
+
             randomXPosition = function () {
                 return Math.random() * gameWidth;
             },
@@ -1326,7 +1354,10 @@ if (typeof Math.log2 !== "function") {
                     updatePowerups = function (dt) {
                         game.powerups.forEach(function (powerup, key) {
                             powerup.lifetime += dt;
-                            if (powerup.xPos() > gameWidth + 20) { // 20 is just a random margin to be safe
+                            if (powerup.xPos() > gameWidth + activePowerupBubbleRadius + playerRadius) {
+                                // The active powerup bubble is larger than all powerups,
+                                // and the '+ playerRadius' is so that he can catch one
+                                // just as it disappears.
                                 game.powerups[key] = null;
                             }
                         });
