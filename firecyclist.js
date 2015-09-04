@@ -10,34 +10,231 @@ if (typeof Math.log2 !== "function") {
 
 (function () {
     "use strict";
-    // Screen-resizing code:
-    var htmlModule = document.getElementById("Main"),
-        windowDims = {
-            width: window.innerWidth || document.documentElement.clientWidth, // The defaulting expression (.documentElement....) is for IE
-            height: window.innerHeight || document.documentElement.clientHeight
-        },
-        pageScaleFactor = 1,
-        moduleOffsetX = 0,
-        resize = function () {
-            var scaleX = windowDims.width / (576 / 2),
-                scaleY = windowDims.height / (1024 / 2),
-                unfitAxis;
-            pageScaleFactor = Math.min(scaleX, scaleY);
-            unfitAxis = pageScaleFactor === scaleX ? "y" : "x";
-            if (unfitAxis === "x") {
-                moduleOffsetX = (windowDims.width - (576 / 2) * pageScaleFactor) / 2;
-                htmlModule.setAttribute("style", "position: fixed; left: " + Math.floor(moduleOffsetX) + "px;");
-            }
-        },
+    var mainCanvas = document.getElementById("canvas"),
+        btnCanvas = document.getElementById("btnCanvas"),
+        overlayCanvas = document.getElementById("overlayCanvas"),
+        gameWidth = 576 / 2,
+        gameHeight = 1024 / 2;
+
+    // Resize and center game canvases:
+    var pageScaleFactor = 1,
+        calcTouchPos;
+    (function () {
+        var htmlModule = document.getElementById("Main"),
+            windowDims = {
+                width: window.innerWidth || document.documentElement.clientWidth, // The defaulting expression (.documentElement....) is for IE
+                height: window.innerHeight || document.documentElement.clientHeight
+            },
+            scaleX = windowDims.width / gameWidth,
+            scaleY = windowDims.height / gameHeight,
+            moduleOffsetX = 0;
+        pageScaleFactor = Math.min(scaleX, scaleY);
+        if (scaleX > scaleY) {
+            // If the game is as tall as the screen but not as wide, center it
+            moduleOffsetX = (windowDims.width - gameWidth * pageScaleFactor) / 2;
+            htmlModule.setAttribute("style", "position: fixed; left: " + Math.floor(moduleOffsetX) + "px;");
+        }
         calcTouchPos = function (event) {
             return {
                 x: ((typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) - moduleOffsetX) / pageScaleFactor,
                 y: (typeof event.clientY === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor
             };
+        };
+        [mainCanvas, btnCanvas, overlayCanvas].forEach(function (canvas) {
+            canvas.width *= pageScaleFactor;
+            canvas.height *= pageScaleFactor;
+        });
+    }());
+
+    // Touch system:
+    var handleTouchend,
+        curTouch = null;
+    (function () {
+        var touchesCount = 0;
+        jQuery(document).on("mousemove touchmove", function (event) {
+            var xy = calcTouchPos(event);
+            if (curTouch !== null) { // Condition fails when a platfm has been materialized, and thus curTouch was reset to null
+                curTouch.x1 = xy.x;
+                curTouch.y1 = xy.y;
+            }
+            event.preventDefault(); // Stops the swipe-to-move-through-browser-history feature in Chrome from interferring.
+        });
+        jQuery(document).on("mousedown touchstart", function (event) {
+            var now = Date.now(), xy = calcTouchPos(event);
+            curTouch = {
+                t0: now,
+                id: touchesCount,
+                x0: xy.x,
+                y0: xy.y,
+                x1: xy.x,
+                y1: xy.y
+            };
+            touchesCount += 1;
+        });
+        jQuery(document).on("mouseup touchend", function () {
+            if (typeof handleTouchend === "function" && curTouch) {
+                handleTouchend(curTouch);
+            }
+            curTouch = null;
+            // Do not use preventDefault here, it prevents
+            // triggering of the 'tap' event.
+        });
+    }());
+
+    // Generic util:
+    var makeObject = function (proto, props) {
+            var o = Object.create(proto);
+            Object.keys(props).forEach(function (key) {
+                o[key] = props[key];
+            });
+            return o;
         },
-        handleTouchend,
-        curTouch = null,
-        mkHighscores = function (identifier, handleUnlockingStuff) {
+        modulo = function (num, modBy) {
+            return num > modBy ? modulo(num - modBy, modBy) :
+                   num < 0 ? modulo(num + modBy, modBy) :
+                   num;
+        },
+        pythag = function (a, b) {
+            return Math.sqrt(a * a + b * b);
+        },
+        dist = function (x0, y0, x1, y1) {
+            return pythag(x1 - x0, y1 - y0);
+        },
+        sqrt3 = Math.sqrt(3),
+        oneDegree = Math.PI / 180,
+        trig = (function () {
+            var sines = [],   // Sine and cosine tables are used so that the approximation work doesn't
+                cosines = [], // have to be done more than once for any given angle. The angles of the
+                              // spokes are rounded down to the nearest degree.
+                sin = function (radians) {
+                    return sines[modulo(Math.floor(radians / oneDegree), 360)];
+                },
+                cos = function (radians) {
+                    return cosines[modulo(Math.floor(radians / oneDegree), 360)];
+                },
+                i;
+            for (i = 0; i < 360; i += 1) {
+                sines[i] = Math.sin(i * oneDegree);
+                cosines[i] = Math.cos(i * oneDegree);
+            }
+            return {sin: sin, cos: cos};
+        }());
+
+    // Config:
+    var canvasBackground = "rgb(185, 185, 255)", // Same color used in CSS
+        fps = 40,
+        playerGrav = 0.32 / 28,
+        fbFallRate = 2 / 20,
+        fbRadius = 10,
+        coinFallRate = 2 / 20,
+        coinRadius = 10,
+        coinSquareLen = 8.5,
+        coinValue = 11,
+        coinStartingY = gameHeight + coinRadius,
+        platfmFallRate = 3 / 20,
+        totalFbHeight = 10,
+        platfmBounciness = 0.75,
+        platfmThickness = 6,
+        playerTorsoLen = 15 * 5/8,
+        playerRadius = 10 * 6/8,
+        playerHeadRadius = 9 * 5/8,
+        playerElbowXDiff = 8 * 5/8,
+        playerElbowYDiff = 2 * 5/8,
+        powerupTotalLifespan = 5500, // in milliseconds
+        pauseBtnCenterX = 10,
+        pauseBtnCenterY = -5,
+        pauseBtnRadius = 65,
+        restartBtnCenterX = gameWidth - 10,
+        restartBtnCenterY = -5,
+        restartBtnRadius = 65,
+        inGamePointsPxSize = 30,
+        inGamePointsYPos = 39,
+        activePowerupsStartingXPos = gameWidth - 78,
+        activePowerupTravelTime = 250,
+        activePowerupBubbleRadius = 18,
+        mkBtn = (function () {
+            var proto = {
+                edgeX: function () {
+                    return this.x - this.w / 2;
+                }
+            };
+            return function (o) {
+                o.redTint = !!o.redTint;
+                o.textWDiff = o.textWDiff || 0;
+                o.textHDiff = o.textHDiff || 0;
+                o.textXOffset = o.textXOffset || 0;
+                return makeObject(proto, o);
+            };
+        }()),
+        menuPlayBtn = mkBtn({
+            text: "Play",
+            font: "italic bold 53px i0",
+            x: gameWidth / 2,
+            y: 280,
+            w: 121,
+            h: 57,
+            textHDiff: -13
+        }),
+        replayBtn = mkBtn({
+            text: "Replay",
+            font: "bold 33px b0",
+            x: gameWidth / 2,
+            y: 327,
+            w: 110,
+            h: 45,
+            textHDiff: -12,
+            textWDiff: -5,
+            tintedRed: true
+        }),
+        resumeBtn = mkBtn({
+            text: "Resume",
+            font: "bold 30px b0",
+            x: gameWidth / 2,
+            y: replayBtn.y - 68,
+            w: replayBtn.w + 9,
+            h: replayBtn.h - 3,
+            textXOffset: 1,
+            textHDiff: -12,
+            textWDiff: -5,
+            tintedRed: true
+        }),
+        pauseBtn = (function () {
+            var margin = 30;
+            var s = 40;
+            return mkBtn({
+                text: ":pause",
+                x: gameWidth - margin,
+                y: margin - s / 2,
+                w: s,
+                h: s,
+                textHDiff: -17
+            });
+        }()),
+        btnShadowOffset = 2,
+        powerupX2Width = 36,
+        powerupX2Height = 30,
+        powerupSlowRadius = 10,
+        powerupWeightScaleUnit = 0.8,
+        powerupWeightUpperWidth = 30 * powerupWeightScaleUnit,
+        powerupWeightLowerWidth = 40 * powerupWeightScaleUnit,
+        powerupWeightHeight = 24 * powerupWeightScaleUnit,
+        activePowerupLifespan = 10000;
+
+    // Specialized util:
+    var isOverRectBtn = function (btn, xy) {
+            var withinHeight = xy.y1 >= btn.y && xy.y1 <= btn.y + btn.h;
+            var withinWidth = xy.x1 >= btn.edgeX() && xy.x1 <= btn.edgeX() + btn.w;
+            return withinHeight && withinWidth;
+        },
+        objIsVisible = function (xradius, obj) {
+            return obj.x > -xradius && obj.x < gameWidth + xradius;
+        },
+        playerYToStdHeadCenterY = function (y) { // 'Std' because it assumes player is not ducking.
+            return y - playerTorsoLen - playerRadius - playerHeadRadius;
+        };
+
+    // Highscore update and storage:
+    var mkHighscores = function (identifier) {
             var scores = [null, null, null], // Highest scores are at the beginning, null represents an empty slot.
                 fromLocal = localStorage.getItem(identifier);
             if (fromLocal !== null) {
@@ -71,207 +268,9 @@ if (typeof Math.log2 !== "function") {
             };
         },
         highscores = mkHighscores("highscores");
-    var mainCanvas = document.getElementById("canvas"),
-        btnCanvas = document.getElementById("btnCanvas"),
-        overlayCanvas = document.getElementById("overlayCanvas");
-    resize();
-    [mainCanvas, btnCanvas, overlayCanvas].forEach(function (canvas) {
-        canvas.width *= pageScaleFactor;
-        canvas.height *= pageScaleFactor;
-    });
-    (function () { // Simple Touch system, similar to Elm's but compatible with the Platfm interface
-        var touchesCount = 0;
-        jQuery(document).on("mousemove touchmove", function (event) {
-            var xy = calcTouchPos(event);
-            if (curTouch !== null) { // Condition fails when a platfm has been materialized, and thus curTouch was reset to null
-                curTouch.x1 = xy.x;
-                curTouch.y1 = xy.y;
-            }
-            event.preventDefault(); // Stops the swipe-to-move-through-browser-history feature in Chrome from interferring.
-        });
-        jQuery(document).on("mousedown touchstart", function (event) {
-            var now = Date.now(), xy = calcTouchPos(event);
-            curTouch = {
-                t0: now,
-                id: touchesCount,
-                x0: xy.x,
-                y0: xy.y,
-                x1:  xy.x,
-                y1:  xy.y
-            };
-            touchesCount += 1;
-        });
-        jQuery(document).on("mouseup touchend", function () {
-            if (typeof handleTouchend === "function" && curTouch) {
-                handleTouchend(curTouch);
-            }
-            curTouch = null;
-            // Do not use preventDefault here, it prevents
-            // triggering of the 'tap' event.
-        });
-    }());
-    // UTIL + CONFIG:
-    var // General util:
-        makeObject = function (proto, props) {
-            var o = Object.create(proto);
-            Object.keys(props).forEach(function (key) {
-                o[key] = props[key];
-            });
-            return o;
-        },
-        avg = (function () {
-            var sum2 = function (a, b) { return a + b; },
-                sum = function (arr) {
-                    return arr.reduce(sum2);
-                };
-            return function () {
-                var nums = [].slice.apply(arguments);
-                return sum(nums) / nums.length;
-            };
-        }()),
-        modulo = function (num, modBy) {
-            return num > modBy ? modulo(num - modBy, modBy) :
-                   num < 0 ? modulo(num + modBy, modBy) :
-                   num;
-        },
-        pythag = function (a, b) { return Math.sqrt(a*a + b*b); },
-        dist = function (x0, y0, x1, y1) { return pythag(x1 - x0, y1 - y0); },
-        sqrt2 = Math.sqrt(2),
-        sqrt3 = Math.sqrt(3),
-        oneDegree = Math.PI / 180,
-        trig = (function () {
-            var sines = [],   // Sine and cosine tables are used so that the approximation work doesn't
-                cosines = [], // have to be done more than once for any given angle. The angles of the
-                              // spokes are rounded down to the nearest degree.
-                sin = function (radians) {
-                    return sines[modulo(Math.floor(radians / oneDegree), 360)];
-                },
-                cos = function (radians) {
-                    return cosines[modulo(Math.floor(radians / oneDegree), 360)];
-                },
-                i;
-            for (i = 0; i < 360; i += 1) {
-                sines[i] = Math.sin(i * oneDegree);
-                cosines[i] = Math.cos(i * oneDegree);
-            }
-            return {sin: sin, cos: cos};
-        }()),
-        // Config:
-        canvasBackground = "rgb(185, 185, 255)", // Used in CSS
-        fps = 40,
-        canvasWidth = 576 / 2,
-        canvasHeight = 1024 / 2,
-        playerGrav = 0.32 / 28,
-        fbFallRate = 2 / 20,
-        fbRadius = 10,
-        coinFallRate = 2 / 20,
-        coinRadius = 10,
-        coinSquareLen = 8.5,
-        coinValue = 11,
-        coinStartingY = canvasHeight + coinRadius,
-        platfmFallRate = 3 / 20,
-        totalFbHeight = 10,
-        platfmBounciness = 0.75,
-        platfmThickness = 6,
-        playerTorsoLen = 15 * 5/8,
-        playerRadius = 10 * 6/8,
-        playerHeadRadius = 9 * 5/8,
-        playerElbowXDiff = 8 * 5/8,
-        playerElbowYDiff = 2 * 5/8,
-        powerupTotalLifespan = 5500, // in milliseconds
-        pauseBtnCenterX = 10,
-        pauseBtnCenterY = -5,
-        pauseBtnRadius = 65,
-        restartBtnCenterX = canvasWidth - 10,
-        restartBtnCenterY = -5,
-        restartBtnRadius = 65,
-        inGamePointsPxSize = 30,
-        inGamePointsYPos = 39,
-        activePowerupsStartingXPos = canvasWidth - 78,
-        activePowerupTravelTime = 250,
-        activePowerupBubbleRadius = 18,
-        mkBtn = (function () {
-            var proto = {
-                edgeX: function () {
-                    return this.x - this.w / 2;
-                }
-            };
-            return function (o) {
-                o.redTint = !!o.redTint;
-                o.textWDiff = o.textWDiff || 0;
-                o.textHDiff = o.textHDiff || 0;
-                o.textXOffset = o.textXOffset || 0;
-                return makeObject(proto, o);
-            };
-        }()),
-        menuPlayBtn = mkBtn({
-            text: "Play",
-            font: "italic bold 53px i0",
-            x: canvasWidth / 2,
-            y: 280,
-            w: 121,
-            h: 57,
-            textHDiff: -13
-        }),
-        replayBtn = mkBtn({
-            text: "Replay",
-            font: "bold 33px b0",
-            x: canvasWidth / 2,
-            y: 327,
-            w: 110,
-            h: 45,
-            textHDiff: -12,
-            textWDiff: -5,
-            tintedRed: true
-        }),
-        resumeBtn = mkBtn({
-            text: "Resume",
-            font: "bold 30px b0",
-            x: canvasWidth / 2,
-            y: replayBtn.y - 68,
-            w: replayBtn.w + 9,
-            h: replayBtn.h - 3,
-            textXOffset: 1,
-            textHDiff: -12,
-            textWDiff: -5,
-            tintedRed: true
-        }),
-        pauseBtn = (function () {
-            var margin = 30;
-            var s = 40;
-            return mkBtn({
-                text: ":pause",
-                x: canvasWidth - margin,
-                y: margin - s / 2,
-                w: s,
-                h: s,
-                textHDiff: -17
-            });
-        }()),
-        btnShadowOffset = 2,
-        powerupX2Width = 36,
-        powerupX2Height = 30,
-        powerupSlowRadius = 10,
-        powerupWeightScaleUnit = 0.8,
-        powerupWeightUpperWidth = 30 * powerupWeightScaleUnit,
-        powerupWeightLowerWidth = 40 * powerupWeightScaleUnit,
-        powerupWeightHeight = 24 * powerupWeightScaleUnit,
-        activePowerupLifespan = 10000,
-        // For app control buttons:
-        isOverRectBtn = function (btn, xy) {
-            var withinHeight = xy.y1 >= btn.y && xy.y1 <= btn.y + btn.h;
-            var withinWidth = xy.x1 >= btn.edgeX() && xy.x1 <= btn.edgeX() + btn.w;
-            return withinHeight && withinWidth;
-        },
-        // More util:
-        objIsVisible = function (hradius, obj) {
-            return obj.x > -hradius && obj.x < canvasWidth + hradius;
-        },
-        playerYToStdHeadCenterY = function (y) { // 'Std' because it assumes player is not ducking.
-            return y - playerTorsoLen - playerRadius - playerHeadRadius;
-        };
-    // RENDER:
-    var renderers = (function () {
+
+    // Rendering:
+    var render = (function () {
         var mainCtx = mainCanvas.getContext("2d"),
             btnCtx = btnCanvas.getContext("2d"),
             overlayCtx = overlayCanvas.getContext("2d");
@@ -340,22 +339,22 @@ if (typeof Math.log2 !== "function") {
                 circleAt(ctx, x, y, playerRadius);
                 ctx.fillStyle = "black";
                 ctx.fill();
-                
+
                 ctx.beginPath();
                 circleAt(ctx, x, y, playerRadius - 1);
                 ctx.fillStyle = canvasBackground;
                 ctx.fill();
-                
+
                 ctx.fillStyle = style;
             },
             drawPlayerDuckingAt = function (ctx, x, y, wheelAngle) {
                 wheelOutlineAt(ctx, x, y);
-                
+
                 ctx.beginPath();
-                
+
                 var playerHeadX = x - 3;
                 var playerHeadY = y - 10;
-                
+
                 // Torso:
                 var torsoStartX = playerHeadX + sqrt3 / 2 * playerHeadRadius;
                 var torsoStartY = playerHeadY + 0.5 * playerHeadRadius;
@@ -364,18 +363,18 @@ if (typeof Math.log2 !== "function") {
                 ctx.moveTo(torsoStartX, torsoStartY);
                 ctx.lineTo(torsoMidX, torsoMidY);
                 ctx.lineTo(x, y);
-                
+
                 // One arm (shadowed by head):
                 ctx.moveTo(torsoMidX, torsoMidY);
                 ctx.lineTo(torsoMidX - 1, playerHeadY - playerHeadRadius * 0.65);
                 ctx.lineTo(playerHeadX - playerHeadRadius * 1.4, playerHeadY - playerHeadRadius + 4);
-                
+
                 // Spokes of wheel:
                 wheelSpokesAt(ctx, x, y, wheelAngle);
-                
+
                 ctx.stroke();
-                
-                
+
+
                 // Solid, background-colored body of head, with slight extra radius for outline:
                 var style = ctx.fillStyle;
                 ctx.beginPath();
@@ -383,42 +382,41 @@ if (typeof Math.log2 !== "function") {
                 circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius + 1);
                 ctx.fill();
                 ctx.fillStyle = style;
-                
+
                 // Now for the lines to appear in front of head:
-                
+
                 ctx.beginPath();
-                
+
                 // Outline of head:
                 circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius);
-                
+
                 // Final arm (not shadowed by head):
                 ctx.moveTo(torsoMidX, torsoMidY);
                 ctx.lineTo(x, playerHeadY);
                 ctx.lineTo(x - playerHeadRadius - 3, playerHeadY + 3);
-                
+
                 ctx.stroke();
             },
             drawPlayerAt = function (ctx, x, y, wheelAngle) {
                 wheelOutlineAt(ctx, x, y);
-                
+
                 ctx.beginPath();
-                
+
                 // Head and torso:
                 circleAt(ctx, x, playerYToStdHeadCenterY(y), playerHeadRadius);
                 ctx.moveTo(x, y - playerTorsoLen - playerRadius);
                 ctx.lineTo(x, y); // (x, y) is the center of the wheel
-                
+
                 // Wheel spokes:
                 wheelSpokesAt(ctx, x, y, wheelAngle);
-                
+
                 // Arms:
-                
                 ctx.save();
                 ctx.translate(x, y - playerRadius - playerTorsoLen / 2);
                 oneArm(ctx);
                 oneArm(ctx, true);
                 ctx.restore();
-                
+
                 ctx.stroke();
             },
             drawFbs = function (ctx, fbs) {
@@ -452,7 +450,7 @@ if (typeof Math.log2 !== "function") {
                 }
                 ctx.fillStyle = "yellow";
                 ctx.fill();
-                
+
                 ctx.beginPath();
                 for (i = 0; i < coins.length; i += 1) {
                     if (objIsVisible(2 * coinRadius, coins[i])) {
@@ -461,14 +459,14 @@ if (typeof Math.log2 !== "function") {
                 }
                 ctx.strokeStyle = "orange";
                 ctx.stroke();
-                
+
                 ctx.fillStyle = "darkOrange";
                 for (i = 0; i < coins.length; i += 1) {
                     if (objIsVisible(2 * coinRadius, coins[i])) {
                         ctx.fillRect(coins[i].x - coinSquareLen / 2, coins[i].y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
                     }
                 }
-                
+
                 for (i = 0; i < coins.length; i += 1) {
                     if (objIsVisible(2 * coinRadius, coins[i])) {
                         // strokeStyle is still "orange"
@@ -495,25 +493,6 @@ if (typeof Math.log2 !== "function") {
                 ctx.moveTo(touch.x0, touch.y0);
                 ctx.lineTo(touch.x1, touch.y1);
                 ctx.stroke();
-            },
-            offCanvImg = function (w, h, src) {
-                var offCanvas = document.createElement('canvas'),
-                    offCtx,
-                    img = document.getElementById(src);
-                offCanvas.width = w;
-                offCanvas.height = h;
-                offCtx = offCanvas.getContext('2d');
-                offCtx.drawImage(img, 0, 0, w, h);
-                return offCanvas;
-            },
-            clearBtnLayer = function () {
-                btnCtx.clearRect(0, 0, canvasWidth, 100);
-            },
-            redrawBtnLayer = function (game) {
-                clearBtnLayer();
-                if (!game.paused && !game.dead) {
-                    drawBtn(btnCtx, pauseBtn);
-                }
             },
             drawInGamePoints = function (ctx, game) {
                 if (!game.dead) {
@@ -550,7 +529,7 @@ if (typeof Math.log2 !== "function") {
                     ctx.lineTo(x - powerupWeightLowerWidth / 2, y + powerupWeightHeight / 2);
                     ctx.fillStyle = "black";
                     ctx.fill();
-                    
+
                     ctx.beginPath();
                     ctx.moveTo(x - 10 * unit, y - powerupWeightHeight / 2);
                     ctx.lineTo(x - 6 * unit, y - powerupWeightHeight / 2 - 4 * unit);
@@ -559,7 +538,7 @@ if (typeof Math.log2 !== "function") {
                     ctx.lineWidth = 2;
                     ctx.strokeStyle = "black";
                     ctx.stroke();
-                    
+
                     ctx.font = "bold 28px Courier New";
                     ctx.fillStyle = "lightGrey";
                     ctx.textAlign = "center";
@@ -621,9 +600,9 @@ if (typeof Math.log2 !== "function") {
             drawMenuTitle = function (ctx) {
                 ctx.font = "italic bold 170px arial";
                 ctx.textAlign = "center";
-                fillShadowyText(ctx, "Fire", canvasWidth / 2 - 3, 190, true, 3);
+                fillShadowyText(ctx, "Fire", gameWidth / 2 - 3, 190, true, 3);
                 ctx.font = "italic bold 95px arial";
-                fillShadowyText(ctx, "cyclist", canvasWidth / 2 - 3, 240, true, 2);
+                fillShadowyText(ctx, "cyclist", gameWidth / 2 - 3, 240, true, 2);
             },
             drawRoundedRectPath = function (ctx, x, y, width, height, radius) {
                 // Thank you, Juan Mendes (function from <http://js-bits.blogspot.com/2010/07/canvas-rounded-corner-rectangles.html>, with slight modification).
@@ -691,8 +670,17 @@ if (typeof Math.log2 !== "function") {
                     ctx.fillText(btn.text, x + btn.textXOffset, y + btn.h + btn.textHDiff, btn.w + btn.textWDiff, btn.h + btn.textHDiff);
                 }
             },
+            clearBtnLayer = function () {
+                btnCtx.clearRect(0, 0, gameWidth, 100);
+            },
+            redrawBtnLayer = function (game) {
+                clearBtnLayer();
+                if (!game.paused && !game.dead) {
+                    drawBtn(btnCtx, pauseBtn);
+                }
+            },
             drawMenu = function (menu) {
-                mainCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+                mainCtx.clearRect(0, 0, gameWidth, gameHeight);
                 drawFbs(mainCtx, menu.fbs);
                 drawFirebits(mainCtx, menu.firebitsRed, "red");
                 drawFirebits(mainCtx, menu.firebitsOrg, "darkOrange");
@@ -701,13 +689,12 @@ if (typeof Math.log2 !== "function") {
             },
             drawGame = function (game) {
                 mainCtx.save();
-                mainCtx.clearRect(0, 0, canvasWidth, canvasHeight);
-                overlayCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+                mainCtx.clearRect(0, 0, gameWidth, gameHeight);
+                overlayCtx.clearRect(0, 0, gameWidth, gameHeight);
                 if (game.player.ducking) {
                     drawPlayerDuckingAt(mainCtx, game.player.x, game.player.y, game.player.wheelAngle);
                 } else {
                     drawPlayerAt(mainCtx, game.player.x, game.player.y, game.player.wheelAngle);
-                    
                 }
                 setupGenericPlatfmChars(mainCtx);
                 game.platfms.forEach(function (platfm) {
@@ -731,7 +718,7 @@ if (typeof Math.log2 !== "function") {
             gameOverlayDrawer = (function () {
                 var vagueify = function (ctx) {
                     ctx.fillStyle = "rgba(200, 200, 200, 0.75)";
-                    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+                    ctx.fillRect(0, 0, gameWidth, gameHeight);
                 };
                 return function (f) {
                     return function (game) {
@@ -747,53 +734,58 @@ if (typeof Math.log2 !== "function") {
                 ctx.fillStyle = "darkOrange";
                 ctx.font = "64px r0";
                 ctx.textAlign = "center";
-                ctx.fillText("Paused", canvasWidth / 2, canvasHeight / 2 - 28);
+                ctx.fillText("Paused", gameWidth / 2, gameHeight / 2 - 28);
                 drawBtn(ctx, resumeBtn);
             }),
             drawGameDead = gameOverlayDrawer(function (ctx, game) {
                 var startY = 105;
-                
+
                 // 'Game Over' text
                 ctx.fillStyle = "darkOrange";
                 ctx.font = "bold italic 90px i0";
                 ctx.textAlign = "center";
-                ctx.fillText("Game", canvasWidth / 2 - 4, startY);
-                ctx.fillText("Over", canvasWidth / 2 - 4, startY + 75);
-                
+                ctx.fillText("Game", gameWidth / 2 - 4, startY);
+                ctx.fillText("Over", gameWidth / 2 - 4, startY + 75);
+
                 // Points big
                 ctx.font = "140px r0";
-                ctx.fillText(Math.floor(game.points), canvasWidth / 2, canvasHeight * 2 / 3 - 28);
-                
+                ctx.fillText(Math.floor(game.points), gameWidth / 2, gameHeight * 2 / 3 - 28);
+
                 startY += 18;
-                
+
                 // Line separator
                 ctx.beginPath();
                 ctx.strokeStyle = "darkOrange";
                 ctx.moveTo(30, startY + 260);
-                ctx.lineTo(canvasWidth - 30, startY + 260);
+                ctx.lineTo(gameWidth - 30, startY + 260);
                 ctx.moveTo(30, startY + 262);
-                ctx.lineTo(canvasWidth - 30, startY + 262);
+                ctx.lineTo(gameWidth - 30, startY + 262);
                 ctx.stroke();
-                
+
                 // Highscores
                 ctx.font = "bold italic 28px i0";
-                ctx.fillText("Highscores", canvasWidth / 2, startY + 300);
+                ctx.fillText("Highscores", gameWidth / 2, startY + 300);
                 var scoreFontSize = 24;
                 ctx.font = scoreFontSize + "px r0";
                 var curY = startY + 325;
                 highscores.highest().forEach(function (score) {
                     if (!score) { return; }
-                    ctx.fillText(score, canvasWidth / 2, curY);
+                    ctx.fillText(score, gameWidth / 2, curY);
                     curY += scoreFontSize + 2;
                 });
-                
+
                 // Replay btn
                 drawBtn(ctx, replayBtn);
             });
-        return [drawGame, drawGamePaused, drawGameDead, drawMenu, redrawBtnLayer, clearBtnLayer];
+        return {
+            menu: drawMenu,
+            game: drawGame,
+            gamePaused: drawGamePaused,
+            gameDead: drawGameDead,
+            btnLayer: redrawBtnLayer
+        };
     }());
-    var drawGame = renderers[0], drawGamePaused = renderers[1], drawGameDead = renderers[2], drawMenu = renderers[3], redrawBtnLayer = renderers[4], clearBtnLayer = renderers[5];
-    
+
     // Handle device events:
     var setCurGame = (function () {
         var curGame = null;
@@ -812,8 +804,8 @@ if (typeof Math.log2 !== "function") {
             curGame = game;
         };
     }());
-    
-    // PLAY:
+
+    // Update/render loops of home menu and gameplay:
     var start = (function () {
         var // MODEL + CALC:
             anglify = function (doCalc, f) {
@@ -854,21 +846,21 @@ if (typeof Math.log2 !== "function") {
             }),
             withAngularCtrls = (function () {
                 var proto = {
-                        angleTo: function (xy) { // Currently unused, but as definition adds only constant time and may be useful in future, I'll leave it.
-                            return Math.atan2(xy.y - this.y, xy.x - this.x);
-                        },
-                        distanceTo: function (xy) {
-                            return dist(this.x, this.y, xy.x, xy.y);
-                        },
-                        setDistanceTo: function (xy, newd) {
-                            var vectorFromPlayer = createVel(this.x - xy.x, this.y - xy.y),
-                                newAbsoluteVector;
-                            vectorFromPlayer.setMagnitude(newd);
-                            newAbsoluteVector = createVel(xy.x + vectorFromPlayer.vx, xy.y + vectorFromPlayer.vy);
-                            this.x = newAbsoluteVector.vx;
-                            this.y = newAbsoluteVector.vy;
-                        }
-                    };
+                    angleTo: function (xy) { // Currently unused, but as definition adds only constant time and may be useful in future, I'll leave it.
+                        return Math.atan2(xy.y - this.y, xy.x - this.x);
+                    },
+                    distanceTo: function (xy) {
+                        return dist(this.x, this.y, xy.x, xy.y);
+                    },
+                    setDistanceTo: function (xy, newd) {
+                        var vectorFromPlayer = createVel(this.x - xy.x, this.y - xy.y),
+                            newAbsoluteVector;
+                        vectorFromPlayer.setMagnitude(newd);
+                        newAbsoluteVector = createVel(xy.x + vectorFromPlayer.vx, xy.y + vectorFromPlayer.vy);
+                        this.x = newAbsoluteVector.vx;
+                        this.y = newAbsoluteVector.vy;
+                    }
+                };
                 return function (f) {
                     return function () {
                         return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
@@ -906,7 +898,7 @@ if (typeof Math.log2 !== "function") {
             createPowerup = (function () {
                 var proto = {
                     xDistanceTravelled: function () {
-                        return this.lifetime / powerupTotalLifespan * canvasWidth;
+                        return this.lifetime / powerupTotalLifespan * gameWidth;
                     },
                     xPos: function () {
                         return this.xDistanceTravelled();
@@ -923,8 +915,8 @@ if (typeof Math.log2 !== "function") {
                 var lifetime = type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan;
                 return {
                     type: type,
-                    width: type === "X2"     ? powerupX2Width :
-                           type === "slow"   ? powerupSlowRadius * 2 :
+                    width: type === "X2" ? powerupX2Width :
+                           type === "slow" ? powerupSlowRadius * 2 :
                            type === "weight" ? 40 :
                            type === "magnet" ? powerupSlowRadius * 2 + 15 :
                            40,
@@ -955,7 +947,7 @@ if (typeof Math.log2 !== "function") {
                 var mkPowerupsObj = simpleIterable(["X2", "slow", "weight", "magnet"]);
                 return function () {
                     return {
-                        player: createPlayer(canvasWidth / 2, 50, 0, 0),
+                        player: createPlayer(gameWidth / 2, 50, 0, 0),
                         platfms: [],
                         previewPlatfmTouch: null,
                         fbs: [],
@@ -999,7 +991,7 @@ if (typeof Math.log2 !== "function") {
                 if (player.x + rad < startx || player.x - rad > endx || player.y + rad < starty || player.y - rad > endy) {
                     return false;
                 }
-                
+
                 // Algorithm from http://mathworld.wolfram.com/Circle-LineIntersection.html
                 var offsetStartX = platfm.x0 - player.x,
                     offsetStartY = platfm.y0 - player.y,
@@ -1032,8 +1024,8 @@ if (typeof Math.log2 !== "function") {
             },
             playerHittingRect = function (player, x, y, w, h) {
                 var headY = playerYToStdHeadCenterY(player.y);
-                return circleHittingRect(player.x, player.y, playerRadius, x, y, w, h) ||
-                       (!player.ducking && circleHittingRect(player.x, headY, playerHeadRadius, x, y, w, h));
+                return circleHittingRect(player.x, player.y, playerRadius, x, y, w, h)
+                    || (!player.ducking && circleHittingRect(player.x, headY, playerHeadRadius, x, y, w, h));
             },
             playerHeadNearFb = function (player, fb) {
                 var headWithMargin = playerHeadRadius + 10;
@@ -1061,7 +1053,7 @@ if (typeof Math.log2 !== "function") {
                 }
             },
             randomXPosition = function () {
-                return Math.random() * canvasWidth;
+                return Math.random() * gameWidth;
             },
             // firebits: the little slivers that fall around a fireball
             makeFirebitAround = function (fbX, fbY) {
@@ -1082,7 +1074,7 @@ if (typeof Math.log2 !== "function") {
                         var i, fb;
                         for (i = 0; i < fbArray.length; i += 1) {
                             fb = fbArray[i];
-                            if (fb.y > canvasHeight * 3 / 4) {
+                            if (fb.y > gameHeight * 3 / 4) {
                                 return false;
                             }
                         }
@@ -1091,9 +1083,10 @@ if (typeof Math.log2 !== "function") {
                     fbFirebitsRed = Array.isArray(obj) ? null : obj.firebitsRed,
                     fbFirebitsOrg = Array.isArray(obj) ? null : obj.firebitsOrg,
                     firebitBeyondVisibility = function (firebit) { // So that when one moves left, to make a fb on the right side go offscreen, and then quickly goes back, the user doesn't notice that the firebits are temporarily depleted.
-                        return firebit.x > -fbRadius * 4 && firebit.x < canvasWidth + fbRadius * 4;
+                        return firebit.x > -fbRadius * 4 && firebit.x < gameWidth + fbRadius * 4;
                     },
-                    x, y,
+                    x,
+                    y,
                     updateFirebits = function (firebits) {
                         firebits.forEach(function (firebit, index) {
                             if (!firebitBeyondVisibility(firebit)) {
@@ -1114,15 +1107,12 @@ if (typeof Math.log2 !== "function") {
                     if (fb.y < -totalFbHeight) {
                         fbArray.splice(index, 1);
                     }
-                    if (!objIsVisible(2 * fbRadius, fb)) { return; } // The '2 *' is so that when the user moves left/right, edge-fbs will already have firebits around them
                     if (fbFirebitsRed) {
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                        //fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                        //fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
                         fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
@@ -1142,22 +1132,21 @@ if (typeof Math.log2 !== "function") {
                 var chanceFactor = (1 / 7);
                 if (Math.random() < 1 / 1000 * 4 * chanceFactor * dt || fewInLowerPortion()) {
                     x = randomXPosition();
-                    y = canvasHeight + fbRadius;
+                    y = gameHeight + fbRadius;
                     fbArray.push(createFb(x, y));
                 }
             },
-            
+
             // PLAY:
             play = function () {
-                var
-                    game = createGame(),
+                var game = createGame(),
                     die = function () {
                         if (game.dead) { return; }
                         game.dead = true;
                         if (game.previewPlatfmTouch) {
                             game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
                         }
-                        redrawBtnLayer(game);
+                        render.btnLayer(game);
                     },
                     addToActivePowerups = function (type, x, y) {
                         var newActive = createActivePowerup(type, x, y);
@@ -1197,11 +1186,6 @@ if (typeof Math.log2 !== "function") {
                         }
                         return false;
                     },
-                    xShifter = function (dx) {
-                        return function (obj) {
-                            obj.x += dx;
-                        };
-                    },
                     magnetObtained = function () {
                         var i;
                         for (i = 0; i < game.activePowerups.length; i += 1) {
@@ -1213,7 +1197,7 @@ if (typeof Math.log2 !== "function") {
                     },
                     updatePlayer = function (dt, totalPoints) {
                         var i, platfm, tmpVel, collided = false;
-                        if (game.player.y > canvasHeight + playerRadius) {
+                        if (game.player.y > gameHeight + playerRadius) {
                             die();
                             // The frame finishes, with all other components also
                             // being updated before the GameOver screen apperas, so
@@ -1258,7 +1242,7 @@ if (typeof Math.log2 !== "function") {
                             }
                         });
                         var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
-                        game.player.x = modulo(game.player.x + dx, canvasWidth);
+                        game.player.x = modulo(game.player.x + dx, gameWidth);
                         game.player.y += dy;
                         game.player.wheelAngle += signNum(game.player.vx) * 0.2 * dt;
                     },
@@ -1272,7 +1256,7 @@ if (typeof Math.log2 !== "function") {
                         var column, xPos, newcoin;
                         for (column = 0; column < columns; column += 1) {
                             xPos = (column + 0.5) * 35;
-                            if (do_rtl) { xPos = canvasWidth - xPos; }
+                            if (do_rtl) { xPos = gameWidth - xPos; }
                             newcoin = createCoin(xPos, coinStartingY + column * 35);
                             game.coins.push(newcoin);
                             game.coinColumnsLowest[column] = newcoin;
@@ -1342,7 +1326,7 @@ if (typeof Math.log2 !== "function") {
                     updatePowerups = function (dt) {
                         game.powerups.forEach(function (powerup, key) {
                             powerup.lifetime += dt;
-                            if (powerup.xPos() > canvasWidth + 20) { // 20 is just a random margin to be safe
+                            if (powerup.xPos() > gameWidth + 20) { // 20 is just a random margin to be safe
                                 game.powerups[key] = null;
                             }
                         });
@@ -1397,9 +1381,9 @@ if (typeof Math.log2 !== "function") {
                     prevFrameTime = now;
                     // Handle state changes
                     if (game.paused) {
-                        drawGamePaused(game);
+                        render.gamePaused(game);
                     } else if (game.dead) {
-                        drawGameDead(game);
+                        render.gameDead(game);
                     } else {
                         // Update state
                         if (curTouch && playerIntersectingPlatfm(game.player, curTouch)) {
@@ -1411,8 +1395,8 @@ if (typeof Math.log2 !== "function") {
                         updatePlatfms(dt);
                         updatePowerups(dt);
                         updateActivePowerups(dt);
-                        game.points += handleActivesPoints(7 * (realDt / 1000) * Math.sqrt(Math.max(0, game.player.y / canvasHeight))); // The use of realDt (rather than dt) here means that when you get the slow powerup, you still get points at normal speed.
-                        
+                        game.points += handleActivesPoints(7 * (realDt / 1000) * Math.sqrt(Math.max(0, game.player.y / gameHeight))); // The use of realDt (rather than dt) here means that when you get the slow powerup, you still get points at normal speed.
+
                         // Render
                         if (!game.dead && !game.paused) { // The paused check is just in case of a bug, or for the future, as now one cannot pause while drawing a platfm
                             game.previewPlatfmTouch = curTouch;
@@ -1420,7 +1404,7 @@ if (typeof Math.log2 !== "function") {
                         if (game.dead) {
                             highscores.sendScore(Math.floor(game.points));
                         }
-                        drawGame(game);
+                        render.game(game);
                     }
                 }, 1000 / fps);
                 handleTouchend = function (touch) {
@@ -1428,7 +1412,7 @@ if (typeof Math.log2 !== "function") {
                         tryToAddPlatfmFromTouch(touch);
                     }
                 };
-                redrawBtnLayer(game);
+                render.btnLayer(game);
                 jQuery(document).on("click", function (event) {
                     var q = calcTouchPos(event);
                     var p = {
@@ -1448,7 +1432,7 @@ if (typeof Math.log2 !== "function") {
                             game.paused = true;
                         }
                     }
-                    redrawBtnLayer(game);
+                    render.btnLayer(game);
                 });
                 (function () {
                     var lastRedraw,
@@ -1461,13 +1445,19 @@ if (typeof Math.log2 !== "function") {
                         if (dt > 30 && // This ensures that it won't render WAY too often when the finger is over the button, which would slow the game down.
                                 (dist(pauseBtnCenterX, pauseBtnCenterY, touch.x, touch.y) < pauseBtnSensitivityRadius ||
                                  dist(restartBtnCenterX, restartBtnCenterY, touch.x, touch.y) < restartBtnSensitivityRadius)) {
-                            redrawBtnLayer(game);
+                            render.btnLayer(game);
                             lastRedraw = now;
                         }
                     });
                 }());
             },
-            createMenu = function () { return {fbs: [], firebitsRed: [], firebitsOrg: []}; },
+            createMenu = function () {
+                return {
+                    fbs: [],
+                    firebitsRed: [],
+                    firebitsOrg: []
+                };
+            },
             runMenu = function () {
                 var menu = createMenu(),
                     updateFbs = function (dt) {
@@ -1480,7 +1470,7 @@ if (typeof Math.log2 !== "function") {
                     var now = Date.now(), dt = now - prevTime;
                     prevTime = now;
                     updateFbs(dt);
-                    drawMenu(menu);
+                    render.menu(menu);
                 }, 1000 / fps);
                 jQuery(document).on("click.menuHandler", function (event) {
                     var pos = calcTouchPos(event), tpos = {x1: pos.x, y1: pos.y};
