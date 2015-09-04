@@ -12,35 +12,26 @@ if (typeof Math.log2 !== "function") {
     "use strict";
     // Screen-resizing code:
     var htmlModule = document.getElementById("Main"),
-        htmlBody = document.querySelector("body"),
         windowDims = {
             width: window.innerWidth || document.documentElement.clientWidth, // The defaulting expression (.documentElement....) is for IE
             height: window.innerHeight || document.documentElement.clientHeight
         },
         pageScaleFactor = 1,
         moduleOffsetX = 0,
-        resize = function () { // This zooms the page so that the Firecyclist rectangle (initially always (576/2) by (1024/2) in dimensions), fits to the page.
+        resize = function () {
             var scaleX = windowDims.width / (576 / 2),
                 scaleY = windowDims.height / (1024 / 2),
                 unfitAxis;
             pageScaleFactor = Math.min(scaleX, scaleY);
             unfitAxis = pageScaleFactor === scaleX ? "y" : "x";
-            htmlBody.setAttribute("style", [ // Using htmlBody.style[property] didn't work, but just using setAttribute is fine here as this is the only style that will ever be applied.
-                "-moz-transform-origin: 0 0",
-                "-moz-transform: scale(" + pageScaleFactor + ")",
-                "-webkit-transform-origin: 0 0",
-                "-webkit-transform: scale(" + pageScaleFactor + ")",
-                "-ms-transform-origin: 0 0",
-                "-ms-transform: scale(" + pageScaleFactor + ")"
-            ].join("; "));
             if (unfitAxis === "x") {
-                moduleOffsetX = ((windowDims.width - (576 / 2) * pageScaleFactor) / 2) / pageScaleFactor; // The last division, by pageScaleFactor, is there because the zoom done above will automatically scale this whole expression/offest by pageScaleFactor, so the division undoes that.
+                moduleOffsetX = (windowDims.width - (576 / 2) * pageScaleFactor) / 2;
                 htmlModule.setAttribute("style", "position: fixed; left: " + Math.floor(moduleOffsetX) + "px;");
             }
         },
         calcTouchPos = function (event) {
             return {
-                x: (typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) / pageScaleFactor - moduleOffsetX,
+                x: ((typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) - moduleOffsetX) / pageScaleFactor,
                 y: (typeof event.clientY === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor
             };
         },
@@ -80,7 +71,14 @@ if (typeof Math.log2 !== "function") {
             };
         },
         highscores = mkHighscores("highscores");
+    var mainCanvas = document.getElementById("canvas"),
+        btnCanvas = document.getElementById("btnCanvas"),
+        overlayCanvas = document.getElementById("overlayCanvas");
     resize();
+    [mainCanvas, btnCanvas, overlayCanvas].forEach(function (canvas) {
+        canvas.width *= pageScaleFactor;
+        canvas.height *= pageScaleFactor;
+    });
     (function () { // Simple Touch system, similar to Elm's but compatible with the Platfm interface
         var touchesCount = 0;
         jQuery(document).on("mousemove touchmove", function (event) {
@@ -274,10 +272,13 @@ if (typeof Math.log2 !== "function") {
         };
     // RENDER:
     var renderers = (function () {
-        var mainCtx = document.getElementById("canvas").getContext("2d"),
-            btnCtx = document.getElementById("btnCanvas").getContext("2d"),
-            overlayCtx = document.getElementById("overlayCanvas").getContext("2d"),
-            fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) {
+        var mainCtx = mainCanvas.getContext("2d"),
+            btnCtx = btnCanvas.getContext("2d"),
+            overlayCtx = overlayCanvas.getContext("2d");
+        mainCtx.scale(pageScaleFactor, pageScaleFactor);
+        btnCtx.scale(pageScaleFactor, pageScaleFactor);
+        overlayCtx.scale(pageScaleFactor, pageScaleFactor);
+        var fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) {
                 // Doesn't set things like ctx.font and ctx.textAlign so that they
                 // can be set on ctx by the caller, before invoking.
                 var clr0 = reverse ? "black" : "darkOrange",
