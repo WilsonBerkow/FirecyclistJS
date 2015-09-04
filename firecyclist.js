@@ -97,8 +97,17 @@ if (typeof Math.log2 !== "function") {
         pythag = function (a, b) {
             return Math.sqrt(a * a + b * b);
         },
+        distanceSquared = function (x0, y0, x1, y1) {
+            var dx = x1 - x0;
+            var dy = y1 - y0;
+            return dx * dx + dy * dy;
+        },
         dist = function (x0, y0, x1, y1) {
-            return pythag(x1 - x0, y1 - y0);
+            return Math.sqrt(distanceSquared(x0, y0, x1, y1));
+        },
+        distLT = function (x0, y0, x1, y1, compareWith) {
+            var distSquared = distanceSquared(x0, y0, x1, y1);
+            return distSquared < compareWith * compareWith;
         },
         sqrt3 = Math.sqrt(3),
         oneDegree = Math.PI / 180,
@@ -1019,21 +1028,21 @@ if (typeof Math.log2 !== "function") {
                     return false;
                 }
 
-                // Algorithm from http://mathworld.wolfram.com/Circle-LineIntersection.html
+                // Algorithm adapted from http://mathworld.wolfram.com/Circle-LineIntersection.html
                 var offsetStartX = platfm.x0 - player.x,
                     offsetStartY = platfm.y0 - player.y,
                     offsetEndX = platfm.x1 - player.x,
                     offsetEndY = platfm.y1 - player.y,
-                    platLength = dist(platfm.x0, platfm.y0, platfm.x1, platfm.y1),
+                    platLengthSquared = distanceSquared(platfm.x0, platfm.y0, platfm.x1, platfm.y1),
                     bigD = offsetStartX * offsetEndY - offsetEndX * offsetStartY;
-                return Math.pow(rad * platLength, 2) >= bigD * bigD;
+                return rad * rad * platLengthSquared >= bigD * bigD;
             },
             playerWheelHittingCircle = function (player, x, y, circleRadius) {
-                return dist(player.x, player.y, x, y) < playerRadius + circleRadius;
+                return distLT(player.x, player.y, x, y, playerRadius + circleRadius);
             },
             playerHittingCircle = function (player, x, y, circleRadius) {
                 return playerWheelHittingCircle(player, x, y, circleRadius)
-                    || (!player.ducking && dist(player.x, playerYToStdHeadCenterY(player.y), x, y) < playerHeadRadius + circleRadius);
+                    || (!player.ducking && distLT(player.x, playerYToStdHeadCenterY(player.y), x, y, playerHeadRadius + circleRadius));
             },
             circleHittingRect = function (circX, circY, radius, rectX, rectY, rectWidth, rectHeight) { // Adapted from StackOverflow answer by 'e. James': http://stackoverflow.com/a/402010
                 var distX = Math.abs(circX - rectX),
@@ -1057,7 +1066,7 @@ if (typeof Math.log2 !== "function") {
             playerHeadNearFb = function (player, fb) {
                 var headWithMargin = playerHeadRadius + 10;
                 // Add a margin of 10 so he ducks a little early.
-                return dist(player.x, playerYToStdHeadCenterY(player.y), fb.x, fb.y) < headWithMargin + fbRadius;
+                return distLT(player.x, playerYToStdHeadCenterY(player.y), fb.x, fb.y, headWithMargin + fbRadius);
             },
             playerHittingFb = function (player, fb) {
                 return playerWheelHittingCircle(player, fb.x, fb.y, fbRadius);
@@ -1474,8 +1483,8 @@ if (typeof Math.log2 !== "function") {
                             dt = lastRedraw === undefined ? 1000 : now - lastRedraw, // The defaulting to 1000 just allows the 'dt > 30' test below to definitely pass even on the first draw.
                             touch = calcTouchPos(event.originalEvent.changedTouches[0]);
                         if (dt > 30 && // This ensures that it won't render WAY too often when the finger is over the button, which would slow the game down.
-                                (dist(pauseBtnCenterX, pauseBtnCenterY, touch.x, touch.y) < pauseBtnSensitivityRadius ||
-                                 dist(restartBtnCenterX, restartBtnCenterY, touch.x, touch.y) < restartBtnSensitivityRadius)) {
+                                (distLT(pauseBtnCenterX, pauseBtnCenterY, touch.x, touch.y, pauseBtnSensitivityRadius) ||
+                                 distLT(restartBtnCenterX, restartBtnCenterY, touch.x, touch.y, restartBtnSensitivityRadius))) {
                             render.btnLayer(game);
                             lastRedraw = now;
                         }
