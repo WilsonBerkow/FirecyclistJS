@@ -1083,6 +1083,16 @@ if (typeof Math.log2 !== "function") {
                 }
             },
 
+            maybeGetPlatfmFromTouch = function (touch, success) {
+                var tx0 = touch.x0;
+                if (touchIsNaNMaker(touch)) {
+                    return;
+                }
+                if (touch.x0 === touch.x1) {
+                    tx0 -= 1;
+                }
+                success(createPlatfm(tx0, touch.y0, touch.x1, touch.y1));
+            },
             randomXPosition = function () {
                 return Math.random() * gameWidth;
             },
@@ -1168,18 +1178,53 @@ if (typeof Math.log2 !== "function") {
                 }
             },
 
-            // PLAY:
-            play = function () {
-                var game = createGame(),
-                    die = function () {
-                        if (game.dead) { return; }
-                        game.dead = true;
-                        if (game.previewPlatfmTouch) {
-                            game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
+            difficultyCurveFromPoints = function (x) {
+                return Math.log2(x + 100) / 37 + 0.67;
+            },
+            handleActivesPoints = function (activePowerups, pointsReceived) {
+                var i;
+                for (i = 0; i < activePowerups.length; i += 1) {
+                    if (activePowerups[i].type === "X2") {
+                        return pointsReceived * 2;
+                    }
+                }
+                return pointsReceived;
+            },
+
+            // Game functions (fns operating on game objects):
+            gPredicates = {
+                slowPowerupObtained: function (game) {
+                    var i;
+                    for (i = 0; i < game.activePowerups.length; i += 1) {
+                        if (game.activePowerups[i].type === "slow") {
+                            return true;
                         }
-                        render.btnLayer(game);
-                    },
-                    addToActivePowerups = function (type, x, y) {
+                    }
+                    return false;
+                },
+                weightObtained: function (game) {
+                    var i;
+                    for (i = 0; i < game.activePowerups.length; i += 1) {
+                        if (game.activePowerups[i].type === "weight") {
+                            return true;
+                        }
+                    }
+                    return false;
+                },
+                magnetObtained: function (game) {
+                    var i;
+                    for (i = 0; i < game.activePowerups.length; i += 1) {
+                        if (game.activePowerups[i].type === "magnet") {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            },
+
+            gUpdaters = (function () {
+                // Some util first:
+                var addToActivePowerups = function (game, type, x, y) {
                         var newActive = createActivePowerup(type, x, y);
                         var i;
                         for (i = 0; i < game.activePowerups.length; i += 1) {
@@ -1190,46 +1235,35 @@ if (typeof Math.log2 !== "function") {
                         }
                         game.activePowerups.push(newActive);
                     },
-                    handleActivesPoints = function (pointsReceived) {
-                        var i;
-                        for (i = 0; i < game.activePowerups.length; i += 1) {
-                            if (game.activePowerups[i].type === "X2") {
-                                return pointsReceived * 2;
-                            }
-                        }
-                        return pointsReceived;
+                    makePowerupRandom = function (type, start, range) {
+                        return createPowerup(Math.random() * range + start, type);
                     },
-                    slowPowerupObtained = function () {
-                        var i;
-                        for (i = 0; i < game.activePowerups.length; i += 1) {
-                            if (game.activePowerups[i].type === "slow") {
-                                return true;
-                            }
+                    addDiagPattern = function (game, do_rtl) {
+                        // If do_rtl is truthy, the diag pattern
+                        // will go down-and-left from the right.
+                        var columns = 8;
+                        var column, xPos, newcoin;
+                        for (column = 0; column < columns; column += 1) {
+                            xPos = (column + 0.5) * 35;
+                            if (do_rtl) { xPos = gameWidth - xPos; }
+                            newcoin = createCoin(xPos, coinStartingY + column * 35);
+                            game.coins.push(newcoin);
+                            game.coinColumnsLowest[column] = newcoin;
                         }
-                        return false;
                     },
-                    weightObtained = function () {
-                        var i;
-                        for (i = 0; i < game.activePowerups.length; i += 1) {
-                            if (game.activePowerups[i].type === "weight") {
-                                return true;
-                            }
+                    die = function (game) {
+                        if (game.dead) { return; }
+                        game.dead = true;
+                        if (game.previewPlatfmTouch) {
+                            game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
                         }
-                        return false;
-                    },
-                    magnetObtained = function () {
-                        var i;
-                        for (i = 0; i < game.activePowerups.length; i += 1) {
-                            if (game.activePowerups[i].type === "magnet") {
-                                return true;
-                            }
-                        }
-                        return false;
-                    },
-                    updatePlayer = function (dt, totalPoints) {
+                        render.btnLayer(game);
+                    };
+                return {
+                    player: function (game, dt) {
                         var i, platfm, tmpVel, collided = false;
                         if (game.player.y > gameHeight + playerRadius) {
-                            die();
+                            die(game);
                             // The frame finishes, with all other components also
                             // being updated before the GameOver screen apperas, so
                             // so does the player's position. This is why there is
@@ -1245,7 +1279,7 @@ if (typeof Math.log2 !== "function") {
                             }
                         }
                         if (!collided) {
-                            if (weightObtained()) {
+                            if (gPredicates.weightObtained(game)) {
                                 game.player.vy += playerGrav * 5 / 2 * dt;
                             } else {
                                 game.player.vy += playerGrav * dt;
@@ -1257,19 +1291,19 @@ if (typeof Math.log2 !== "function") {
                                 game.player.ducking = true;
                             }
                             if (playerHittingFb(game.player, game.fbs[i])) {
-                                die();
+                                die(game);
                             }
                         }
                         game.coins.forEach(function (coin, index) {
                             if (playerHittingCoin(game.player, coin)) {
                                 game.coins.splice(index, 1);
-                                game.points += handleActivesPoints(coinValue * difficultyCurve(totalPoints));
+                                game.points += handleActivesPoints(game.activePowerups, coinValue * difficultyCurveFromPoints(game.points));
                             }
                         });
                         game.powerups.forEach(function (powerup, key) {
                             if (playerHittingPowerup(game.player, powerup)) {
                                 game.powerups[key] = null;
-                                addToActivePowerups(powerup.type, powerup.xPos(), powerup.yPos());
+                                addToActivePowerups(game, powerup.type, powerup.xPos(), powerup.yPos());
                             }
                         });
                         var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
@@ -1277,24 +1311,9 @@ if (typeof Math.log2 !== "function") {
                         game.player.y += dy;
                         game.player.wheelAngle += signNum(game.player.vx) * 0.2 * dt;
                     },
-                    updateFbs = function (dt) {
-                        updateFbsGeneric(game, dt);
-                    },
-                    addDiagPattern = function (do_rtl) {
-                        // If do_rtl is truthy, the diag pattern
-                        // will go down-and-left from the right.
-                        var columns = 8;
-                        var column, xPos, newcoin;
-                        for (column = 0; column < columns; column += 1) {
-                            xPos = (column + 0.5) * 35;
-                            if (do_rtl) { xPos = gameWidth - xPos; }
-                            newcoin = createCoin(xPos, coinStartingY + column * 35);
-                            game.coins.push(newcoin);
-                            game.coinColumnsLowest[column] = newcoin;
-                        }
-                    },
-                    updateCoins = function (dt) {
-                        var magnetOn = magnetObtained();
+                    fbs: updateFbsGeneric,
+                    coins: function (game, dt) {
+                        var magnetOn = gPredicates.magnetObtained(game);
                         var dy = coinFallRate * dt;
                         game.coinGridOffset += dy;
                         game.coinGridOffset = game.coinGridOffset % 35;
@@ -1313,7 +1332,7 @@ if (typeof Math.log2 !== "function") {
                         });
                         var chanceFactor = 1 / 7;
                         if (Math.random() < 1 / (1000 * 25) * dt) {
-                            addDiagPattern(Math.random() < 0.5);
+                            addDiagPattern(game, Math.random() < 0.5);
                         } else {
                             if (Math.random() < 1 / (1000 * 10/4) * chanceFactor * 4 * dt) {
                                 var column = Math.floor(Math.random() * 8);
@@ -1328,7 +1347,7 @@ if (typeof Math.log2 !== "function") {
                             }
                         }
                     },
-                    updatePlatfms = function (dt) {
+                    platfms: function (game, dt) {
                         game.platfms.forEach(function (platfm, index) {
                             platfm.y0 -= platfmFallRate * dt;
                             platfm.y1 -= platfmFallRate * dt;
@@ -1338,23 +1357,7 @@ if (typeof Math.log2 !== "function") {
                             }
                         });
                     },
-                    tryToAddPlatfmFromTouch = function (touch, resolver) {
-                        var tx0 = touch.x0;
-                        if (touchIsNaNMaker(touch)) {
-                            return;
-                        }
-                        if (touch.x0 === touch.x1) {
-                            tx0 -= 1;
-                        }
-                        game.platfms.push(createPlatfm(tx0, touch.y0, touch.x1, touch.y1));
-                        if (typeof resolver === "function") {
-                            resolver();
-                        }
-                    },
-                    makePowerupRandom = function (type, start, range) {
-                        return createPowerup(Math.random() * range + start, type);
-                    },
-                    updatePowerups = function (dt) {
+                    powerups: function (game, dt) {
                         game.powerups.forEach(function (powerup, key) {
                             powerup.lifetime += dt;
                             if (powerup.xPos() > gameWidth + activePowerupBubbleRadius + playerRadius) {
@@ -1377,7 +1380,7 @@ if (typeof Math.log2 !== "function") {
                             game.powerups.magnet = makePowerupRandom("magnet", 25, 145);
                         }
                     },
-                    updateActivePowerups = function (dt) {
+                    activePowerups: function (game, dt) {
                         game.activePowerups.forEach(function (activePowerup, index) {
                             if (activePowerup.lifetime <= 0) {
                                 game.activePowerups.splice(index, 1);
@@ -1387,10 +1390,13 @@ if (typeof Math.log2 !== "function") {
                                 activePowerup.timeSinceAcquired += dt;
                             }
                         });
-                    },
-                    difficultyCurve = function (x) {
-                        return Math.log2(x + 100) / 37 + 0.67;
-                    },
+                    }
+                };
+            }()),
+
+            // PLAY:
+            play = function () {
+                var game = createGame(),
                     restart = function () {
                         // The interval isn't cleared because the same interval
                         // is used for the next game (after the restart).
@@ -1399,15 +1405,15 @@ if (typeof Math.log2 !== "function") {
                     prevFrameTime = Date.now();
                 setCurGame(game);
                 setInterval(function () {
-                    window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
+                    //window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
                     // Handle time (necessary, regardless of pausing)
                     var now = Date.now(), realDt = now - prevFrameTime, dt;
                     // If the frame takes too long, a jump in all of the objects
                     // will be noticable, and more undesirable than the objects
                     // acting as if the jump didn't happen. Thus, cap realDt:
                     realDt = Math.min(realDt, 1000 / fps * 3);
-                    realDt *= difficultyCurve(game.points);
-                    if (slowPowerupObtained()) {
+                    realDt *= difficultyCurveFromPoints(game.points);
+                    if (gPredicates.slowPowerupObtained(game)) {
                         dt = realDt * 2/3; // Sloooooooow
                     } else {
                         dt = realDt;
@@ -1421,15 +1427,18 @@ if (typeof Math.log2 !== "function") {
                     } else {
                         // Update state
                         if (curTouch && playerIntersectingPlatfm(game.player, curTouch)) {
-                            tryToAddPlatfmFromTouch(curTouch, function () { curTouch = null; });
+                            maybeGetPlatfmFromTouch(curTouch, function (platfm) {
+                                game.platfms.push(platfm);
+                                curTouch = null;
+                            });
                         }
-                        updatePlayer(dt, game.points);
-                        updateCoins(dt);
-                        updateFbs(dt);
-                        updatePlatfms(dt);
-                        updatePowerups(dt);
-                        updateActivePowerups(dt);
-                        game.points += handleActivesPoints(7 * (realDt / 1000) * Math.sqrt(Math.max(0, game.player.y / gameHeight))); // The use of realDt (rather than dt) here means that when you get the slow powerup, you still get points at normal speed.
+                        gUpdaters.player(game, dt, game.points);
+                        gUpdaters.coins(game, dt);
+                        gUpdaters.fbs(game, dt);
+                        gUpdaters.platfms(game, dt);
+                        gUpdaters.powerups(game, dt);
+                        gUpdaters.activePowerups(game, dt);
+                        game.points += handleActivesPoints(game.activePowerups, 7 * (realDt / 1000) * Math.sqrt(Math.max(0, game.player.y / gameHeight))); // The use of realDt (rather than dt) here means that when you get the slow powerup, you still get points at normal speed.
 
                         // Render
                         if (!game.dead && !game.paused) { // The paused check is just in case of a bug, or for the future, as now one cannot pause while drawing a platfm
@@ -1443,7 +1452,9 @@ if (typeof Math.log2 !== "function") {
                 }, 1000 / fps);
                 handleTouchend = function (touch) {
                     if (!game.paused && !game.dead) {
-                        tryToAddPlatfmFromTouch(touch);
+                        maybeGetPlatfmFromTouch(touch, function (platfm) {
+                            game.platfms.push(platfm);
+                        });
                     }
                 };
                 render.btnLayer(game);
