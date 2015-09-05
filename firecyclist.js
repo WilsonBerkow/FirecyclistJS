@@ -150,12 +150,6 @@ if (typeof Math.log2 !== "function") {
         playerElbowXDiff = 8 * 5/8,
         playerElbowYDiff = 2 * 5/8,
         powerupTotalLifespan = 5500, // in milliseconds
-        pauseBtnCenterX = 10,
-        pauseBtnCenterY = -5,
-        pauseBtnRadius = 65,
-        restartBtnCenterX = gameWidth - 10,
-        restartBtnCenterY = -5,
-        restartBtnRadius = 65,
         inGamePointsPxSize = 30,
         inGamePointsYPos = 39,
         activePowerupsStartingXPos = gameWidth - 78,
@@ -1474,22 +1468,22 @@ if (typeof Math.log2 !== "function") {
                     }
                     render.btnLayer(game);
                 });
-                (function () {
+                jQuery(document).on("touchmove touchstart touchend", (function () {
                     var lastRedraw,
-                        pauseBtnSensitivityRadius = pauseBtnRadius * 1.2, // The '* 1.2's are present to ensure that when someone drags their finger off the btn, as the finger leaves the btn, the btn will get redrawn (in the inactive state).
-                        restartBtnSensitivityRadius = restartBtnRadius * 1.2;
-                    jQuery(document).on("touchmove touchstart touchend", function (event) {
+                        sensitivityMarginY = 40, // Margin around button for events to trigger redraws on, so that a release is registered when the user slides a finger off the button
+                        sensitivityMarginX = 70; // People do faster horizontal swipes, so a larger margin is necessary
+                    return function (event) {
                         var now = Date.now(),
                             dt = lastRedraw === undefined ? 1000 : now - lastRedraw, // The defaulting to 1000 just allows the 'dt > 30' test below to definitely pass even on the first draw.
                             touch = calcTouchPos(event.originalEvent.changedTouches[0]);
-                        if (dt > 30 && // This ensures that it won't render WAY too often when the finger is over the button, which would slow the game down.
-                                (distLT(pauseBtnCenterX, pauseBtnCenterY, touch.x, touch.y, pauseBtnSensitivityRadius) ||
-                                 distLT(restartBtnCenterX, restartBtnCenterY, touch.x, touch.y, restartBtnSensitivityRadius))) {
+                        if (dt > 30 && // To prevent way-too-inefficiently-frequent rerendering
+                                touch.x > pauseBtn.edgeX() - sensitivityMarginX && 
+                                touch.y < pauseBtn.y + pauseBtn.h + sensitivityMarginY) {
                             render.btnLayer(game);
                             lastRedraw = now;
                         }
-                    });
-                }());
+                    };
+                }()));
             },
             createMenu = function () {
                 return {
