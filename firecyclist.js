@@ -1422,7 +1422,54 @@ if (typeof Math.log2 !== "function") {
                     });
                 }
             };
-        }());
+        }()),
+        gEventHandlers = {
+            handleTouchend: function (game, touch) {
+                if (!game.paused && !game.dead) {
+                    maybeGetPlatfmFromTouch(touch, function (platfm) {
+                        game.platfms.push(platfm);
+                    });
+                }
+            },
+            handleDocumentClick: function (game, event, restart) {
+                var q = calcTouchPos(event);
+                var p = {
+                    x1: q.x,
+                    y1: q.y
+                };
+                if (game.paused) {
+                    if (resumeBtn.touchIsInside(p)) {
+                        game.paused = false;
+                    }
+                } else if (game.dead) {
+                    if (replayBtn.touchIsInside(p)) {
+                        restart();
+                    }
+                } else {
+                    if (pauseBtn.touchIsInside(p)) {
+                        game.paused = true;
+                    }
+                }
+                render.btnLayer(game);
+            },
+            handleBtnLayerUpdates: (function () {
+                var sensitivityMarginY = 40, // Margin around button for events to trigger redraws on, so that a release is registered when the user slides a finger off the button
+                    sensitivityMarginX = 70; // People do faster horizontal swipes, so a larger margin is necessary
+                return function (game, event, lastRedraw) {
+                    // This should handle all of: touchmove, touchstart, touchend
+                    var now = Date.now(),
+                        dt = now - lastRedraw,
+                        touch = calcTouchPos(event.originalEvent.changedTouches[0]);
+                    if (dt > 30 && // To prevent way-too-inefficiently-frequent rerendering
+                            touch.x > pauseBtn.edgeX() - sensitivityMarginX && 
+                            touch.y < pauseBtn.y + pauseBtn.h + sensitivityMarginY) {
+                        render.btnLayer(game);
+                        return now; // Tell caller last redraw happened at 'now'
+                    }
+                    return lastRedraw; // Tell caller the time of the last redraw hasn't changed
+                };
+            }())
+        };
 
     // Update/render loops of home menu and gameplay:
     var play = function () {
@@ -1488,48 +1535,16 @@ if (typeof Math.log2 !== "function") {
                 }
             }, 1000 / fps);
             Touch.onTouchend = function (touch) {
-                if (!game.paused && !game.dead) {
-                    maybeGetPlatfmFromTouch(touch, function (platfm) {
-                        game.platfms.push(platfm);
-                    });
-                }
+                gEventHandlers.handleTouchend(game, touch);
             };
-            render.btnLayer(game);
             jQuery(document).on("click", function (event) {
-                var q = calcTouchPos(event);
-                var p = {
-                    x1: q.x,
-                    y1: q.y
-                };
-                if (game.paused) {
-                    if (resumeBtn.touchIsInside(p)) {
-                        game.paused = false;
-                    }
-                } else if (game.dead) {
-                    if (replayBtn.touchIsInside(p)) {
-                        restart();
-                    }
-                } else {
-                    if (pauseBtn.touchIsInside(p)) {
-                        game.paused = true;
-                    }
-                }
-                render.btnLayer(game);
+                gEventHandlers.handleDocumentClick(game, event, restart);
             });
+            render.btnLayer(game);
             jQuery(document).on("touchmove touchstart touchend", (function () {
-                var lastRedraw,
-                    sensitivityMarginY = 40, // Margin around button for events to trigger redraws on, so that a release is registered when the user slides a finger off the button
-                    sensitivityMarginX = 70; // People do faster horizontal swipes, so a larger margin is necessary
+                var lastRedraw = Date.now();
                 return function (event) {
-                    var now = Date.now(),
-                        dt = lastRedraw === undefined ? 1000 : now - lastRedraw, // The defaulting to 1000 just allows the 'dt > 30' test below to definitely pass even on the first draw.
-                        touch = calcTouchPos(event.originalEvent.changedTouches[0]);
-                    if (dt > 30 && // To prevent way-too-inefficiently-frequent rerendering
-                            touch.x > pauseBtn.edgeX() - sensitivityMarginX && 
-                            touch.y < pauseBtn.y + pauseBtn.h + sensitivityMarginY) {
-                        render.btnLayer(game);
-                        lastRedraw = now;
-                    }
+                    lastRedraw = gEventHandlers.handleBtnLayerUpdates(game, event, lastRedraw);
                 };
             }()));
         },
