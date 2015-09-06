@@ -47,21 +47,19 @@ if (typeof Math.log2 !== "function") {
     }());
 
     // Touch system:
-    var handleTouchend,
-        curTouch = null;
-    (function () {
+    var Touch = (function () {
         var touchesCount = 0;
         jQuery(document).on("mousemove touchmove", function (event) {
             var xy = calcTouchPos(event);
-            if (curTouch !== null) { // Condition fails when a platfm has been materialized, and thus curTouch was reset to null
-                curTouch.x1 = xy.x;
-                curTouch.y1 = xy.y;
+            if (Touch.curTouch !== null) { // Condition fails when a platfm has been materialized, and thus curTouch was reset to null
+                Touch.curTouch.x1 = xy.x;
+                Touch.curTouch.y1 = xy.y;
             }
             event.preventDefault(); // Stops the swipe-to-move-through-browser-history feature in Chrome from interferring.
         });
         jQuery(document).on("mousedown touchstart", function (event) {
             var now = Date.now(), xy = calcTouchPos(event);
-            curTouch = {
+            Touch.curTouch = {
                 t0: now,
                 id: touchesCount,
                 x0: xy.x,
@@ -72,13 +70,30 @@ if (typeof Math.log2 !== "function") {
             touchesCount += 1;
         });
         jQuery(document).on("mouseup touchend", function () {
-            if (typeof handleTouchend === "function" && curTouch) {
-                handleTouchend(curTouch);
+            if (typeof Touch.onTouchend === "function" && Touch.curTouch) {
+                Touch.onTouchend(Touch.curTouch);
             }
-            curTouch = null;
+            Touch.curTouch = null;
             // Do not use preventDefault here, it prevents
             // triggering of the 'tap' event.
         });
+        return {
+            curTouch: null,
+            onTouchend: null,
+            copy: function (t) {
+                return {
+                    t0: t.t0,
+                    id: t.id,
+                    x0: t.x0,
+                    y0: t.y0,
+                    x1: t.x1,
+                    y1: t.y1
+                };
+            },
+            zeroLength: function (t) {
+                return t.x0 === t.x1 && t.y0 === t.y1;
+            }
+        };
     }());
 
     // Generic util:
@@ -88,6 +103,22 @@ if (typeof Math.log2 !== "function") {
                 o[key] = props[key];
             });
             return o;
+        },
+        iterableObjectFactory = function (propsToIter) {
+            var proto = {
+                forEach: function (f) {
+                    var obj = this;
+                    propsToIter.forEach(function (prop) {
+                        var val = obj[prop];
+                        if (val !== undefined && val !== null) {
+                            f(val, prop);
+                        }
+                    });
+                }
+            };
+            return function (props) {
+                return makeObject(proto, props);
+            };
         },
         modulo = function (num, modBy) {
             return num > modBy ? modulo(num - modBy, modBy) :
@@ -108,6 +139,11 @@ if (typeof Math.log2 !== "function") {
         distLT = function (x0, y0, x1, y1, compareWith) {
             var distSquared = distanceSquared(x0, y0, x1, y1);
             return distSquared < compareWith * compareWith;
+        },
+        signNum = function (num) {
+            return num > 0 ? 1 :
+                   num < 0 ? -1 :
+                   0;
         },
         sqrt3 = Math.sqrt(3),
         oneDegree = Math.PI / 180,
@@ -149,6 +185,7 @@ if (typeof Math.log2 !== "function") {
         playerHeadRadius = 9 * 5/8,
         playerElbowXDiff = 8 * 5/8,
         playerElbowYDiff = 2 * 5/8,
+        playerWheelToHeadDist = playerTorsoLen + playerRadius + playerHeadRadius,
         powerupTotalLifespan = 5500, // in milliseconds
         inGamePointsPxSize = 30,
         inGamePointsYPos = 39,
@@ -159,6 +196,11 @@ if (typeof Math.log2 !== "function") {
             var proto = {
                 edgeX: function () {
                     return this.x - this.w / 2;
+                },
+                touchIsInside: function (xy) {
+                    var withinHeight = xy.y1 >= this.y && xy.y1 <= this.y + this.h;
+                    var withinWidth = xy.x1 >= this.edgeX() && xy.x1 <= this.edgeX() + this.w;
+                    return withinHeight && withinWidth;
                 }
             };
             return function (o) {
@@ -225,19 +267,6 @@ if (typeof Math.log2 !== "function") {
         powerupWeightHeight = powerupWeightBlockHeight + powerupWeightHandleHeight,
         activePowerupLifespan = 10000;
 
-    // Specialized util:
-    var isOverRectBtn = function (btn, xy) {
-            var withinHeight = xy.y1 >= btn.y && xy.y1 <= btn.y + btn.h;
-            var withinWidth = xy.x1 >= btn.edgeX() && xy.x1 <= btn.edgeX() + btn.w;
-            return withinHeight && withinWidth;
-        },
-        objIsVisible = function (xradius, obj) {
-            return obj.x > -xradius && obj.x < gameWidth + xradius;
-        },
-        playerYToStdHeadCenterY = function (y) { // 'Std' because it assumes player is not ducking.
-            return y - playerTorsoLen - playerRadius - playerHeadRadius;
-        };
-
     // Highscore update and storage:
     var mkHighscores = function (identifier) {
             var scores = [null, null, null], // Highest scores are at the beginning, null represents an empty slot.
@@ -283,12 +312,15 @@ if (typeof Math.log2 !== "function") {
         btnCtx.scale(pageScaleFactor, pageScaleFactor);
         overlayCtx.scale(pageScaleFactor, pageScaleFactor);
         var offScreenRender = function (width, height, render) {
-            var newCanvas = document.createElement('canvas');
-            newCanvas.width = width;
-            newCanvas.height = height;
-            render(newCanvas.getContext('2d'), width, height);
-            return newCanvas;
-        };
+                var newCanvas = document.createElement('canvas');
+                newCanvas.width = width;
+                newCanvas.height = height;
+                render(newCanvas.getContext('2d'), width, height);
+                return newCanvas;
+            },
+            objIsVisible = function (xradius, obj) {
+                return obj.x > -xradius && obj.x < gameWidth + xradius;
+            };
         // Renderers:
         var fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) {
                 // Doesn't set things like ctx.font and ctx.textAlign so that they
@@ -416,7 +448,7 @@ if (typeof Math.log2 !== "function") {
                 ctx.beginPath();
 
                 // Head and torso:
-                circleAt(ctx, x, playerYToStdHeadCenterY(y), playerHeadRadius);
+                circleAt(ctx, x, y - playerWheelToHeadDist, playerHeadRadius);
                 ctx.moveTo(x, y - playerTorsoLen - playerRadius);
                 ctx.lineTo(x, y); // (x, y) is the center of the wheel
 
@@ -684,7 +716,7 @@ if (typeof Math.log2 !== "function") {
                 ctx.fillRect(leftX + barW * 5 / 3, barsY, barW, barH);
             },
             drawBtn = function (ctx, btn) {
-                var pressed = curTouch && isOverRectBtn(btn, curTouch);
+                var pressed = Touch.curTouch && btn.touchIsInside(Touch.curTouch);
                 drawButtonStructureAt(ctx, btn.edgeX(), btn.y, btn.w, btn.h, pressed, btn.tintedRed);
                 var x = btn.x, y = btn.y;
                 if (pressed) {
@@ -835,292 +867,267 @@ if (typeof Math.log2 !== "function") {
         };
     }());
 
-    // Update/render loops of home menu and gameplay:
-    var start = (function () {
-        var // MODEL + CALC:
-            anglify = function (doCalc, f) {
-                var proto = {
-                    angle: function () {
-                        return doCalc ? Math.atan2(this.y1 - this.y0, this.x1 - this.x0)
-                                      : Math.atan2(this.vy, this.vx);
-                    },
-                    magnitude: function () {
-                        return doCalc ? dist(this.x0, this.y0, this.x1, this.y1)
-                                      : pythag(this.vx, this.vy);
-                    },
-                    slope: function () {
-                        return doCalc ? (this.y1 - this.y0) / (this.x1 - this.x0)
-                                      : this.vy / this.vx;
-                    }
-                };
-                if (!doCalc) {
-                    proto.setAngle = function (theta) {
-                        this.vx = trig.cos(theta) * this.magnitude();
-                        this.vy = trig.sin(theta) * this.magnitude();
-                    };
-                    proto.setMagnitude = function (mag) {
-                        this.vx = trig.cos(this.angle()) * mag;
-                        this.vy = trig.sin(this.angle()) * mag;
-                    };
-                    proto.scaleMagnitude = function (scaleFactor) {
-                        this.vx *= scaleFactor;
-                        this.vy *= scaleFactor;
-                    };
+    // Vector and line util:
+    var anglify = function (doCalc, f) {
+            // If 'doCalc' is true, the object in question ('this') has
+            //  properties x0, y0, x1, y1, and the anglify methods will
+            //  DO the CALCulation of converting those to length deltas.
+            // If 'doCalc' is false, the object has vx, vy properties.
+            var proto = {
+                angle: function () {
+                    return doCalc ? Math.atan2(this.y1 - this.y0, this.x1 - this.x0)
+                                  : Math.atan2(this.vy, this.vx);
+                },
+                magnitude: function () {
+                    return doCalc ? dist(this.x0, this.y0, this.x1, this.y1)
+                                  : pythag(this.vx, this.vy);
+                },
+                slope: function () {
+                    return doCalc ? (this.y1 - this.y0) / (this.x1 - this.x0)
+                                  : this.vy / this.vx;
                 }
+            };
+            if (!doCalc) {
+                proto.setAngle = function (theta) {
+                    this.vx = trig.cos(theta) * this.magnitude();
+                    this.vy = trig.sin(theta) * this.magnitude();
+                };
+                proto.setMagnitude = function (mag) {
+                    this.vx = trig.cos(this.angle()) * mag;
+                    this.vy = trig.sin(this.angle()) * mag;
+                };
+                proto.scaleMagnitude = function (scaleFactor) {
+                    this.vx *= scaleFactor;
+                    this.vy *= scaleFactor;
+                };
+            }
+            return function () {
+                return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
+            };
+        },
+        createVel = anglify(false, function (vx, vy) {
+            return {vx: vx, vy: vy};
+        }),
+        withAngularCtrls = (function () {
+            var proto = {
+                angleTo: function (xy) { // Currently unused, but as definition adds only constant time and may be useful in future, I'll leave it.
+                    return Math.atan2(xy.y - this.y, xy.x - this.x);
+                },
+                distanceTo: function (xy) {
+                    return dist(this.x, this.y, xy.x, xy.y);
+                },
+                setDistanceTo: function (xy, newd) {
+                    var vectorFromPlayer = createVel(this.x - xy.x, this.y - xy.y),
+                        newAbsoluteVector;
+                    vectorFromPlayer.setMagnitude(newd);
+                    newAbsoluteVector = createVel(xy.x + vectorFromPlayer.vx, xy.y + vectorFromPlayer.vy);
+                    this.x = newAbsoluteVector.vx;
+                    this.y = newAbsoluteVector.vy;
+                }
+            };
+            return function (f) {
                 return function () {
                     return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
                 };
-            },
-            createVel = anglify(false, function (vx, vy) {
-                return {vx: vx, vy: vy};
-            }),
-            withAngularCtrls = (function () {
-                var proto = {
-                    angleTo: function (xy) { // Currently unused, but as definition adds only constant time and may be useful in future, I'll leave it.
-                        return Math.atan2(xy.y - this.y, xy.x - this.x);
-                    },
-                    distanceTo: function (xy) {
-                        return dist(this.x, this.y, xy.x, xy.y);
-                    },
-                    setDistanceTo: function (xy, newd) {
-                        var vectorFromPlayer = createVel(this.x - xy.x, this.y - xy.y),
-                            newAbsoluteVector;
-                        vectorFromPlayer.setMagnitude(newd);
-                        newAbsoluteVector = createVel(xy.x + vectorFromPlayer.vx, xy.y + vectorFromPlayer.vy);
-                        this.x = newAbsoluteVector.vx;
-                        this.y = newAbsoluteVector.vy;
-                    }
-                };
-                return function (f) {
-                    return function () {
-                        return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
-                    };
-                };
-            }()),
-            createPlayer = anglify(false, function (x, y, vx, vy) {
-                return {x: x, y: y, vx: vx, vy: vy, wheelAngle: 0, ducking: false};
-            }),
-            createPlatfm = anglify(true, function (x0, y0, x1, y1) {
-                return {x0: x0, y0: y0, x1: x1, y1: y1, time_left: 800};
-            }),
-            copyTouch = function (t) {
-                return {
-                    t0: t.t0,
-                    id: t.id,
-                    x0: t.x0,
-                    y0: t.y0,
-                    x1: t.x1,
-                    y1: t.y1
-                };
-            },
-            touchIsNaNMaker = function (touch) { // Returns whether or not `touch` will cause NaN to appear.
-                return touch.x0 === touch.x1 && touch.y0 === touch.y1;
-            },
-            createCoin = withAngularCtrls(function (x, y) {
-                return {x: x, y: y};
-            }),
-            createFb = function (x, y) {
-                return {x: x, y: y};
-            },
-            createFirebit = function (x, y) {
-                return {x: x, y: y, lifespan: 0};
-            },
-            createPowerup = (function () {
-                var proto = {
-                    xDistanceTravelled: function () {
-                        return this.lifetime / powerupTotalLifespan * gameWidth;
-                    },
-                    xPos: function () {
-                        return this.xDistanceTravelled();
-                    },
-                    yPos: function () {
-                        return this.offsetY + trig.sin(this.xDistanceTravelled() / 20) * 40;
-                    }
-                };
-                return function (y, powerupType) {
-                    return makeObject(proto, {offsetY: y, lifetime: 0, type: powerupType});
-                };
-            }()),
-            createActivePowerup = function (type, srcX, srcY) {
-                var lifetime = type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan;
-                return {
-                    type: type,
-                    width: type === "X2" ? powerupX2Width :
-                           type === "slow" ? powerupSlowRadius * 2 :
-                           type === "weight" ? 40 :
-                           type === "magnet" ? powerupSlowRadius * 2 + 15 :
-                           40,
-                    totalLifetime: lifetime,
-                    lifetime: lifetime,
-                    srcX: srcX,
-                    srcY: srcY,
-                    timeSinceAcquired: 0
-                };
-            },
-            simpleIterable = function (propsToIter) {
-                var proto = {
-                    forEach: function (f) {
-                        var obj = this;
-                        propsToIter.forEach(function (prop) {
-                            var val = obj[prop];
-                            if (val !== undefined && val !== null) {
-                                f(val, prop);
-                            }
-                        });
-                    }
-                };
-                return function (props) {
-                    return makeObject(proto, props);
-                };
-            },
-            createGame = (function () {
-                var mkPowerupsObj = simpleIterable(["X2", "slow", "weight", "magnet"]);
-                return function () {
-                    return {
-                        player: createPlayer(gameWidth / 2, 50, 0, 0),
-                        platfms: [],
-                        previewPlatfmTouch: null,
-                        fbs: [],
-                        firebitsRed: [],
-                        firebitsOrg: [],
-                        coins: [],
-                        coinColumnsLowest: [],
-                        coinGridOffset: 0,
-                        powerups: mkPowerupsObj({}),
-                        activePowerups: [],
-                        points: 0,
-                        paused: false,
-                        dead: false
-                    };
-                };
-            }()),
-            signNum = function (num) {
-                return num > 0 ? 1 :
-                       num < 0 ? -1 :
-                       0;
-            },
-            velFromPlatfm = function (dt, player, platfm) {
-                var slope = platfm.slope(),
-                    cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmFallRate * dt - platfmBounciness);
-                cartesianVel.setMagnitude(Math.min(cartesianVel.magnitude(), player.magnitude()) + playerGrav * dt);
-                return {
-                    x: cartesianVel.vx,
-                    y: cartesianVel.vy
-                };
-            },
-            playerIntersectingPlatfm = function (player, platfm) {
-                // Make sure that the ball is in the square who's opposite
-                // corners are the endpoints of the platfm. Necessary because
-                // the algorithm for testing intersection used below is made
-                // for (infinite) lines, not line segments, which the platfm is.
-                var rad = playerRadius + platfmThickness,
-                    startx = Math.min(platfm.x0, platfm.x1),
-                    starty = Math.min(platfm.y0, platfm.y1),
-                    endx = Math.max(platfm.x0, platfm.x1),
-                    endy = Math.max(platfm.y0, platfm.y1);
-                if (player.x + rad < startx || player.x - rad > endx || player.y + rad < starty || player.y - rad > endy) {
-                    return false;
-                }
+            };
+        }());
 
-                // Algorithm adapted from http://mathworld.wolfram.com/Circle-LineIntersection.html
-                var offsetStartX = platfm.x0 - player.x,
-                    offsetStartY = platfm.y0 - player.y,
-                    offsetEndX = platfm.x1 - player.x,
-                    offsetEndY = platfm.y1 - player.y,
-                    platLengthSquared = distanceSquared(platfm.x0, platfm.y0, platfm.x1, platfm.y1),
-                    bigD = offsetStartX * offsetEndY - offsetEndX * offsetStartY;
-                return rad * rad * platLengthSquared >= bigD * bigD;
-            },
-            playerWheelHittingCircle = function (player, x, y, circleRadius) {
-                return distLT(player.x, player.y, x, y, playerRadius + circleRadius);
-            },
-            playerHittingCircle = function (player, x, y, circleRadius) {
-                return playerWheelHittingCircle(player, x, y, circleRadius)
-                    || (!player.ducking && distLT(player.x, playerYToStdHeadCenterY(player.y), x, y, playerHeadRadius + circleRadius));
-            },
-            circleHittingRect = function (circX, circY, radius, rectX, rectY, rectWidth, rectHeight) { // Adapted from StackOverflow answer by 'e. James': http://stackoverflow.com/a/402010
-                var distX = Math.abs(circX - rectX),
-                    distY = Math.abs(circY - rectY),
-                    cornerDist_squared;
-                if (distX > (rectWidth/2 + radius) || distY > (rectHeight/2 + radius)) {
-                    return false;
+    // Constructors for in-game objects:
+    var createPlayer = anglify(false, function (x, y, vx, vy) {
+            return {x: x, y: y, vx: vx, vy: vy, wheelAngle: 0, ducking: false};
+        }),
+        createPlatfm = anglify(true, function (x0, y0, x1, y1) {
+            return {x0: x0, y0: y0, x1: x1, y1: y1, time_left: 800};
+        }),
+        createCoin = withAngularCtrls(function (x, y) {
+            return {x: x, y: y};
+        }),
+        createFb = function (x, y) {
+            return {x: x, y: y};
+        },
+        createFirebit = function (x, y) {
+            return {x: x, y: y, lifespan: 0};
+        },
+        createPowerup = (function () {
+            var proto = {
+                xDistanceTravelled: function () {
+                    return this.lifetime / powerupTotalLifespan * gameWidth;
+                },
+                xPos: function () {
+                    return this.xDistanceTravelled();
+                },
+                yPos: function () {
+                    return this.offsetY + trig.sin(this.xDistanceTravelled() / 20) * 40;
                 }
-                if (distX <= (rectWidth/2) || distY <= (rectHeight/2)) {
-                    return true;
-                }
-                cornerDist_squared = Math.pow(distX - rectWidth/2, 2) +
-                                     Math.pow(distY - rectHeight/2, 2);
-                return cornerDist_squared <= (radius * radius);
-            },
-            playerHittingRect = function (player, x, y, w, h) {
-                var headY = playerYToStdHeadCenterY(player.y);
-                return circleHittingRect(player.x, player.y, playerRadius, x, y, w, h)
-                    || (!player.ducking && circleHittingRect(player.x, headY, playerHeadRadius, x, y, w, h));
-            },
-            playerHeadNearFb = function (player, fb) {
-                var headWithMargin = playerHeadRadius + 10;
-                // Add a margin of 10 so he ducks a little early.
-                return distLT(player.x, playerYToStdHeadCenterY(player.y), fb.x, fb.y, headWithMargin + fbRadius);
-            },
-            playerHittingFb = function (player, fb) {
-                return playerWheelHittingCircle(player, fb.x, fb.y, fbRadius);
-            },
-            playerHittingCoin = function (player, coin) {
-                return playerHittingCircle(player, coin.x, coin.y, coinRadius);
-            },
-            playerHittingPowerup = function (player, powerup) {
-                if (powerup.type === "X2") {
-                    return playerHittingRect(player, powerup.xPos(), powerup.yPos(), powerupX2Width, powerupX2Height);
-                }
-                if (powerup.type === "slow") {
-                    return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
-                }
-                if (powerup.type === "weight") {
-                    return playerHittingRect(player, powerup.xPos(), powerup.yPos(), powerupWeightBlockLowerWidth, powerupWeightHeight);
-                }
-                if (powerup.type === "magnet") {
-                    return playerHittingCircle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
-                }
-            },
+            };
+            return function (y, powerupType) {
+                return makeObject(proto, {offsetY: y, lifetime: 0, type: powerupType});
+            };
+        }()),
+        createActivePowerup = function (type, srcX, srcY) {
+            var lifetime = type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan;
+            return {
+                type: type,
+                width: type === "X2" ? powerupX2Width :
+                       type === "slow" ? powerupSlowRadius * 2 :
+                       type === "weight" ? 40 :
+                       type === "magnet" ? powerupSlowRadius * 2 + 15 :
+                       40,
+                totalLifetime: lifetime,
+                lifetime: lifetime,
+                srcX: srcX,
+                srcY: srcY,
+                timeSinceAcquired: 0
+            };
+        },
+        createGame = (function () {
+            var mkPowerupsObj = iterableObjectFactory(["X2", "slow", "weight", "magnet"]);
+            return function () {
+                return {
+                    player: createPlayer(gameWidth / 2, 50, 0, 0),
+                    platfms: [],
+                    previewPlatfmTouch: null,
+                    fbs: [],
+                    firebitsRed: [],
+                    firebitsOrg: [],
+                    coins: [],
+                    coinColumnsLowest: [],
+                    coinGridOffset: 0,
+                    powerups: mkPowerupsObj({}),
+                    activePowerups: [],
+                    points: 0,
+                    paused: false,
+                    dead: false
+                };
+            };
+        }());
 
-            maybeGetPlatfmFromTouch = function (touch, success) {
-                var tx0 = touch.x0;
-                if (touchIsNaNMaker(touch)) {
-                    return;
-                }
-                if (touch.x0 === touch.x1) {
-                    tx0 -= 1;
-                }
-                success(createPlatfm(tx0, touch.y0, touch.x1, touch.y1));
-            },
-            randomXPosition = function () {
-                return Math.random() * gameWidth;
-            },
-            // firebits: the little slivers that fall around a fireball
-            makeFirebitAround = function (fbX, fbY) {
-                var relX = Math.random() * 2 * fbRadius - fbRadius,
-                    absoluteX = fbX + relX,
-                    // Now, place the y close to the top edge of the
-                    // fireball with a quadratic approximation. See graph
-                    // at http://wolfr.am/6LvgDMu~ for what I'm going for.
-                    highestRelY = (fbRadius + 3) - relX * relX / 19,
-                    relY = Math.random() * -highestRelY,
-                    absoluteY = fbY + relY;
-                return createFirebit(absoluteX, absoluteY);
-            },
-            // 'fb' is short for 'fireball'
-            updateFbsGeneric = function (obj, dt) { // This is used in both play and runMenu, and thus must be declared here.
-                var fbArray = Array.isArray(obj) ? obj : obj.fbs,
-                    fewInLowerPortion = function () { // If too few FBs are in the lower portion of the screen, more must be made
-                        var i, fb;
-                        for (i = 0; i < fbArray.length; i += 1) {
-                            fb = fbArray[i];
-                            if (fb.y > gameHeight * 3 / 4) {
-                                return false;
-                            }
+    // Collision predicates:
+    var Collision = {
+        player_platfm: function (player, platfm) {
+            // Make sure that the ball is in the square who's opposite
+            // corners are the endpoints of the platfm. Necessary because
+            // the algorithm for testing intersection used below is made
+            // for (infinite) lines, not line segments, which the platfm is.
+            var rad = playerRadius + platfmThickness,
+                startx = Math.min(platfm.x0, platfm.x1),
+                starty = Math.min(platfm.y0, platfm.y1),
+                endx = Math.max(platfm.x0, platfm.x1),
+                endy = Math.max(platfm.y0, platfm.y1);
+            if (player.x + rad < startx || player.x - rad > endx || player.y + rad < starty || player.y - rad > endy) {
+                return false;
+            }
+
+            // Algorithm adapted from http://mathworld.wolfram.com/Circle-LineIntersection.html
+            var offsetStartX = platfm.x0 - player.x,
+                offsetStartY = platfm.y0 - player.y,
+                offsetEndX = platfm.x1 - player.x,
+                offsetEndY = platfm.y1 - player.y,
+                platLengthSquared = distanceSquared(platfm.x0, platfm.y0, platfm.x1, platfm.y1),
+                bigD = offsetStartX * offsetEndY - offsetEndX * offsetStartY;
+            return rad * rad * platLengthSquared >= bigD * bigD;
+        },
+        playerWheel_circle: function (player, x, y, circleRadius) {
+            return distLT(player.x, player.y, x, y, playerRadius + circleRadius);
+        },
+        player_circle: function (player, x, y, circleRadius) {
+            return Collision.playerWheel_circle(player, x, y, circleRadius)
+                || (!player.ducking && distLT(player.x, player.y - playerWheelToHeadDist, x, y, playerHeadRadius + circleRadius));
+        },
+        circle_rect: function (circX, circY, radius, rectX, rectY, rectWidth, rectHeight) { // Adapted from StackOverflow answer by 'e. James': http://stackoverflow.com/a/402010
+            var distX = Math.abs(circX - rectX),
+                distY = Math.abs(circY - rectY),
+                cornerDist_squared;
+            if (distX > (rectWidth/2 + radius) || distY > (rectHeight/2 + radius)) {
+                return false;
+            }
+            if (distX <= (rectWidth/2) || distY <= (rectHeight/2)) {
+                return true;
+            }
+            cornerDist_squared = Math.pow(distX - rectWidth/2, 2) +
+                                 Math.pow(distY - rectHeight/2, 2);
+            return cornerDist_squared <= (radius * radius);
+        },
+        player_rect: function (player, x, y, w, h) {
+            var headY = player.y - playerWheelToHeadDist;
+            return Collision.circle_rect(player.x, player.y, playerRadius, x, y, w, h)
+                || (!player.ducking && Collision.circle_rect(player.x, headY, playerHeadRadius, x, y, w, h));
+        },
+        playerHeadNearFb: function (player, fb) {
+            var headWithMargin = playerHeadRadius + 10;
+            // Add a margin of 10 so he ducks a little early.
+            return distLT(player.x, player.y - playerWheelToHeadDist, fb.x, fb.y, headWithMargin + fbRadius);
+        },
+        player_fb: function (player, fb) {
+            return Collision.playerWheel_circle(player, fb.x, fb.y, fbRadius);
+        },
+        player_coin: function (player, coin) {
+            return Collision.player_circle(player, coin.x, coin.y, coinRadius);
+        },
+        player_powerup: function (player, powerup) {
+            if (powerup.type === "X2") {
+                return Collision.player_rect(player, powerup.xPos(), powerup.yPos(), powerupX2Width, powerupX2Height);
+            }
+            if (powerup.type === "slow") {
+                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
+            }
+            if (powerup.type === "weight") {
+                return Collision.player_rect(player, powerup.xPos(), powerup.yPos(), powerupWeightBlockLowerWidth, powerupWeightHeight);
+            }
+            if (powerup.type === "magnet") {
+                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
+            }
+        }
+    };
+
+    // Other small gameplay functions:
+    var maybeGetPlatfmFromTouch = function (touch, success) {
+            var tx0 = touch.x0;
+            if (Touch.zeroLength(touch)) {
+                return;
+                // If its length is zero, (1) the user tapped and did not
+                // mean to draw a platfm, and (2) it will cause NaN to
+                // spread in the data.
+            }
+            if (touch.x0 === touch.x1) {
+                tx0 -= 1;
+                // Prevents problems which arise when line is exactly vertical.
+            }
+            success(createPlatfm(tx0, touch.y0, touch.x1, touch.y1));
+        },
+        randomXPosition = function () {
+            return Math.random() * gameWidth;
+        },
+        // 'fb' is short for 'fireball'
+        updateFbsGeneric = (function () {
+            var // firebits: the little slivers that fall around a fireball
+                makeFirebitAround = function (fbX, fbY) {
+                    var relX = Math.random() * 2 * fbRadius - fbRadius,
+                        absoluteX = fbX + relX,
+                        // Now, place the y close to the top edge of the
+                        // fireball with a quadratic approximation. See graph
+                        // at http://wolfr.am/6LvgDMu~ for what I'm going for.
+                        highestRelY = (fbRadius + 3) - relX * relX / 19,
+                        relY = Math.random() * -highestRelY,
+                        absoluteY = fbY + relY;
+                    return createFirebit(absoluteX, absoluteY);
+                },
+                fewInLowerPortion = function (fbArray) {
+                    // Predicate asks: are there few enough fbs in bottom
+                    // of screen that more should be made?
+                    var i, fb;
+                    for (i = 0; i < fbArray.length; i += 1) {
+                        fb = fbArray[i];
+                        if (fb.y > gameHeight * 3 / 4) {
+                            return false;
                         }
-                        return true;
-                    },
+                    }
+                    return true;
+                };
+            return function (obj, dt) {
+                // Can be passed a menu object, game object, or straight array
+                // of fbs, and thus is not directly placed in gUpdaters.
+                var fbArray = Array.isArray(obj) ? obj : obj.fbs,
                     fbFirebitsRed = Array.isArray(obj) ? null : obj.firebitsRed,
                     fbFirebitsOrg = Array.isArray(obj) ? null : obj.firebitsOrg,
                     firebitBeyondVisibility = function (firebit) { // So that when one moves left, to make a fb on the right side go offscreen, and then quickly goes back, the user doesn't notice that the firebits are temporarily depleted.
@@ -1171,362 +1178,387 @@ if (typeof Math.log2 !== "function") {
                 updateFirebits(fbFirebitsRed);
                 updateFirebits(fbFirebitsOrg);
                 var chanceFactor = (1 / 7);
-                if (Math.random() < 1 / 1000 * 4 * chanceFactor * dt || fewInLowerPortion()) {
+                if (Math.random() < 1 / 1000 * 4 * chanceFactor * dt || fewInLowerPortion(fbArray)) {
                     x = randomXPosition();
                     y = gameHeight + fbRadius;
                     fbArray.push(createFb(x, y));
                 }
-            },
+            };
+        }()),
 
-            difficultyCurveFromPoints = function (x) {
-                return Math.log2(x + 100) / 37 + 0.67;
-            },
-            handleActivesPoints = function (activePowerups, pointsReceived) {
+        difficultyCurveFromPoints = function (x) {
+            return Math.log2(x + 100) / 37 + 0.67;
+        },
+        handleActivesPoints = function (activePowerups, pointsReceived) {
+            // Handle the effect that active powerups have on the amount of
+            // points recieved.
+            var i;
+            for (i = 0; i < activePowerups.length; i += 1) {
+                if (activePowerups[i].type === "X2") {
+                    return pointsReceived * 2;
+                }
+            }
+            return pointsReceived;
+        },
+        timeBasedPointsVanilla = function (playerY, realDt) {
+            // Find the points earned, not including coins or powerups,
+            // during this frame. 'Vanilla' because powerup effects are
+            // not considered.
+            return 7 * (realDt / 1000) * Math.sqrt(Math.max(0, playerY / gameHeight));
+        };
+
+    // Functions operating on the game object:
+    var gPredicates = {
+            slowPowerupObtained: function (game) {
                 var i;
-                for (i = 0; i < activePowerups.length; i += 1) {
-                    if (activePowerups[i].type === "X2") {
-                        return pointsReceived * 2;
+                for (i = 0; i < game.activePowerups.length; i += 1) {
+                    if (game.activePowerups[i].type === "slow") {
+                        return true;
                     }
                 }
-                return pointsReceived;
+                return false;
             },
-
-            // Game functions (fns operating on game objects):
-            gPredicates = {
-                slowPowerupObtained: function (game) {
-                    var i;
-                    for (i = 0; i < game.activePowerups.length; i += 1) {
-                        if (game.activePowerups[i].type === "slow") {
-                            return true;
-                        }
+            weightObtained: function (game) {
+                var i;
+                for (i = 0; i < game.activePowerups.length; i += 1) {
+                    if (game.activePowerups[i].type === "weight") {
+                        return true;
                     }
-                    return false;
-                },
-                weightObtained: function (game) {
-                    var i;
-                    for (i = 0; i < game.activePowerups.length; i += 1) {
-                        if (game.activePowerups[i].type === "weight") {
-                            return true;
-                        }
-                    }
-                    return false;
-                },
-                magnetObtained: function (game) {
-                    var i;
-                    for (i = 0; i < game.activePowerups.length; i += 1) {
-                        if (game.activePowerups[i].type === "magnet") {
-                            return true;
-                        }
-                    }
-                    return false;
                 }
+                return false;
             },
-
-            gUpdaters = (function () {
-                // Some util first:
-                var addToActivePowerups = function (game, type, x, y) {
-                        var newActive = createActivePowerup(type, x, y);
-                        var i;
-                        for (i = 0; i < game.activePowerups.length; i += 1) {
-                            if (game.activePowerups[i].type === type) {
-                                game.activePowerups.splice(i, 1);
-                                break;
-                            }
+            magnetObtained: function (game) {
+                var i;
+                for (i = 0; i < game.activePowerups.length; i += 1) {
+                    if (game.activePowerups[i].type === "magnet") {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        },
+        gUpdaters = (function () {
+            // Some util first:
+            var addToActivePowerups = function (game, type, x, y) {
+                    var newActive = createActivePowerup(type, x, y);
+                    var i;
+                    for (i = 0; i < game.activePowerups.length; i += 1) {
+                        if (game.activePowerups[i].type === type) {
+                            game.activePowerups.splice(i, 1);
+                            break;
                         }
-                        game.activePowerups.push(newActive);
-                    },
-                    makePowerupRandom = function (type, start, range) {
-                        return createPowerup(Math.random() * range + start, type);
-                    },
-                    addDiagPattern = function (game, do_rtl) {
-                        // If do_rtl is truthy, the diag pattern
-                        // will go down-and-left from the right.
-                        var columns = 8;
-                        var column, xPos, newcoin;
-                        for (column = 0; column < columns; column += 1) {
-                            xPos = (column + 0.5) * 35;
-                            if (do_rtl) { xPos = gameWidth - xPos; }
-                            newcoin = createCoin(xPos, coinStartingY + column * 35);
-                            game.coins.push(newcoin);
-                            game.coinColumnsLowest[column] = newcoin;
-                        }
-                    },
-                    die = function (game) {
-                        if (game.dead) { return; }
-                        game.dead = true;
-                        if (game.previewPlatfmTouch) {
-                            game.previewPlatfmTouch = copyTouch(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
-                        }
-                        render.btnLayer(game);
+                    }
+                    game.activePowerups.push(newActive);
+                },
+                makePowerupRandom = function (type, start, range) {
+                    return createPowerup(Math.random() * range + start, type);
+                },
+                addDiagCoinPattern = function (game, do_rtl) {
+                    // If do_rtl is truthy, the diag pattern
+                    // will go down-and-left from the right.
+                    var columns = 8;
+                    var column, xPos, newcoin;
+                    for (column = 0; column < columns; column += 1) {
+                        xPos = (column + 0.5) * 35;
+                        if (do_rtl) { xPos = gameWidth - xPos; }
+                        newcoin = createCoin(xPos, coinStartingY + column * 35);
+                        game.coins.push(newcoin);
+                        game.coinColumnsLowest[column] = newcoin;
+                    }
+                },
+                velFromPlatfm = function (dt, player, platfm) {
+                    var slope = platfm.slope(),
+                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmFallRate * dt - platfmBounciness);
+                    cartesianVel.setMagnitude(Math.min(cartesianVel.magnitude(), player.magnitude()) + playerGrav * dt);
+                    return {
+                        x: cartesianVel.vx,
+                        y: cartesianVel.vy
                     };
-                return {
-                    player: function (game, dt) {
-                        var i, platfm, tmpVel, collided = false;
-                        if (game.player.y > gameHeight + playerRadius) {
-                            die(game);
-                            // The frame finishes, with all other components also
-                            // being updated before the GameOver screen apperas, so
-                            // so does the player's position. This is why there is
-                            // no 'return;' here.
-                        }
-                        for (i = 0; i < game.platfms.length; i += 1) {
-                            platfm = game.platfms[i];
-                            if (playerIntersectingPlatfm(game.player, platfm)) {
-                                tmpVel = velFromPlatfm(dt, game.player, platfm);
-                                game.player.vx = tmpVel.x;
-                                game.player.vy = tmpVel.y;
-                                collided = true;
-                            }
-                        }
-                        if (!collided) {
-                            if (gPredicates.weightObtained(game)) {
-                                game.player.vy += playerGrav * 5 / 2 * dt;
-                            } else {
-                                game.player.vy += playerGrav * dt;
-                            }
-                        }
-                        game.player.ducking = false;
-                        for (i = 0; i < game.fbs.length; i += 1) {
-                            if (game.player.ducking === false && playerHeadNearFb(game.player, game.fbs[i])) {
-                                game.player.ducking = true;
-                            }
-                            if (playerHittingFb(game.player, game.fbs[i])) {
-                                die(game);
-                            }
-                        }
-                        game.coins.forEach(function (coin, index) {
-                            if (playerHittingCoin(game.player, coin)) {
-                                game.coins.splice(index, 1);
-                                game.points += handleActivesPoints(game.activePowerups, coinValue * difficultyCurveFromPoints(game.points));
-                            }
-                        });
-                        game.powerups.forEach(function (powerup, key) {
-                            if (playerHittingPowerup(game.player, powerup)) {
-                                game.powerups[key] = null;
-                                addToActivePowerups(game, powerup.type, powerup.xPos(), powerup.yPos());
-                            }
-                        });
-                        var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
-                        game.player.x = modulo(game.player.x + dx, gameWidth);
-                        game.player.y += dy;
-                        game.player.wheelAngle += signNum(game.player.vx) * 0.2 * dt;
-                    },
-                    fbs: updateFbsGeneric,
-                    coins: function (game, dt) {
-                        var magnetOn = gPredicates.magnetObtained(game);
-                        var dy = coinFallRate * dt;
-                        game.coinGridOffset += dy;
-                        game.coinGridOffset = game.coinGridOffset % 35;
-                        game.coins.forEach(function (coin, index) {
-                            coin.y -= dy;
-                            var distance;
-                            if (magnetOn) {
-                                distance = coin.distanceTo(game.player);
-                                if (distance < 100 && distance !== 0) {
-                                    coin.setDistanceTo(game.player, distance - (100 / distance));
-                                }
-                            }
-                            if (coin.y < -2 * coinRadius) {
-                                game.coins.splice(index, 1);
-                            }
-                        });
-                        var chanceFactor = 1 / 7;
-                        if (Math.random() < 1 / (1000 * 25) * dt) {
-                            addDiagPattern(game, Math.random() < 0.5);
-                        } else {
-                            if (Math.random() < 1 / (1000 * 10/4) * chanceFactor * 4 * dt) {
-                                var column = Math.floor(Math.random() * 8);
-                                var pos = (column + 0.5) * 35;
-                                var newcoin = createCoin(pos, coinStartingY + 35 - game.coinGridOffset);
-                                game.coinColumnsLowest[column] = game.coinColumnsLowest[column] || newcoin;
-                                if (newcoin.y - game.coinColumnsLowest[column].y <= 35) {
-                                    newcoin.y += 35;
-                                    game.coinColumnsLowest[column] = newcoin;
-                                }
-                                game.coins.push(newcoin);
-                            }
-                        }
-                    },
-                    platfms: function (game, dt) {
-                        game.platfms.forEach(function (platfm, index) {
-                            platfm.y0 -= platfmFallRate * dt;
-                            platfm.y1 -= platfmFallRate * dt;
-                            platfm.time_left -= dt;
-                            if (platfm.time_left <= 0) {
-                                game.platfms.splice(index, 1);
-                            }
-                        });
-                    },
-                    powerups: function (game, dt) {
-                        game.powerups.forEach(function (powerup, key) {
-                            powerup.lifetime += dt;
-                            if (powerup.xPos() > gameWidth + activePowerupBubbleRadius + playerRadius) {
-                                // The active powerup bubble is larger than all powerups,
-                                // and the '+ playerRadius' is so that he can catch one
-                                // just as it disappears.
-                                game.powerups[key] = null;
-                            }
-                        });
-                        if (!game.powerups.X2 && Math.random() < 1 / 75000 * dt) { // 100 times less frequent than fireballs
-                            game.powerups.X2 = makePowerupRandom("X2", 25, 145);
-                        }
-                        if (!game.powerups.slow && Math.random() < 1 / 75000 * dt) {
-                            game.powerups.slow = makePowerupRandom("slow", 25, 145);
-                        }
-                        if (!game.powerups.weight && game.points > 50 && Math.random() < 1 / 75000 * dt) {
-                            game.powerups.weight = makePowerupRandom("weight", 25, 145);
-                        }
-                        if (!game.powerups.magnet && Math.random() < 1 / 75000 * dt) {
-                            game.powerups.magnet = makePowerupRandom("magnet", 25, 145);
-                        }
-                    },
-                    activePowerups: function (game, dt) {
-                        game.activePowerups.forEach(function (activePowerup, index) {
-                            if (activePowerup.lifetime <= 0) {
-                                game.activePowerups.splice(index, 1);
-                            }
-                            activePowerup.lifetime -= dt;
-                            if (activePowerup.timeSinceAcquired < activePowerupTravelTime) {
-                                activePowerup.timeSinceAcquired += dt;
-                            }
-                        });
-                    }
-                };
-            }()),
-
-            // PLAY:
-            play = function () {
-                var game = createGame(),
-                    restart = function () {
-                        // The interval isn't cleared because the same interval
-                        // is used for the next game (after the restart).
-                        game = createGame();
-                    },
-                    prevFrameTime = Date.now();
-                setCurGame(game);
-                setInterval(function () {
-                    //window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
-                    // Handle time (necessary, regardless of pausing)
-                    var now = Date.now(), realDt = now - prevFrameTime, dt;
-                    // If the frame takes too long, a jump in all of the objects
-                    // will be noticable, and more undesirable than the objects
-                    // acting as if the jump didn't happen. Thus, cap realDt:
-                    realDt = Math.min(realDt, 1000 / fps * 3);
-                    realDt *= difficultyCurveFromPoints(game.points);
-                    if (gPredicates.slowPowerupObtained(game)) {
-                        dt = realDt * 2/3; // Sloooooooow
-                    } else {
-                        dt = realDt;
-                    }
-                    prevFrameTime = now;
-                    // Handle state changes
-                    if (game.paused) {
-                        render.gamePaused(game);
-                    } else if (game.dead) {
-                        render.gameDead(game);
-                    } else {
-                        // Update state
-                        if (curTouch && playerIntersectingPlatfm(game.player, curTouch)) {
-                            maybeGetPlatfmFromTouch(curTouch, function (platfm) {
-                                game.platfms.push(platfm);
-                                curTouch = null;
-                            });
-                        }
-                        gUpdaters.player(game, dt, game.points);
-                        gUpdaters.coins(game, dt);
-                        gUpdaters.fbs(game, dt);
-                        gUpdaters.platfms(game, dt);
-                        gUpdaters.powerups(game, dt);
-                        gUpdaters.activePowerups(game, dt);
-                        game.points += handleActivesPoints(game.activePowerups, 7 * (realDt / 1000) * Math.sqrt(Math.max(0, game.player.y / gameHeight))); // The use of realDt (rather than dt) here means that when you get the slow powerup, you still get points at normal speed.
-
-                        // Render
-                        if (!game.dead && !game.paused) { // The paused check is just in case of a bug, or for the future, as now one cannot pause while drawing a platfm
-                            game.previewPlatfmTouch = curTouch;
-                        }
-                        if (game.dead) {
-                            highscores.sendScore(Math.floor(game.points));
-                        }
-                        render.game(game);
-                    }
-                }, 1000 / fps);
-                handleTouchend = function (touch) {
-                    if (!game.paused && !game.dead) {
-                        maybeGetPlatfmFromTouch(touch, function (platfm) {
-                            game.platfms.push(platfm);
-                        });
-                    }
-                };
-                render.btnLayer(game);
-                jQuery(document).on("click", function (event) {
-                    var q = calcTouchPos(event);
-                    var p = {
-                        x1: q.x,
-                        y1: q.y
-                    };
-                    if (game.paused) {
-                        if (isOverRectBtn(resumeBtn, p)) {
-                            game.paused = false;
-                        }
-                    } else if (game.dead) {
-                        if (isOverRectBtn(replayBtn, p)) {
-                            restart();
-                        }
-                    } else {
-                        if (isOverRectBtn(pauseBtn, p)) {
-                            game.paused = true;
-                        }
+                },
+                die = function (game) {
+                    if (game.dead) { return; }
+                    game.dead = true;
+                    if (game.previewPlatfmTouch) {
+                        game.previewPlatfmTouch = Touch.copy(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
                     }
                     render.btnLayer(game);
-                });
-                jQuery(document).on("touchmove touchstart touchend", (function () {
-                    var lastRedraw,
-                        sensitivityMarginY = 40, // Margin around button for events to trigger redraws on, so that a release is registered when the user slides a finger off the button
-                        sensitivityMarginX = 70; // People do faster horizontal swipes, so a larger margin is necessary
-                    return function (event) {
-                        var now = Date.now(),
-                            dt = lastRedraw === undefined ? 1000 : now - lastRedraw, // The defaulting to 1000 just allows the 'dt > 30' test below to definitely pass even on the first draw.
-                            touch = calcTouchPos(event.originalEvent.changedTouches[0]);
-                        if (dt > 30 && // To prevent way-too-inefficiently-frequent rerendering
-                                touch.x > pauseBtn.edgeX() - sensitivityMarginX && 
-                                touch.y < pauseBtn.y + pauseBtn.h + sensitivityMarginY) {
-                            render.btnLayer(game);
-                            lastRedraw = now;
-                        }
-                    };
-                }()));
-            },
-            createMenu = function () {
-                return {
-                    fbs: [],
-                    firebitsRed: [],
-                    firebitsOrg: []
                 };
-            },
-            runMenu = function () {
-                var menu = createMenu(),
-                    updateFbs = function (dt) {
-                        updateFbsGeneric(menu, dt);
-                    },
-                    intervalId,
-                    prevTime = Date.now();
-                window.menu = menu;
-                intervalId = setInterval(function () {
-                    var now = Date.now(), dt = now - prevTime;
-                    prevTime = now;
-                    updateFbs(dt);
-                    render.menu(menu);
-                }, 1000 / fps);
-                jQuery(document).on("click.menuHandler", function (event) {
-                    var pos = calcTouchPos(event), tpos = {x1: pos.x, y1: pos.y};
-                    if (isOverRectBtn(menuPlayBtn, tpos)) {
-                        clearInterval(intervalId);
-                        jQuery(document).off(".menuHandler");
-                        play();
+            return {
+                player: function (game, dt) {
+                    var i, platfm, tmpVel, collided = false;
+                    if (game.player.y > gameHeight + playerRadius) {
+                        die(game);
+                        // The frame finishes, with all other components also
+                        // being updated before the GameOver screen apperas, so
+                        // so does the player's position. This is why there is
+                        // no 'return;' here.
                     }
-                });
+                    for (i = 0; i < game.platfms.length; i += 1) {
+                        platfm = game.platfms[i];
+                        if (Collision.player_platfm(game.player, platfm)) {
+                            tmpVel = velFromPlatfm(dt, game.player, platfm);
+                            game.player.vx = tmpVel.x;
+                            game.player.vy = tmpVel.y;
+                            collided = true;
+                        }
+                    }
+                    if (!collided) {
+                        if (gPredicates.weightObtained(game)) {
+                            game.player.vy += playerGrav * 5 / 2 * dt;
+                        } else {
+                            game.player.vy += playerGrav * dt;
+                        }
+                    }
+                    game.player.ducking = false;
+                    for (i = 0; i < game.fbs.length; i += 1) {
+                        if (game.player.ducking === false && Collision.playerHeadNearFb(game.player, game.fbs[i])) {
+                            game.player.ducking = true;
+                        }
+                        if (Collision.player_fb(game.player, game.fbs[i])) {
+                            die(game);
+                        }
+                    }
+                    game.coins.forEach(function (coin, index) {
+                        if (Collision.player_coin(game.player, coin)) {
+                            game.coins.splice(index, 1);
+                            game.points += handleActivesPoints(game.activePowerups, coinValue * difficultyCurveFromPoints(game.points));
+                        }
+                    });
+                    game.powerups.forEach(function (powerup, key) {
+                        if (Collision.player_powerup(game.player, powerup)) {
+                            game.powerups[key] = null;
+                            addToActivePowerups(game, powerup.type, powerup.xPos(), powerup.yPos());
+                        }
+                    });
+                    var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
+                    game.player.x = modulo(game.player.x + dx, gameWidth);
+                    game.player.y += dy;
+                    game.player.wheelAngle += signNum(game.player.vx) * 0.2 * dt;
+                },
+                fbs: updateFbsGeneric,
+                coins: function (game, dt) {
+                    var magnetOn = gPredicates.magnetObtained(game);
+                    var dy = coinFallRate * dt;
+                    game.coinGridOffset += dy;
+                    game.coinGridOffset = game.coinGridOffset % 35;
+                    game.coins.forEach(function (coin, index) {
+                        coin.y -= dy;
+                        var distance;
+                        if (magnetOn) {
+                            distance = coin.distanceTo(game.player);
+                            if (distance < 100 && distance !== 0) {
+                                coin.setDistanceTo(game.player, distance - (100 / distance));
+                            }
+                        }
+                        if (coin.y < -2 * coinRadius) {
+                            game.coins.splice(index, 1);
+                        }
+                    });
+                    var chanceFactor = 1 / 7;
+                    if (Math.random() < 1 / (1000 * 25) * dt) {
+                        addDiagCoinPattern(game, Math.random() < 0.5);
+                    } else {
+                        if (Math.random() < 1 / (1000 * 10/4) * chanceFactor * 4 * dt) {
+                            var column = Math.floor(Math.random() * 8);
+                            var pos = (column + 0.5) * 35;
+                            var newcoin = createCoin(pos, coinStartingY + 35 - game.coinGridOffset);
+                            game.coinColumnsLowest[column] = game.coinColumnsLowest[column] || newcoin;
+                            if (newcoin.y - game.coinColumnsLowest[column].y <= 35) {
+                                newcoin.y += 35;
+                                game.coinColumnsLowest[column] = newcoin;
+                            }
+                            game.coins.push(newcoin);
+                        }
+                    }
+                },
+                platfms: function (game, dt) {
+                    game.platfms.forEach(function (platfm, index) {
+                        platfm.y0 -= platfmFallRate * dt;
+                        platfm.y1 -= platfmFallRate * dt;
+                        platfm.time_left -= dt;
+                        if (platfm.time_left <= 0) {
+                            game.platfms.splice(index, 1);
+                        }
+                    });
+                },
+                powerups: function (game, dt) {
+                    game.powerups.forEach(function (powerup, key) {
+                        powerup.lifetime += dt;
+                        if (powerup.xPos() > gameWidth + activePowerupBubbleRadius + playerRadius) {
+                            // The active powerup bubble is larger than all powerups,
+                            // and the '+ playerRadius' is so that he can catch one
+                            // just as it disappears.
+                            game.powerups[key] = null;
+                        }
+                    });
+                    if (!game.powerups.X2 && Math.random() < 1 / 75 * dt) { // 100 times less frequent than fireballs
+                        game.powerups.X2 = makePowerupRandom("X2", 25, 145);
+                    }
+                    if (!game.powerups.slow && Math.random() < 1 / 75 * dt) {
+                        game.powerups.slow = makePowerupRandom("slow", 25, 145);
+                    }
+                    if (!game.powerups.weight && game.points > 50 && Math.random() < 1 / 75000 * dt) {
+                        game.powerups.weight = makePowerupRandom("weight", 25, 145);
+                    }
+                    if (!game.powerups.magnet && Math.random() < 1 / 75 * dt) {
+                        game.powerups.magnet = makePowerupRandom("magnet", 25, 145);
+                    }
+                },
+                activePowerups: function (game, dt) {
+                    game.activePowerups.forEach(function (activePowerup, index) {
+                        if (activePowerup.lifetime <= 0) {
+                            game.activePowerups.splice(index, 1);
+                        }
+                        activePowerup.lifetime -= dt;
+                        if (activePowerup.timeSinceAcquired < activePowerupTravelTime) {
+                            activePowerup.timeSinceAcquired += dt;
+                        }
+                    });
+                }
             };
-        return {runMenu: runMenu, play: play};
-    }());
-    start.runMenu();
+        }());
+
+    // Update/render loops of home menu and gameplay:
+    var play = function () {
+            var game = createGame(),
+                restart = function () {
+                    // The interval isn't cleared because the same interval
+                    // is used for the next game (after the restart).
+                    game = createGame();
+                    setCurGame(game);
+                },
+                prevFrameTime = Date.now();
+            setCurGame(game);
+            setInterval(function () {
+                window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
+
+                // Initialize time deltas
+                var now = Date.now(),
+                    realDt = now - prevFrameTime,
+                    dt;
+                // Cap realDt at 3 times the normal frame length to prevent
+                // a large noticable jump in on-screen objects:
+                realDt = Math.min(realDt, 1000 / fps * 3);
+
+                realDt *= difficultyCurveFromPoints(game.points);
+
+                // Handle effects of slow powerup
+                if (gPredicates.slowPowerupObtained(game)) {
+                    dt = realDt * 2/3;
+                    // Any functions given 'dt' as the time delta will thus
+                    // behave as if 2/3 as much time has passed.
+                } else {
+                    dt = realDt;
+                }
+                prevFrameTime = now;
+
+                // Handle state changes
+                if (game.paused) {
+                    render.gamePaused(game);
+                } else if (game.dead) {
+                    render.gameDead(game);
+                } else {
+                    // Update state
+                    if (Touch.curTouch && Collision.player_platfm(game.player, Touch.curTouch)) {
+                        maybeGetPlatfmFromTouch(Touch.curTouch, function (platfm) {
+                            game.platfms.push(platfm);
+                            Touch.curTouch = null;
+                        });
+                    }
+                    gUpdaters.player(game, dt);
+                    gUpdaters.coins(game, dt);
+                    gUpdaters.fbs(game, dt);
+                    gUpdaters.platfms(game, dt);
+                    gUpdaters.powerups(game, dt);
+                    gUpdaters.activePowerups(game, dt);
+                    game.points += handleActivesPoints(game.activePowerups, timeBasedPointsVanilla(game.player.y, realDt));
+                    // Because timeBasedPoints takes 'realDt', when the slow
+                    // powerup is held, points still flow in at the normal
+                    // speed from the user's perspective.
+
+                    if (game.dead) {
+                        highscores.sendScore(Math.floor(game.points));
+                    }
+
+                    // Render
+                    if (!game.dead && !game.paused) { // The paused check is just in case of a bug, or for the future, as now one cannot pause while drawing a platfm
+                        game.previewPlatfmTouch = Touch.curTouch;
+                    }
+                    render.game(game);
+                }
+            }, 1000 / fps);
+            Touch.onTouchend = function (touch) {
+                if (!game.paused && !game.dead) {
+                    maybeGetPlatfmFromTouch(touch, function (platfm) {
+                        game.platfms.push(platfm);
+                    });
+                }
+            };
+            render.btnLayer(game);
+            jQuery(document).on("click", function (event) {
+                var q = calcTouchPos(event);
+                var p = {
+                    x1: q.x,
+                    y1: q.y
+                };
+                if (game.paused) {
+                    if (resumeBtn.touchIsInside(p)) {
+                        game.paused = false;
+                    }
+                } else if (game.dead) {
+                    if (replayBtn.touchIsInside(p)) {
+                        restart();
+                    }
+                } else {
+                    if (pauseBtn.touchIsInside(p)) {
+                        game.paused = true;
+                    }
+                }
+                render.btnLayer(game);
+            });
+            jQuery(document).on("touchmove touchstart touchend", (function () {
+                var lastRedraw,
+                    sensitivityMarginY = 40, // Margin around button for events to trigger redraws on, so that a release is registered when the user slides a finger off the button
+                    sensitivityMarginX = 70; // People do faster horizontal swipes, so a larger margin is necessary
+                return function (event) {
+                    var now = Date.now(),
+                        dt = lastRedraw === undefined ? 1000 : now - lastRedraw, // The defaulting to 1000 just allows the 'dt > 30' test below to definitely pass even on the first draw.
+                        touch = calcTouchPos(event.originalEvent.changedTouches[0]);
+                    if (dt > 30 && // To prevent way-too-inefficiently-frequent rerendering
+                            touch.x > pauseBtn.edgeX() - sensitivityMarginX && 
+                            touch.y < pauseBtn.y + pauseBtn.h + sensitivityMarginY) {
+                        render.btnLayer(game);
+                        lastRedraw = now;
+                    }
+                };
+            }()));
+        },
+        createMenu = function () {
+            return {
+                fbs: [],
+                firebitsRed: [],
+                firebitsOrg: []
+            };
+        },
+        runMenu = function () {
+            var menu = createMenu(),
+                intervalId,
+                prevTime = Date.now();
+            window.menu = menu;
+            intervalId = setInterval(function () {
+                var now = Date.now(), dt = now - prevTime;
+                prevTime = now;
+                updateFbsGeneric(menu, dt);
+                render.menu(menu);
+            }, 1000 / fps);
+            jQuery(document).on("click.menuHandler", function (event) {
+                var pos = calcTouchPos(event), tpos = {x1: pos.x, y1: pos.y};
+                if (menuPlayBtn.touchIsInside(tpos)) {
+                    clearInterval(intervalId);
+                    jQuery(document).off(".menuHandler");
+                    play();
+                }
+            });
+        };
+    runMenu();
 }());
