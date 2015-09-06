@@ -1397,16 +1397,16 @@ if (typeof Math.log2 !== "function") {
                             game.powerups[key] = null;
                         }
                     });
-                    if (!game.powerups.X2 && Math.random() < 1 / 75 * dt) { // 100 times less frequent than fireballs
+                    if (!game.powerups.X2 && Math.random() < 1 / 75000 * dt) { // 100 times less frequent than fireballs
                         game.powerups.X2 = makePowerupRandom("X2", 25, 145);
                     }
-                    if (!game.powerups.slow && Math.random() < 1 / 75 * dt) {
+                    if (!game.powerups.slow && Math.random() < 1 / 75000 * dt) {
                         game.powerups.slow = makePowerupRandom("slow", 25, 145);
                     }
                     if (!game.powerups.weight && game.points > 50 && Math.random() < 1 / 75000 * dt) {
                         game.powerups.weight = makePowerupRandom("weight", 25, 145);
                     }
-                    if (!game.powerups.magnet && Math.random() < 1 / 75 * dt) {
+                    if (!game.powerups.magnet && Math.random() < 1 / 75000 * dt) {
                         game.powerups.magnet = makePowerupRandom("magnet", 25, 145);
                     }
                 },
