@@ -1293,6 +1293,12 @@ if (typeof Math.log2 !== "function") {
                         // so does the player's position. This is why there is
                         // no 'return;' here.
                     }
+                    if (Touch.curTouch && Collision.player_platfm(game.player, Touch.curTouch)) {
+                        maybeGetPlatfmFromTouch(Touch.curTouch, function (platfm) {
+                            game.platfms.push(platfm);
+                            Touch.curTouch = null;
+                        });
+                    }
                     for (i = 0; i < game.platfms.length; i += 1) {
                         platfm = game.platfms[i];
                         if (Collision.player_platfm(game.player, platfm)) {
@@ -1459,12 +1465,6 @@ if (typeof Math.log2 !== "function") {
                     render.gameDead(game);
                 } else {
                     // Update state
-                    if (Touch.curTouch && Collision.player_platfm(game.player, Touch.curTouch)) {
-                        maybeGetPlatfmFromTouch(Touch.curTouch, function (platfm) {
-                            game.platfms.push(platfm);
-                            Touch.curTouch = null;
-                        });
-                    }
                     gUpdaters.player(game, dt);
                     gUpdaters.coins(game, dt);
                     gUpdaters.fbs(game, dt);
