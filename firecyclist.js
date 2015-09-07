@@ -777,6 +777,50 @@ if (typeof Math.log2 !== "function") {
                 drawInGamePoints(mainCtx, game);
                 mainCtx.restore();
             },
+            drawTutorialHand = function (ctx, x, y) {
+                ctx.font = "80px r0";
+                ctx.fillStyle = "tan";
+                ctx.fillText("☚", x + 36, y + 36);
+                ctx.strokeStyle = "brown";
+                ctx.lineWidth = 3;
+                ctx.strokeText("☚", x + 36, y + 36);
+            },
+            drawSwipeHelpText = (function () {
+                var t0 = "Swipe to draw",
+                    t1 = "platforms";
+                return function (ctx, x, y) {
+                    var helpTextPxSize = 25;
+                    ctx.font = "italic " + helpTextPxSize + "px i0";
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = "tan";
+                    ctx.strokeText(t0, x, y);
+                    ctx.strokeText(t1, x, y + helpTextPxSize);
+                    ctx.fillStyle = "brown";
+                    ctx.fillText(t0, x, y);
+                    ctx.fillText(t1, x, y + helpTextPxSize);
+                };
+            }()),
+            drawTutorial = function (game, handX, handY) {
+                mainCtx.save();
+                mainCtx.clearRect(0, 0, gameWidth, gameHeight);
+                overlayCtx.clearRect(0, 0, gameWidth, gameHeight);
+                if (game.player.ducking) {
+                    drawPlayerDuckingAt(mainCtx, game.player.x, game.player.y, game.player.wheelAngle);
+                } else {
+                    drawPlayerAt(mainCtx, game.player.x, game.player.y, game.player.wheelAngle);
+                }
+                setupGenericPlatfmChars(mainCtx);
+                game.platfms.forEach(function (platfm) {
+                    drawPlatfm(mainCtx, platfm);
+                });
+                mainCtx.globalAlpha = 1; // Changed in platfm drawing, so must be reset
+                if (game.previewPlatfmTouch) {
+                    drawPreviewPlatfm(mainCtx, game.previewPlatfmTouch);
+                }
+                drawTutorialHand(mainCtx, handX, handY);
+                drawSwipeHelpText(mainCtx, gameWidth / 2, 350);
+                mainCtx.restore();
+            },
             gameOverlayDrawer = (function () {
                 var vagueify = function (ctx) {
                     ctx.fillStyle = "rgba(200, 200, 200, 0.75)";
@@ -844,7 +888,8 @@ if (typeof Math.log2 !== "function") {
             game: drawGame,
             gamePaused: drawGamePaused,
             gameDead: drawGameDead,
-            btnLayer: redrawBtnLayer
+            btnLayer: redrawBtnLayer,
+            tutorial: drawTutorial
         };
     }());
 
@@ -1431,7 +1476,7 @@ if (typeof Math.log2 !== "function") {
                     });
                 }
             },
-            handleDocumentClick: function (game, event, restart) {
+            handleDocumentClick: function (game, event, restart, disallowPause) {
                 var q = calcTouchPos(event);
                 var p = {
                     x1: q.x,
@@ -1445,12 +1490,13 @@ if (typeof Math.log2 !== "function") {
                     if (replayBtn.touchIsInside(p)) {
                         restart();
                     }
-                } else {
+                }
+                if (!disallowPause) {
                     if (pauseBtn.touchIsInside(p)) {
                         game.paused = true;
                     }
+                    render.btnLayer(game);
                 }
-                render.btnLayer(game);
             },
             handleBtnLayerUpdates: (function () {
                 var sensitivityMarginY = 40, // Margin around button for events to trigger redraws on, so that a release is registered when the user slides a finger off the button
@@ -1472,8 +1518,8 @@ if (typeof Math.log2 !== "function") {
         };
 
     // Update/render loops of home menu and gameplay:
-    var play = function () {
-            var game = createGame(),
+    var play = function (existingGame) {
+            var game = existingGame || createGame(),
                 restart = function () {
                     // The interval isn't cleared because the same interval
                     // is used for the next game (after the restart).
@@ -1505,7 +1551,6 @@ if (typeof Math.log2 !== "function") {
                 }
                 prevFrameTime = now;
 
-                // Handle state changes
                 if (game.paused) {
                     render.gamePaused(game);
                 } else if (game.dead) {
@@ -1528,7 +1573,7 @@ if (typeof Math.log2 !== "function") {
                     }
 
                     // Render
-                    if (!game.dead && !game.paused) { // The paused check is just in case of a bug, or for the future, as now one cannot pause while drawing a platfm
+                    if (!game.dead && !game.paused) {
                         game.previewPlatfmTouch = Touch.curTouch;
                     }
                     render.game(game);
@@ -1547,6 +1592,111 @@ if (typeof Math.log2 !== "function") {
                     lastRedraw = gEventHandlers.handleBtnLayerUpdates(game, event, lastRedraw);
                 };
             }()));
+        },
+        createAutomatedTouch = function (dir) {
+            var autoTouchStartY = 230,
+                autoTouchStartXDiff = gameWidth * 0.3;
+            var x = gameWidth / 2 + dir * autoTouchStartXDiff;
+            return {
+                x0: x,
+                y0: autoTouchStartY,
+                x1: x,
+                y1: autoTouchStartY
+            };
+        },
+        stepAutomatedTouch = function (autoTouch) {
+            if (autoTouch.x0 > gameWidth / 2) {
+                autoTouch.x1 -= 1.4 * 5;
+            } else {
+                autoTouch.x1 += 1.4 * 5;
+            }
+            autoTouch.y1 += 1 * 5;
+        },
+        timeBetweenAutoTouches = 600,
+        runTutorial = function () {
+            var game = createGame(),
+                prevFrameTime = Date.now(),
+                autoTouchDir = 1,
+                curAutomatedTouch = createAutomatedTouch(autoTouchDir),
+                interTouchWait = 0,
+                materializeAutoTouch = function () {
+                    maybeGetPlatfmFromTouch(curAutomatedTouch, function (platfm) {
+                        game.platfms.push(platfm);
+                    });
+                    autoTouchDir *= -1;
+                    curAutomatedTouch = createAutomatedTouch(autoTouchDir);
+                    interTouchWait = timeBetweenAutoTouches;
+                },
+                startRealGame = function () {
+                    clearInterval(intervalId);
+                    jQuery(document).off(".tutorial");
+                    play(game);
+                },
+                restartTut = function () {
+                    game = createGame();
+                    curAutomatedTouch = createAutomatedTouch(autoTouchDir);
+                },
+                intervalId;
+            var prevX, prevY, midwayX, midwayY;
+            intervalId = setInterval(function () {
+                window.tutorial = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
+
+                // Initialize time deltas
+                var now = Date.now(),
+                    dt = now - prevFrameTime;
+                // Cap dt at 3 times the normal frame length to prevent
+                // a large noticable jump in on-screen objects:
+                dt = Math.min(dt, 1000 / fps * 3);
+
+                dt *= difficultyCurveFromPoints(game.points);
+
+                prevFrameTime = now;
+
+                if (game.paused) {
+                    render.gamePaused(game);
+                } else if (game.dead) {
+                    render.gameDead(game);
+                } else {
+                    // Update state
+                    gUpdaters.player(game, dt);
+                    gUpdaters.platfms(game, dt);
+                    if (Touch.curTouch) {
+                        materializeAutoTouch();
+                        startRealGame();
+                    }
+                    if (curAutomatedTouch.y1 > 290) {
+                        materializeAutoTouch();
+                    } else if (interTouchWait <= 0) {
+                        stepAutomatedTouch(curAutomatedTouch);
+                    } else {
+                        interTouchWait -= dt;
+                    }
+                    // Placement of hand:
+                    if (interTouchWait <= 0) {
+                        // Put it at the end of the automated touch
+                        prevX = midwayX = curAutomatedTouch.x1;
+                        prevY = midwayY = curAutomatedTouch.y1;
+                    } else {
+                        // Slide it towards the start of the next touch
+                        midwayX -= (prevX - curAutomatedTouch.x0) * dt / timeBetweenAutoTouches;
+                        midwayY -= (prevY - curAutomatedTouch.y0) * dt / timeBetweenAutoTouches;
+                    }
+
+                    // Render
+                    if (!game.dead && !game.paused) {
+                        game.previewPlatfmTouch = Touch.curTouch || curAutomatedTouch;
+                    }
+                    render.tutorial(game, midwayX, midwayY);
+                }
+            }, 1000 / fps);
+            Touch.onTouchend = function (touch) {
+                gEventHandlers.handleTouchend(game, touch);
+            };
+            jQuery(document).on("click.tutorial", function (event) {
+                gEventHandlers.handleDocumentClick(game, event, restartTut, true);
+            });
+            // Not adding events for handleBtnLayerUpdates because the pause
+            // btn is not drawn in tutorial.
         },
         createMenu = function () {
             return {
@@ -1571,7 +1721,7 @@ if (typeof Math.log2 !== "function") {
                 if (menuPlayBtn.touchIsInside(tpos)) {
                     clearInterval(intervalId);
                     jQuery(document).off(".menuHandler");
-                    play();
+                    runTutorial();
                 }
             });
         };
