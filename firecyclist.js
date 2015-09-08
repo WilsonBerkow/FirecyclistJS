@@ -1529,7 +1529,7 @@ if (typeof Math.log2 !== "function") {
                     // This should handle all of: touchmove, touchstart, touchend
                     var now = Date.now(),
                         dt = now - lastRedraw,
-                        touch = calcTouchPos(event.changedTouches[0]);
+                        touch = calcTouchPos(event);
                     if (dt > 30 && // To prevent way-too-inefficiently-frequent rerendering
                             touch.x > pauseBtn.edgeX() - sensitivityMarginX && 
                             touch.y < pauseBtn.y + pauseBtn.h + sensitivityMarginY) {
@@ -1611,12 +1611,17 @@ if (typeof Math.log2 !== "function") {
                 gEventHandlers.handleDocumentClick(game, event, restart);
             };
             render.btnLayer(game);
-            document.body.ontouchmove = document.body.ontouchstart = document.body.ontouchend = (function () {
-                var lastRedraw = Date.now();
-                return function (event) {
-                    lastRedraw = gEventHandlers.handleBtnLayerUpdates(game, event, lastRedraw);
-                };
-            }());
+            document.body.ontouchmove =
+                document.body.ontouchstart =
+                document.body.ontouchend =
+                document.body.onmousedown =
+                document.body.onmousemove =
+                document.body.onmouseup = (function () {
+                    var lastRedraw = Date.now();
+                    return function (event) {
+                        lastRedraw = gEventHandlers.handleBtnLayerUpdates(game, event, lastRedraw);
+                    };
+                }());
         },
         createAutomatedTouch = function (dir) {
             var autoTouchStartY = 230,
