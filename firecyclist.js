@@ -1337,10 +1337,10 @@ if (typeof Math.log2 !== "function") {
                         game.coinColumnsLowest[column] = newcoin;
                     }
                 },
-                velFromPlatfm = function (dt, player, platfm) {
+                velFromPlatfm = function (player, platfm) {
                     var slope = platfm.slope(),
-                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmFallRate * dt - platfmBounciness);
-                    cartesianVel.setMagnitude(Math.min(cartesianVel.magnitude(), player.magnitude()) + playerGrav * dt);
+                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmFallRate * 25 - platfmBounciness);
+                    cartesianVel.setMagnitude(Math.min(cartesianVel.magnitude(), player.magnitude()) + playerGrav * 25);
                     return {
                         x: cartesianVel.vx,
                         y: cartesianVel.vy
@@ -1373,7 +1373,7 @@ if (typeof Math.log2 !== "function") {
                     for (i = 0; i < game.platfms.length; i += 1) {
                         platfm = game.platfms[i];
                         if (Collision.player_platfm(game.player, platfm)) {
-                            tmpVel = velFromPlatfm(dt, game.player, platfm);
+                            tmpVel = velFromPlatfm(game.player, platfm);
                             game.player.vx = tmpVel.x;
                             game.player.vy = tmpVel.y;
                             collided = true;
