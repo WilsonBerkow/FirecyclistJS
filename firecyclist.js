@@ -901,17 +901,21 @@ if (typeof Math.log2 !== "function") {
     // Handle device events:
     var setCurGame = (function () {
         var curGame = null;
-        document.addEventListener("pause", function () {
-            localStorage.setItem("halted_game", JSON.stringify(curGame));
-        }, false);
-        document.addEventListener("resume", function () {
-            var storedGameText = localStorage.getItem("halted_game");
-            if (typeof storedGameText === "string") {
-                var storedGame = JSON.parse(storedGameText);
-                storedGame.paused = true;
-                start.play(storedGame);
-            }
-        }, false);
+        document.addEventListener("load", function () {
+            document.addEventListener("deviceready", function () {
+                document.addEventListener("pause", function () {
+                    localStorage.setItem("halted_game", JSON.stringify(curGame));
+                }, false);
+                document.addEventListener("resume", function () {
+                    var storedGameText = localStorage.getItem("halted_game");
+                    if (typeof storedGameText === "string") {
+                        var storedGame = JSON.parse(storedGameText);
+                        storedGame.paused = true;
+                        start.play(storedGame);
+                    }
+                }, false);
+            });
+        });
         return function (game) {
             curGame = game;
         };
