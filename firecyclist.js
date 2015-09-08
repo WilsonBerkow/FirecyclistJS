@@ -1082,11 +1082,13 @@ if (typeof Math.log2 !== "function") {
                 || (!player.ducking && distLT(player.x, player.y - playerWheelToHeadDist, x, y, playerHeadRadius + circleRadius));
         },
         playerHead_circle: function (player, x, y, circleRadius) {
-            var headX = player.x;
-            var headY = player.y - playerWheelToHeadDist;
+            var headX, headY;
             if (player.ducking) {
-                headX += playerDuckingXDiff;
-                headY += playerDuckingYDiff;
+                headX = player.x + playerDuckingXDiff;
+                headY = player.y + playerDuckingYDiff;
+            } else {
+                headX = player.x;
+                headY = player.y - playerWheelToHeadDist;
             }
             return distLT(headX, headY, x, y, playerHeadRadius + circleRadius);
         },
