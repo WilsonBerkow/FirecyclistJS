@@ -166,7 +166,7 @@ if (typeof Math.log2 !== "function") {
         }());
 
     // Config:
-    var canvasBackground = "rgb(185, 185, 255)", // Same color used in CSS
+    var canvasBackground = "rgb(155, 155, 255)", // Same color used in CSS
         fps = 40,
         playerGrav = 0.32 / 28,
         fbFallRate = 2 / 20,
