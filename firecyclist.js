@@ -186,6 +186,8 @@ if (typeof Math.log2 !== "function") {
         playerElbowXDiff = 8 * 5/8,
         playerElbowYDiff = 2 * 5/8,
         playerWheelToHeadDist = playerTorsoLen + playerRadius + playerHeadRadius,
+        playerDuckingXDiff = -3,
+        playerDuckingYDiff = -10,
         powerupTotalLifespan = 5500, // in milliseconds
         inGamePointsPxSize = 30,
         inGamePointsYPos = 39,
@@ -397,8 +399,8 @@ if (typeof Math.log2 !== "function") {
 
                 ctx.beginPath();
 
-                var playerHeadX = x - 3;
-                var playerHeadY = y - 10;
+                var playerHeadX = x + playerDuckingXDiff;
+                var playerHeadY = y + playerDuckingYDiff;
 
                 // Torso:
                 var torsoStartX = playerHeadX + sqrt3 / 2 * playerHeadRadius;
@@ -1079,6 +1081,20 @@ if (typeof Math.log2 !== "function") {
             return Collision.playerWheel_circle(player, x, y, circleRadius)
                 || (!player.ducking && distLT(player.x, player.y - playerWheelToHeadDist, x, y, playerHeadRadius + circleRadius));
         },
+        playerHead_circle: function (player, x, y, circleRadius) {
+            var headX = player.x;
+            var headY = player.y - playerWheelToHeadDist;
+            if (player.ducking) {
+                headX += playerDuckingXDiff;
+                headY += playerDuckingYDiff;
+            }
+            return distLT(headX, headY, x, y, playerHeadRadius + circleRadius);
+        },
+        playerTorso_circle: function (player, x, y, circleRadius) {
+            var approxRadius = playerTorsoLen * 0.4;
+            var cy = player.y - playerTorsoLen  * 0.8;
+            return distLT(player.x, cy, x, y, approxRadius + circleRadius);
+        },
         circle_rect: function (circX, circY, radius, rectX, rectY, rectWidth, rectHeight) { // Adapted from StackOverflow answer by 'e. James': http://stackoverflow.com/a/402010
             var distX = Math.abs(circX - rectX),
                 distY = Math.abs(circY - rectY),
@@ -1104,7 +1120,8 @@ if (typeof Math.log2 !== "function") {
             return distLT(player.x, player.y - playerWheelToHeadDist, fb.x, fb.y, headWithMargin + fbRadius);
         },
         player_fb: function (player, fb) {
-            return Collision.playerWheel_circle(player, fb.x, fb.y, fbRadius);
+            return Collision.playerHead_circle(player, fb.x, fb.y, fbRadius)
+                || Collision.playerTorso_circle(player, fb.x, fb.y, fbRadius);
         },
         player_coin: function (player, coin) {
             return Collision.player_circle(player, coin.x, coin.y, coinRadius);
