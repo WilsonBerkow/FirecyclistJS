@@ -692,11 +692,11 @@ if (typeof Math.log2 !== "function") {
             drawButtonStructureAt = (function () {
                 var stdClrs = {
                     shadow: "rgba(133, 133, 171, 0.7)",
-                    btn: "rgba(158, 158, 196, 1)"
+                    btn: "rgba(158, 158, 200, 1)"
                 };
                 var tintedClrs = {
                     shadow: "rgba(178, 148, 138, 0.7)",
-                    btn: "rgba(208, 188, 173, 1)"
+                    btn: "rgba(215, 188, 173, 1)"
                 };
                 return function (ctx, edgeX, edgeY, width, height, pressed, reddish, radius) {
                     var clrs = reddish ? tintedClrs : stdClrs;
@@ -728,7 +728,7 @@ if (typeof Math.log2 !== "function") {
                     x -= btnShadowOffset;
                     y += btnShadowOffset;
                 }
-                ctx.fillStyle = btn.tintedRed ? "rgb(175, 155, 125)" : "rgb(130, 135, 130)";
+                ctx.fillStyle = btn.tintedRed ? "rgb(175, 145, 125)" : "rgb(120, 120, 130)";
                 if (btn.text === ":pause") {
                     drawPauseBars(ctx, y, btn);
                 } else {
