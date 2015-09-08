@@ -1485,16 +1485,14 @@ if (typeof Math.log2 !== "function") {
                 if (game.paused) {
                     if (resumeBtn.touchIsInside(p)) {
                         game.paused = false;
+                        render.btnLayer(game);
                     }
                 } else if (game.dead) {
                     if (replayBtn.touchIsInside(p)) {
                         restart();
                     }
-                }
-                if (!disallowPause) {
-                    if (pauseBtn.touchIsInside(p)) {
-                        game.paused = true;
-                    }
+                } else if (!disallowPause && pauseBtn.touchIsInside(p)) {
+                    game.paused = true;
                     render.btnLayer(game);
                 }
             },
@@ -1525,6 +1523,7 @@ if (typeof Math.log2 !== "function") {
                     // is used for the next game (after the restart).
                     game = createGame();
                     setCurGame(game);
+                    render.btnLayer(game);
                 },
                 prevFrameTime = Date.now();
             setCurGame(game);
@@ -1671,7 +1670,7 @@ if (typeof Math.log2 !== "function") {
                     } else {
                         interTouchWait -= dt;
                     }
-                    // Placement of hand:
+                    // Placement of hand
                     if (interTouchWait <= 0) {
                         // Put it at the end of the automated touch
                         prevX = midwayX = curAutomatedTouch.x1;
