@@ -36,8 +36,11 @@ if (typeof Math.log2 !== "function") {
         }
         calcTouchPos = function (event) {
             return {
-                x: ((typeof event.clientX === "number" ? event.clientX : event.originalEvent.changedTouches[0].clientX) - moduleOffsetX) / pageScaleFactor,
-                y: (typeof event.clientY === "number" ? event.clientY : event.originalEvent.changedTouches[0].clientY) / pageScaleFactor
+                x: ((typeof event.clientX === "number" ? event.clientX : event.changedTouches[0].clientX) - moduleOffsetX) / pageScaleFactor,
+                y: (typeof event.clientY === "number" ? event.clientY : event.changedTouches[0].clientY) / pageScaleFactor
+                // event.changedTouches[0] still works when handling touchend,
+                // while event.touches[0] will be undefined.
+                // event.clientX/Y are tried to allow mouse use in testing.
             };
         };
         [mainCanvas, btnCanvas, overlayCanvas].forEach(function (canvas) {
@@ -49,15 +52,15 @@ if (typeof Math.log2 !== "function") {
     // Touch system:
     var Touch = (function () {
         var touchesCount = 0;
-        jQuery(document).on("mousemove touchmove", function (event) {
+        document.onmousemove = document.ontouchmove = function (event) {
             var xy = calcTouchPos(event);
             if (Touch.curTouch !== null) { // Condition fails when a platfm has been materialized, and thus curTouch was reset to null
                 Touch.curTouch.x1 = xy.x;
                 Touch.curTouch.y1 = xy.y;
             }
             event.preventDefault(); // Stops the swipe-to-move-through-browser-history feature in Chrome from interferring.
-        });
-        jQuery(document).on("mousedown touchstart", function (event) {
+        };
+        document.onmousedown = document.ontouchstart = function (event) {
             var now = Date.now(), xy = calcTouchPos(event);
             Touch.curTouch = {
                 t0: now,
@@ -68,15 +71,15 @@ if (typeof Math.log2 !== "function") {
                 y1: xy.y
             };
             touchesCount += 1;
-        });
-        jQuery(document).on("mouseup touchend", function () {
+        };
+        document.onmouseup = document.ontouchend = function () {
             if (typeof Touch.onTouchend === "function" && Touch.curTouch) {
                 Touch.onTouchend(Touch.curTouch);
             }
             Touch.curTouch = null;
             // Do not use preventDefault here, it prevents
             // triggering of the 'tap' event.
-        });
+        };
         return {
             curTouch: null,
             onTouchend: null,
@@ -1522,7 +1525,7 @@ if (typeof Math.log2 !== "function") {
                     // This should handle all of: touchmove, touchstart, touchend
                     var now = Date.now(),
                         dt = now - lastRedraw,
-                        touch = calcTouchPos(event.originalEvent.changedTouches[0]);
+                        touch = calcTouchPos(event.changedTouches[0]);
                     if (dt > 30 && // To prevent way-too-inefficiently-frequent rerendering
                             touch.x > pauseBtn.edgeX() - sensitivityMarginX && 
                             touch.y < pauseBtn.y + pauseBtn.h + sensitivityMarginY) {
@@ -1600,16 +1603,16 @@ if (typeof Math.log2 !== "function") {
             Touch.onTouchend = function (touch) {
                 gEventHandlers.handleTouchend(game, touch);
             };
-            jQuery(document).on("click", function (event) {
+            document.body.onclick = function (event) {
                 gEventHandlers.handleDocumentClick(game, event, restart);
-            });
+            };
             render.btnLayer(game);
-            jQuery(document).on("touchmove touchstart touchend", (function () {
+            document.body.ontouchmove = document.body.ontouchstart = document.body.ontouchend = (function () {
                 var lastRedraw = Date.now();
                 return function (event) {
                     lastRedraw = gEventHandlers.handleBtnLayerUpdates(game, event, lastRedraw);
                 };
-            }()));
+            }());
         },
         createAutomatedTouch = function (dir) {
             var autoTouchStartY = 230,
@@ -1647,7 +1650,7 @@ if (typeof Math.log2 !== "function") {
                 },
                 startRealGame = function () {
                     clearInterval(intervalId);
-                    jQuery(document).off(".tutorial");
+                    document.body.onclick = function () {};
                     play(game);
                 },
                 restartTut = function () {
@@ -1710,9 +1713,9 @@ if (typeof Math.log2 !== "function") {
             Touch.onTouchend = function (touch) {
                 gEventHandlers.handleTouchend(game, touch);
             };
-            jQuery(document).on("click.tutorial", function (event) {
+            document.body.onclick = function (event) {
                 gEventHandlers.handleDocumentClick(game, event, restartTut, true);
-            });
+            };
             // Not adding events for handleBtnLayerUpdates because the pause
             // btn is not drawn in tutorial.
         },
@@ -1734,14 +1737,14 @@ if (typeof Math.log2 !== "function") {
                 updateFbsGeneric(menu, dt);
                 render.menu(menu);
             }, 1000 / fps);
-            jQuery(document).on("click.menuHandler", function (event) {
+            document.body.onclick = function (event) {
                 var pos = calcTouchPos(event), tpos = {x1: pos.x, y1: pos.y};
                 if (menuPlayBtn.touchIsInside(tpos)) {
                     clearInterval(intervalId);
-                    jQuery(document).off(".menuHandler");
+                    document.body.onclick = function () {};
                     runTutorial();
                 }
-            });
+            };
         };
     runMenu();
 }());
