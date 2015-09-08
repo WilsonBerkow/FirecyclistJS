@@ -229,7 +229,7 @@ if (typeof Math.log2 !== "function") {
             text: "Replay",
             font: "bold 33px b0",
             x: gameWidth / 2,
-            y: 327,
+            y: 323,
             w: 110,
             h: 45,
             textHDiff: -12,
@@ -860,7 +860,7 @@ if (typeof Math.log2 !== "function") {
 
                 // Points big
                 ctx.font = "140px r0";
-                ctx.fillText(Math.floor(game.points), gameWidth / 2, gameHeight * 2 / 3 - 28);
+                ctx.fillText(Math.floor(game.points), gameWidth / 2, gameHeight * 2 / 3 - 38);
 
                 startY += 18;
 
