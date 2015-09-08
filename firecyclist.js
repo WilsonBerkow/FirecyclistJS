@@ -124,9 +124,10 @@ if (typeof Math.log2 !== "function") {
             };
         },
         modulo = function (num, modBy) {
-            return num > modBy ? modulo(num - modBy, modBy) :
-                   num < 0 ? modulo(num + modBy, modBy) :
-                   num;
+            if (num < 0) {
+                return modulo(modBy + num, modBy);
+            }
+            return num % modBy;
         },
         pythag = function (a, b) {
             return Math.sqrt(a * a + b * b);
