@@ -4,7 +4,7 @@
 if (typeof Math.log2 !== "function") {
     Math.log2 = function (e) {
         "use strict";
-        return Math.log(e) / Math.log(2);
+        return Math.log(e) / Math.LN2;
     };
 }
 
