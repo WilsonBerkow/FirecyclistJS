@@ -1259,6 +1259,7 @@ if (typeof Math.log2 !== "function") {
         }()),
 
         difficultyCurveFromPoints = function (x) {
+            x = Math.max(x, 0); // Just in case (i.e. strongly avoiding NaN)
             return Math.log2(x + 100) / 37 + 0.67;
         },
         handleActivesPoints = function (activePowerups, pointsReceived) {
