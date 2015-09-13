@@ -1318,10 +1318,17 @@ if (typeof Math.log2 !== "function") {
                         // so does the player's position. This is why there is
                         // no 'return;' here.
                     }
-                    if (Touch.curTouch && Collision.player_platfm(game.player, Touch.curTouch)) {
-                        maybeGetPlatfmFromTouch(Touch.curTouch, function (platfm) {
+                    if (game.previewPlatfmTouch && Collision.player_platfm(game.player, game.previewPlatfmTouch)) {
+                        // Use game.previewPlatfmTouch rather than Touch.curTouch
+                        // so that in runTutorial, the automated touch still
+                        // is used here in place of a real touch.
+                        maybeGetPlatfmFromTouch(game.previewPlatfmTouch, function (platfm) {
                             game.platfms.push(platfm);
                             Touch.curTouch = null;
+                            // Reset Touch.curTouch so that as user slides
+                            // finger before lifting it, another platfm doesn't
+                            // show up unwantedly due to the fact that curTouch
+                            // is still non-null.
                         });
                     }
                     for (i = 0; i < game.platfms.length; i += 1) {
