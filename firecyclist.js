@@ -310,7 +310,7 @@ if (typeof Math.log2 !== "function") {
         highscores = mkHighscores("highscores");
 
     // Rendering:
-    var render = (function () {
+    var Render = (function () {
         var mainCtx = mainCanvas.getContext("2d"),
             btnCtx = btnCanvas.getContext("2d"),
             overlayCtx = overlayCanvas.getContext("2d");
@@ -1346,7 +1346,7 @@ if (typeof Math.log2 !== "function") {
                     if (game.previewPlatfmTouch) {
                         game.previewPlatfmTouch = Touch.copy(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
                     }
-                    render.btnLayer(game);
+                    Render.btnLayer(game);
                 };
             return {
                 player: function (game, dt) {
@@ -1504,7 +1504,7 @@ if (typeof Math.log2 !== "function") {
                 if (game.paused) {
                     if (resumeBtn.touchIsInside(p)) {
                         game.paused = false;
-                        render.btnLayer(game);
+                        Render.btnLayer(game);
                     }
                 } else if (game.dead) {
                     if (replayBtn.touchIsInside(p)) {
@@ -1512,7 +1512,7 @@ if (typeof Math.log2 !== "function") {
                     }
                 } else if (!disallowPause && pauseBtn.touchIsInside(p)) {
                     game.paused = true;
-                    render.btnLayer(game);
+                    Render.btnLayer(game);
                 }
             },
             handleBtnLayerUpdates: (function () {
@@ -1526,7 +1526,7 @@ if (typeof Math.log2 !== "function") {
                     if (dt > 30 && // To prevent way-too-inefficiently-frequent rerendering
                             touch.x > pauseBtn.edgeX() - sensitivityMarginX && 
                             touch.y < pauseBtn.y + pauseBtn.h + sensitivityMarginY) {
-                        render.btnLayer(game);
+                        Render.btnLayer(game);
                         return now; // Tell caller last redraw happened at 'now'
                     }
                     return lastRedraw; // Tell caller the time of the last redraw hasn't changed
@@ -1542,7 +1542,7 @@ if (typeof Math.log2 !== "function") {
                     // is used for the next game (after the restart).
                     game = createGame();
                     setCurGame(game);
-                    render.btnLayer(game);
+                    Render.btnLayer(game);
                 },
                 prevFrameTime = Date.now();
             setCurGame(game);
@@ -1570,9 +1570,9 @@ if (typeof Math.log2 !== "function") {
                 prevFrameTime = now;
 
                 if (game.paused) {
-                    render.gamePaused(game);
+                    Render.gamePaused(game);
                 } else if (game.dead) {
-                    render.gameDead(game);
+                    Render.gameDead(game);
                 } else {
                     // Update state
                     gUpdaters.player(game, dt);
@@ -1594,7 +1594,7 @@ if (typeof Math.log2 !== "function") {
                     if (!game.dead && !game.paused) {
                         game.previewPlatfmTouch = Touch.curTouch;
                     }
-                    render.game(game);
+                    Render.game(game);
                 }
             }, 1000 / fps);
             Touch.onTouchend = function (touch) {
@@ -1603,7 +1603,7 @@ if (typeof Math.log2 !== "function") {
             document.body.onclick = function (event) {
                 gEventHandlers.handleDocumentClick(game, event, restart);
             };
-            render.btnLayer(game);
+            Render.btnLayer(game);
             document.body.ontouchmove =
                 document.body.ontouchstart =
                 document.body.ontouchend =
@@ -1676,9 +1676,9 @@ if (typeof Math.log2 !== "function") {
                 prevFrameTime = now;
 
                 if (game.paused) {
-                    render.gamePaused(game);
+                    Render.gamePaused(game);
                 } else if (game.dead) {
-                    render.gameDead(game);
+                    Render.gameDead(game);
                 } else {
                     // Update state
                     gUpdaters.player(game, dt);
@@ -1709,7 +1709,7 @@ if (typeof Math.log2 !== "function") {
                     if (!game.dead && !game.paused) {
                         game.previewPlatfmTouch = Touch.curTouch || curAutomatedTouch;
                     }
-                    render.tutorial(game, midwayX, midwayY);
+                    Render.tutorial(game, midwayX, midwayY);
                 }
             }, 1000 / fps);
             Touch.onTouchend = function (touch) {
@@ -1737,7 +1737,7 @@ if (typeof Math.log2 !== "function") {
                 var now = Date.now(), dt = now - prevTime;
                 prevTime = now;
                 updateFbsGeneric(menu, dt);
-                render.menu(menu);
+                Render.menu(menu);
             }, 1000 / fps);
             document.body.onclick = function (event) {
                 var pos = calcTouchPos(event), tpos = {x1: pos.x, y1: pos.y};
