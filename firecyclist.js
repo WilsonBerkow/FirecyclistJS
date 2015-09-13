@@ -180,7 +180,7 @@ if (typeof Math.log2 !== "function") {
         coinSquareLen = 8.5,
         coinValue = 11,
         coinStartingY = gameHeight + coinRadius,
-        platfmFallRate = 3 / 20,
+        platfmRiseRate = 3 / 20,
         totalFbHeight = 10,
         platfmBounciness = 0.75,
         platfmThickness = 6,
@@ -1294,7 +1294,7 @@ if (typeof Math.log2 !== "function") {
                 },
                 velFromPlatfm = function (player, platfm) {
                     var slope = platfm.slope(),
-                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmFallRate * 25 - platfmBounciness),
+                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * 25 - platfmBounciness),
                         calculatedMagSqd = cartesianVel.magnitudeSquared(),
                         playerMagSqd = player.magnitudeSquared();
                     cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd, playerMagSqd)) + playerGrav * 25);
@@ -1414,8 +1414,8 @@ if (typeof Math.log2 !== "function") {
                 },
                 platfms: function (game, dt) {
                     game.platfms.forEach(function (platfm, index) {
-                        platfm.y0 -= platfmFallRate * dt;
-                        platfm.y1 -= platfmFallRate * dt;
+                        platfm.y0 -= platfmRiseRate * dt;
+                        platfm.y1 -= platfmRiseRate * dt;
                         platfm.time_left -= dt;
                         if (platfm.time_left <= 0) {
                             game.platfms.splice(index, 1);
