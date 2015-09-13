@@ -1378,9 +1378,9 @@ if (typeof Math.log2 !== "function") {
                     }
                     if (!collided) {
                         if (gPredicates.weightObtained(game)) {
-                            game.player.vy += playerGrav * 5 / 2 * dt;
+                            game.player.vy += playerGrav * 5 / 2 * 25;
                         } else {
-                            game.player.vy += playerGrav * dt;
+                            game.player.vy += playerGrav * 25;
                         }
                     }
                     game.player.ducking = false;
@@ -1404,9 +1404,8 @@ if (typeof Math.log2 !== "function") {
                             addToActivePowerups(game, powerup.type, powerup.xPos(), powerup.yPos());
                         }
                     });
-                    var dx = game.player.vx * dt / 20, dy = game.player.vy * dt / 20;
-                    game.player.x = modulo(game.player.x + dx, gameWidth);
-                    game.player.y += dy;
+                    game.player.x = modulo(game.player.x + game.player.vx * dt / 20, gameWidth);
+                    game.player.y += game.player.vy * dt / 20;
                     game.player.wheelAngle += signNum(game.player.vx) * 0.2 * dt;
                 },
                 fbs: updateFbsGeneric,
