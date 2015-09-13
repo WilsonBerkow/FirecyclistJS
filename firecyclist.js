@@ -501,13 +501,6 @@ if (typeof Math.log2 !== "function") {
                 }
                 ctx.fillStyle = "yellow";
                 ctx.fill();
-
-                ctx.beginPath();
-                for (i = 0; i < coins.length; i += 1) {
-                    if (objIsVisible(2 * coinRadius, coins[i])) {
-                        circleAt(ctx, coins[i].x, coins[i].y, coinRadius);
-                    }
-                }
                 ctx.strokeStyle = "orange";
                 ctx.stroke();
 
