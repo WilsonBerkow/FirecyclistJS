@@ -1276,7 +1276,11 @@ if (typeof Math.log2 !== "function") {
             // Find the points earned, not including coins or powerups,
             // during this frame. 'Vanilla' because powerup effects are
             // not considered.
-            return 7 * (realDt / 1000) * Math.sqrt(Math.max(0, playerY / gameHeight));
+            var depth = playerY / gameHeight;
+            var cappedDepth = Math.min(0.85, depth);
+            return 7 * (realDt / 1000) * (1 - Math.pow((cappedDepth + 0.1) * 1.1 - 1, 2));
+            // To see shape of curve, use WolframAlpha query:
+            //  plot y = 1 - ((min(x, .85) + .1) * 1.1 - 1) ^ 2
         };
 
     // Functions operating on the game object:
