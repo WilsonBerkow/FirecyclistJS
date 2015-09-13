@@ -1250,6 +1250,15 @@ if (typeof Math.log2 !== "function") {
                 }
             };
         }()),
+        powerupObtained = function (activePowerups, type) {
+            var i;
+            for (i = 0; i < activePowerups.length; i += 1) {
+                if (activePowerups[i].type === type) {
+                    return true;
+                }
+            }
+            return false;
+        },
 
         difficultyCurveFromPoints = function (x) {
             x = Math.max(x, 0); // Just in case (i.e. strongly avoiding NaN)
@@ -1258,11 +1267,8 @@ if (typeof Math.log2 !== "function") {
         handleActivesPoints = function (activePowerups, pointsReceived) {
             // Handle the effect that active powerups have on the amount of
             // points recieved.
-            var i;
-            for (i = 0; i < activePowerups.length; i += 1) {
-                if (activePowerups[i].type === "X2") {
-                    return pointsReceived * 2;
-                }
+            if (powerupObtained(activePowerups, "X2")) {
+                return pointsReceived * 2;
             }
             return pointsReceived;
         },
@@ -1274,36 +1280,7 @@ if (typeof Math.log2 !== "function") {
         };
 
     // Functions operating on the game object:
-    var gPredicates = {
-            slowPowerupObtained: function (game) {
-                var i;
-                for (i = 0; i < game.activePowerups.length; i += 1) {
-                    if (game.activePowerups[i].type === "slow") {
-                        return true;
-                    }
-                }
-                return false;
-            },
-            weightObtained: function (game) {
-                var i;
-                for (i = 0; i < game.activePowerups.length; i += 1) {
-                    if (game.activePowerups[i].type === "weight") {
-                        return true;
-                    }
-                }
-                return false;
-            },
-            magnetObtained: function (game) {
-                var i;
-                for (i = 0; i < game.activePowerups.length; i += 1) {
-                    if (game.activePowerups[i].type === "magnet") {
-                        return true;
-                    }
-                }
-                return false;
-            }
-        },
-        gUpdaters = (function () {
+    var gUpdaters = (function () {
             // Some util first:
             var addToActivePowerups = function (game, type, x, y) {
                     var newActive = createActivePowerup(type, x, y);
@@ -1374,7 +1351,7 @@ if (typeof Math.log2 !== "function") {
                         }
                     }
                     if (!collided) {
-                        if (gPredicates.weightObtained(game)) {
+                        if (powerupObtained(game.activePowerups, "weight")) {
                             game.player.vy += playerGrav * 5 / 2 * 25;
                         } else {
                             game.player.vy += playerGrav * 25;
@@ -1407,7 +1384,7 @@ if (typeof Math.log2 !== "function") {
                 },
                 fbs: updateFbsGeneric,
                 coins: function (game, dt) {
-                    var magnetOn = gPredicates.magnetObtained(game);
+                    var magnetOn = powerupObtained(game.activePowerups, "magnet");
                     var dy = coinFallRate * dt;
                     game.coinGridOffset += dy;
                     game.coinGridOffset = game.coinGridOffset % 35;
@@ -1560,7 +1537,7 @@ if (typeof Math.log2 !== "function") {
                 realDt *= difficultyCurveFromPoints(game.points);
 
                 // Handle effects of slow powerup
-                if (gPredicates.slowPowerupObtained(game)) {
+                if (powerupObtained(game.activePowerups, "slow")) {
                     dt = realDt * 2/3;
                     // Any functions given 'dt' as the time delta will thus
                     // behave as if 2/3 as much time has passed.
