@@ -1338,10 +1338,7 @@ if (typeof Math.log2 !== "function") {
                         calculatedMagSqd = cartesianVel.magnitudeSquared(),
                         playerMagSqd = player.magnitudeSquared();
                     cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd, playerMagSqd)) + playerGrav * 25);
-                    return {
-                        x: cartesianVel.vx,
-                        y: cartesianVel.vy
-                    };
+                    return cartesianVel;
                 },
                 die = function (game) {
                     if (game.dead) { return; }
@@ -1371,8 +1368,8 @@ if (typeof Math.log2 !== "function") {
                         platfm = game.platfms[i];
                         if (Collision.player_platfm(game.player, platfm)) {
                             tmpVel = velFromPlatfm(game.player, platfm);
-                            game.player.vx = tmpVel.x;
-                            game.player.vy = tmpVel.y;
+                            game.player.vx = tmpVel.vx;
+                            game.player.vy = tmpVel.vy;
                             collided = true;
                         }
                     }
