@@ -933,9 +933,9 @@ if (typeof Math.log2 !== "function") {
                     return doCalc ? Math.atan2(this.y1 - this.y0, this.x1 - this.x0)
                                   : Math.atan2(this.vy, this.vx);
                 },
-                magnitude: function () {
-                    return doCalc ? dist(this.x0, this.y0, this.x1, this.y1)
-                                  : pythag(this.vx, this.vy);
+                magnitudeSquared: function () {
+                    return doCalc ? distanceSquared(this.x0, this.y0, this.x1, this.y1)
+                                  : (this.vx * this.vx + this.vy * this.vy);
                 },
                 slope: function () {
                     return doCalc ? (this.y1 - this.y0) / (this.x1 - this.x0)
@@ -943,17 +943,10 @@ if (typeof Math.log2 !== "function") {
                 }
             };
             if (!doCalc) {
-                proto.setAngle = function (theta) {
-                    this.vx = trig.cos(theta) * this.magnitude();
-                    this.vy = trig.sin(theta) * this.magnitude();
-                };
                 proto.setMagnitude = function (mag) {
-                    this.vx = trig.cos(this.angle()) * mag;
-                    this.vy = trig.sin(this.angle()) * mag;
-                };
-                proto.scaleMagnitude = function (scaleFactor) {
-                    this.vx *= scaleFactor;
-                    this.vy *= scaleFactor;
+                    var angle = this.angle();
+                    this.vx = trig.cos(angle) * mag;
+                    this.vy = trig.sin(angle) * mag;
                 };
             }
             return function () {
@@ -1341,8 +1334,10 @@ if (typeof Math.log2 !== "function") {
                 },
                 velFromPlatfm = function (player, platfm) {
                     var slope = platfm.slope(),
-                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmFallRate * 25 - platfmBounciness);
-                    cartesianVel.setMagnitude(Math.min(cartesianVel.magnitude(), player.magnitude()) + playerGrav * 25);
+                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmFallRate * 25 - platfmBounciness),
+                        calculatedMagSqd = cartesianVel.magnitudeSquared(),
+                        playerMagSqd = player.magnitudeSquared();
+                    cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd, playerMagSqd)) + playerGrav * 25);
                     return {
                         x: cartesianVel.vx,
                         y: cartesianVel.vy
