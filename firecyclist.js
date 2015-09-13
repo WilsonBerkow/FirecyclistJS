@@ -173,9 +173,9 @@ if (typeof Math.log2 !== "function") {
     var canvasBackground = "rgb(155, 155, 255)", // Same color used in CSS
         fps = 40,
         playerGrav = 0.32 / 28,
-        fbFallRate = 2 / 20,
+        fbRiseRate = 1 / 10,
         fbRadius = 10,
-        coinFallRate = 2 / 20,
+        coinRiseRate = 1 / 10,
         coinRadius = 10,
         coinSquareLen = 8.5,
         coinValue = 11,
@@ -1181,65 +1181,51 @@ if (typeof Math.log2 !== "function") {
                         }
                     }
                     return true;
+                },
+                updateFirebits = function (firebits, dt) {
+                    firebits.forEach(function (firebit, index) {
+                        firebit.y += Math.random() * 1.5 + 0.1;
+                        firebit.x += Math.random() * 1.5 - 1;
+                        firebit.lifespan += dt;
+                        if (firebit.lifespan >= 100 && Math.random() < 0.3) {
+                            firebits.splice(index, 1);
+                        }
+                    });
                 };
             return function (obj, dt) {
-                // Can be passed a menu object, game object, or straight array
-                // of fbs, and thus is not directly placed in gUpdaters.
-                var fbArray = Array.isArray(obj) ? obj : obj.fbs,
-                    fbFirebitsRed = Array.isArray(obj) ? null : obj.firebitsRed,
-                    fbFirebitsOrg = Array.isArray(obj) ? null : obj.firebitsOrg,
-                    firebitBeyondVisibility = function (firebit) { // So that when one moves left, to make a fb on the right side go offscreen, and then quickly goes back, the user doesn't notice that the firebits are temporarily depleted.
-                        return firebit.x > -fbRadius * 4 && firebit.x < gameWidth + fbRadius * 4;
-                    },
-                    x,
-                    y,
-                    updateFirebits = function (firebits) {
-                        firebits.forEach(function (firebit, index) {
-                            if (!firebitBeyondVisibility(firebit)) {
-                                firebits.splice(index, 1);
-                            }
-                            firebit.y += Math.random() * 1.5 + 0.1;
-                            firebit.x += Math.random() * 1.5 - 1;
-                            firebit.lifespan += dt;
-                            if (firebit.lifespan >= 100 && Math.random() < 0.3) {
-                                firebits.splice(index, 1);
-                            }
-                        });
-                    };
-                // fbArray can't be abstracted out and used in closure, because
-                // every new game uses a different 'fbs' array and 'game' object
-                fbArray.forEach(function (fb, index) {
-                    fb.y -= fbFallRate * dt;
+                // Can be passed a menu object or game object, and
+                // thus is not directly placed in gUpdaters.
+                obj.fbs.forEach(function (fb, index) {
+                    fb.y -= fbRiseRate * dt;
                     if (fb.y < -totalFbHeight) {
-                        fbArray.splice(index, 1);
+                        obj.fbs.splice(index, 1);
                     }
-                    if (fbFirebitsRed) {
-                        fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                        fbFirebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    }
+                    obj.firebitsRed.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsRed.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsRed.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsRed.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsRed.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
                 });
-                updateFirebits(fbFirebitsRed);
-                updateFirebits(fbFirebitsOrg);
-                var chanceFactor = (1 / 7);
-                if (Math.random() < 1 / 1000 * 4 * chanceFactor * dt || fewInLowerPortion(fbArray)) {
-                    x = randomXPosition();
-                    y = gameHeight + fbRadius;
-                    fbArray.push(createFb(x, y));
+                updateFirebits(obj.firebitsRed, dt);
+                updateFirebits(obj.firebitsOrg, dt);
+                var chanceFactor = 4 / 7;
+                if (Math.random() < 1 / 1000 * chanceFactor * dt || fewInLowerPortion(obj.fbs)) {
+                    obj.fbs.push(createFb(
+                        randomXPosition(),
+                        gameHeight + fbRadius
+                    ));
                 }
             };
         }()),
@@ -1382,7 +1368,11 @@ if (typeof Math.log2 !== "function") {
                 fbs: updateFbsGeneric,
                 coins: function (game, dt) {
                     var magnetOn = powerupObtained(game.activePowerups, "magnet");
-                    var dy = coinFallRate * dt;
+                    var dy = coinRiseRate * dt;
+                    // The coins are all rendered in a vertically sliding
+                    // grid, and coinGridOffset keeps track of the distance
+                    // to the bottom on-screen invisible line of that grid
+                    // from the base of the screen.
                     game.coinGridOffset += dy;
                     game.coinGridOffset = game.coinGridOffset % 35;
                     game.coins.forEach(function (coin, index) {
@@ -1398,11 +1388,11 @@ if (typeof Math.log2 !== "function") {
                             game.coins.splice(index, 1);
                         }
                     });
-                    var chanceFactor = 1 / 7;
+                    var chanceFactor = 10 / 7;
                     if (Math.random() < 1 / (1000 * 25) * dt) {
                         addDiagCoinPattern(game, Math.random() < 0.5);
                     } else {
-                        if (Math.random() < 1 / (1000 * 10/4) * chanceFactor * 4 * dt) {
+                        if (Math.random() < 1 / 1000 * chanceFactor * dt) {
                             var column = Math.floor(Math.random() * 8);
                             var pos = (column + 0.5) * 35;
                             var newcoin = createCoin(pos, coinStartingY + 35 - game.coinGridOffset);
