@@ -753,7 +753,7 @@ if (typeof Math.log2 !== "function") {
                 };
                 cloudImg.src = "img/bg-clouds-20-blurs.png";
                 var xOffset = 0, yOffset = 0;
-                return function () {
+                return function (doMovement) {
                     xOffset = modulo(xOffset, cloudImg.width);
                     yOffset = modulo(yOffset, cloudImg.height);
                     if (cloudPattern) {
@@ -761,13 +761,14 @@ if (typeof Math.log2 !== "function") {
                         bgCtx.translate(-xOffset, -yOffset);
                         bgCtx.fillRect(0, 0, gameWidth * 6, gameHeight * 4);
                         bgCtx.restore();
-                        xOffset += 0.115;
-                        yOffset += 0.021;
+                        if (doMovement) {
+                            xOffset += 0.115;
+                            yOffset += 0.021;
+                        }
                     }
                 };
             }()),
             drawMenu = function (menu) {
-                drawCloudBg();
                 mainCtx.clearRect(0, 0, gameWidth, gameHeight);
                 drawFbs(mainCtx, menu.fbs);
                 drawFirebits(mainCtx, menu.firebitsRed, "red");
@@ -776,7 +777,6 @@ if (typeof Math.log2 !== "function") {
                 drawBtn(mainCtx, menuPlayBtn);
             },
             drawGame = function (game) {
-                drawCloudBg();
                 mainCtx.save();
                 mainCtx.clearRect(0, 0, gameWidth, gameHeight);
                 overlayCtx.clearRect(0, 0, gameWidth, gameHeight);
@@ -828,7 +828,6 @@ if (typeof Math.log2 !== "function") {
                 };
             }()),
             drawTutorial = function (game, handX, handY) {
-                drawCloudBg();
                 mainCtx.save();
                 mainCtx.clearRect(0, 0, gameWidth, gameHeight);
                 overlayCtx.clearRect(0, 0, gameWidth, gameHeight);
@@ -917,7 +916,8 @@ if (typeof Math.log2 !== "function") {
             gamePaused: drawGamePaused,
             gameDead: drawGameDead,
             btnLayer: redrawBtnLayer,
-            tutorial: drawTutorial
+            tutorial: drawTutorial,
+            cloudyBg: drawCloudBg
         };
     }());
 
@@ -1574,6 +1574,7 @@ if (typeof Math.log2 !== "function") {
                 }
                 prevFrameTime = now;
 
+                Render.cloudyBg(!game.paused && !game.dead);
                 if (game.paused) {
                     Render.gamePaused(game);
                 } else if (game.dead) {
@@ -1680,6 +1681,7 @@ if (typeof Math.log2 !== "function") {
 
                 prevFrameTime = now;
 
+                Render.cloudyBg(!game.paused && !game.dead);
                 if (game.paused) {
                     Render.gamePaused(game);
                 } else if (game.dead) {
@@ -1742,6 +1744,7 @@ if (typeof Math.log2 !== "function") {
                 var now = Date.now(), dt = now - prevTime;
                 prevTime = now;
                 updateFbsGeneric(menu, dt);
+                Render.cloudyBg(true);
                 Render.menu(menu);
             }, 1000 / fps);
             document.body.onclick = function (event) {
