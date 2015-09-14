@@ -759,8 +759,8 @@ if (typeof Math.log2 !== "function") {
                         bgCtx.translate(-xOffset, -yOffset);
                         bgCtx.fillRect(0, 0, gameWidth * 6, gameHeight * 4);
                         bgCtx.restore();
-                        xOffset += 0.1;
-                        yOffset += 0.02;
+                        xOffset += 0.115;
+                        yOffset += 0.021;
                     }
                 };
             }()),
