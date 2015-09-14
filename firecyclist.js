@@ -1490,6 +1490,10 @@ if (typeof Math.log2 !== "function") {
                 if (!game.paused && !game.dead) {
                     maybeGetPlatfmFromTouch(touch, function (platfm) {
                         game.platfms.push(platfm);
+                        game.previewPlatfmTouch = null;
+                        // If not reset previewPlatfmTouch, then when the user
+                        // lifts finger at same time preview is hit by player,
+                        // two platfms would be created at that position.
                     });
                 }
             },
