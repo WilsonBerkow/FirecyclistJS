@@ -1224,7 +1224,7 @@ if (typeof Math.log2 !== "function") {
                 // thus is not directly placed in gUpdaters.
                 obj.fbs.forEach(function (fb, index) {
                     fb.y -= fbRiseRate * dt;
-                    if (fb.y < -totalFbHeight) {
+                    if (fb.y < -totalFbHeight - 20) {
                         obj.fbs.splice(index, 1);
                     }
                     obj.firebitsRed.push(makeFirebitAround(fb.x, fb.y));
