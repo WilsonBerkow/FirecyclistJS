@@ -749,7 +749,7 @@ if (typeof Math.log2 !== "function") {
                     cloudPattern = bgCtx.createPattern(cloudImg, "repeat");
                     bgCtx.fillStyle = cloudPattern;
                 };
-                cloudImg.src = "img/bg-clouds.jpg";
+                cloudImg.src = "img/bg-clouds-20-blurs.png";
                 var xOffset = 0, yOffset = 0;
                 return function () {
                     xOffset = modulo(xOffset, cloudImg.width);
