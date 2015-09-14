@@ -1338,13 +1338,6 @@ if (typeof Math.log2 !== "function") {
             return {
                 player: function (game, dt) {
                     var i, platfm, tmpVel, collided = false;
-                    if (game.player.y > gameHeight + playerRadius) {
-                        die(game);
-                        // The frame finishes, with all other components also
-                        // being updated before the GameOver screen apperas, so
-                        // so does the player's position. This is why there is
-                        // no 'return;' here.
-                    }
                     if (game.previewPlatfmTouch && Collision.player_platfm(game.player, game.previewPlatfmTouch)) {
                         // Use game.previewPlatfmTouch rather than Touch.curTouch
                         // so that in runTutorial, the automated touch still
@@ -1356,7 +1349,15 @@ if (typeof Math.log2 !== "function") {
                             // finger before lifting it, another platfm doesn't
                             // show up unwantedly due to the fact that curTouch
                             // is still non-null.
+                            game.previewPlatfmTouch = null;
                         });
+                    }
+                    if (game.player.y > gameHeight + playerRadius) {
+                        die(game);
+                        // The frame finishes, with all other components also
+                        // being updated before the GameOver screen apperas, so
+                        // so does the player's position. This is why there is
+                        // no 'return;' here.
                     }
                     for (i = 0; i < game.platfms.length; i += 1) {
                         platfm = game.platfms[i];
