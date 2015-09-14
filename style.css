@@ -30,6 +30,3 @@ html, body {
 canvas {
     position: absolute;
 }
-#canvas {
-    background: rgb(155, 155, 255);
-}

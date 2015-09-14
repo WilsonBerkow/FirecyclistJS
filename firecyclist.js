@@ -10,7 +10,8 @@ if (typeof Math.log2 !== "function") {
 
 (function () {
     "use strict";
-    var mainCanvas = document.getElementById("canvas"),
+    var bgCanvas = document.getElementById("bgCanvas"),
+        mainCanvas = document.getElementById("canvas"),
         btnCanvas = document.getElementById("btnCanvas"),
         overlayCanvas = document.getElementById("overlayCanvas"),
         gameWidth = 576 / 2,
@@ -43,7 +44,7 @@ if (typeof Math.log2 !== "function") {
                 // event.clientX/Y are tried to allow mouse use in testing.
             };
         };
-        [mainCanvas, btnCanvas, overlayCanvas].forEach(function (canvas) {
+        [bgCanvas, mainCanvas, btnCanvas, overlayCanvas].forEach(function (canvas) {
             canvas.width *= pageScaleFactor;
             canvas.height *= pageScaleFactor;
         });
@@ -170,7 +171,7 @@ if (typeof Math.log2 !== "function") {
         }());
 
     // Config:
-    var canvasBackground = "rgb(155, 155, 255)", // Same color used in CSS
+    var canvasBackground = "rgb(153, 217, 234)", // Same color used in CSS
         fps = 40,
         playerGrav = 0.32 / 28,
         fbRiseRate = 0.1,
@@ -311,7 +312,8 @@ if (typeof Math.log2 !== "function") {
 
     // Rendering:
     var Render = (function () {
-        var mainCtx = mainCanvas.getContext("2d"),
+        var bgCtx = bgCanvas.getContext("2d"),
+            mainCtx = mainCanvas.getContext("2d"),
             btnCtx = btnCanvas.getContext("2d"),
             overlayCtx = overlayCanvas.getContext("2d");
         mainCtx.scale(pageScaleFactor, pageScaleFactor);
@@ -740,7 +742,30 @@ if (typeof Math.log2 !== "function") {
                     drawBtn(btnCtx, pauseBtn);
                 }
             },
+            drawCloudBg = (function () {
+                var cloudImg = new Image(), cloudPattern;
+                cloudImg.onload = function () {
+                    cloudPattern = bgCtx.createPattern(cloudImg, "repeat");
+                    bgCtx.fillStyle = cloudPattern;
+                };
+                cloudImg.src = "img/bg-clouds.png";
+                bgCtx.scale(0.5, 0.5);
+                var xOffset = 0, yOffset = 0;
+                return function () {
+                    xOffset = modulo(xOffset, cloudImg.width);
+                    yOffset = modulo(yOffset, cloudImg.height);
+                    if (cloudPattern) {
+                        bgCtx.save();
+                        bgCtx.translate(-xOffset, -yOffset);
+                        bgCtx.fillRect(0, 0, gameWidth * 6, gameHeight * 4);
+                        bgCtx.restore();
+                        xOffset += 0.1;
+                        yOffset += 0.02;
+                    }
+                };
+            }()),
             drawMenu = function (menu) {
+                drawCloudBg();
                 mainCtx.clearRect(0, 0, gameWidth, gameHeight);
                 drawFbs(mainCtx, menu.fbs);
                 drawFirebits(mainCtx, menu.firebitsRed, "red");
@@ -749,6 +774,7 @@ if (typeof Math.log2 !== "function") {
                 drawBtn(mainCtx, menuPlayBtn);
             },
             drawGame = function (game) {
+                drawCloudBg();
                 mainCtx.save();
                 mainCtx.clearRect(0, 0, gameWidth, gameHeight);
                 overlayCtx.clearRect(0, 0, gameWidth, gameHeight);
@@ -800,6 +826,7 @@ if (typeof Math.log2 !== "function") {
                 };
             }()),
             drawTutorial = function (game, handX, handY) {
+                drawCloudBg();
                 mainCtx.save();
                 mainCtx.clearRect(0, 0, gameWidth, gameHeight);
                 overlayCtx.clearRect(0, 0, gameWidth, gameHeight);
