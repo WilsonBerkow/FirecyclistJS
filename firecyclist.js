@@ -172,6 +172,7 @@ if (typeof Math.log2 !== "function") {
 
     // Config:
     var canvasBackground = "rgb(153, 217, 234)", // Same color used in CSS
+        starfieldActive = false,
         fps = 40,
         playerGrav = 0.32 / 28,
         fbRiseRate = 0.1,
@@ -334,8 +335,10 @@ if (typeof Math.log2 !== "function") {
         var fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) {
                 // Doesn't set things like ctx.font and ctx.textAlign so that they
                 // can be set on ctx by the caller, before invoking.
-                var clr0 = reverse ? "black" : "darkOrange",
-                    clr1 = reverse ? "darkOrange" : "black",
+                var neutralClr = starfieldActive ? "white" : "black";
+                var brightClr = starfieldActive ? "royalblue" : "darkOrange";
+                var clr0 = reverse ? neutralClr : brightClr,
+                    clr1 = reverse ? brightClr : neutralClr,
                     offset = offsetAmt || 1,
                     setW = w !== undefined;
                 ctx.fillStyle = clr0;
@@ -391,17 +394,19 @@ if (typeof Math.log2 !== "function") {
                 var style = ctx.fillStyle;
                 ctx.beginPath();
                 circleAt(ctx, x, y, playerRadius);
-                ctx.fillStyle = "black";
+                ctx.fillStyle = starfieldActive ? "white" : "black";
                 ctx.fill();
 
                 ctx.beginPath();
                 circleAt(ctx, x, y, playerRadius - 1);
-                ctx.fillStyle = canvasBackground;
+                ctx.fillStyle = starfieldActive ? "black" : canvasBackground;
                 ctx.fill();
 
                 ctx.fillStyle = style;
             },
             drawPlayerDuckingAt = function (ctx, x, y, wheelAngle) {
+                mainCtx.strokeStyle = starfieldActive ? "white" : "black";
+
                 wheelOutlineAt(ctx, x, y);
 
                 ctx.beginPath();
@@ -432,7 +437,7 @@ if (typeof Math.log2 !== "function") {
                 // Solid, background-colored body of head, with slight extra radius for outline:
                 var style = ctx.fillStyle;
                 ctx.beginPath();
-                ctx.fillStyle = canvasBackground;
+                ctx.fillStyle = starfieldActive ? "black" : canvasBackground;
                 circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius + 1);
                 ctx.fill();
                 ctx.fillStyle = style;
@@ -452,6 +457,8 @@ if (typeof Math.log2 !== "function") {
                 ctx.stroke();
             },
             drawPlayerAt = function (ctx, x, y, wheelAngle) {
+                mainCtx.strokeStyle = starfieldActive ? "white" : "black";
+
                 wheelOutlineAt(ctx, x, y);
 
                 ctx.beginPath();
@@ -480,7 +487,7 @@ if (typeof Math.log2 !== "function") {
                         circleAt(ctx, fb.x, fb.y, fbRadius);
                     }
                 });
-                ctx.fillStyle = "orange";
+                ctx.fillStyle = starfieldActive ? "blue" : "orange";
                 ctx.fill();
             },
             drawFirebits = function (ctx, firebits, color) {
@@ -504,9 +511,9 @@ if (typeof Math.log2 !== "function") {
                         circleAt(ctx, coins[i].x, coins[i].y, coinRadius);
                     }
                 }
-                ctx.strokeStyle = "orange";
+                ctx.strokeStyle = starfieldActive ? "darkgreen" : "orange";
                 ctx.stroke();
-                ctx.fillStyle = "yellow";
+                ctx.fillStyle = starfieldActive ? "palegreen" : "yellow";
                 ctx.fill();
 
                 ctx.beginPath();
@@ -515,28 +522,35 @@ if (typeof Math.log2 !== "function") {
                         ctx.rect(coins[i].x - coinSquareLen / 2, coins[i].y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
                     }
                 }
-                ctx.fillStyle = "darkOrange";
+                ctx.fillStyle = starfieldActive ? "palegreen" : "darkOrange";
                 ctx.fill();
 
+                if (starfieldActive) {
+                    ctx.lineWidth = 1;
+                }
                 // strokeStyle is still "orange"
                 ctx.stroke();
             },
             setupGenericPlatfmChars = function (ctx) {
-                ctx.strokeStyle = "black";
+                ctx.strokeStyle = starfieldActive ? "white" : "black";
                 ctx.lineWidth = platfmThickness;
                 ctx.lineCap = "round";
                 ctx.lineJoin = "smooth";
             },
             drawPlatfm = function (ctx, p) { // Must be run after setupGenericPlatfmChars
                 ctx.beginPath();
-                ctx.globalAlpha = Math.max(0, p.time_left / 1000);
+                if (starfieldActive) {
+                    ctx.globalAlpha = Math.max(0, Math.min(400, p.time_left) / 400);
+                } else {
+                    ctx.globalAlpha = Math.max(0, p.time_left / 1000);
+                }
                 ctx.moveTo(p.x0, p.y0);
                 ctx.lineTo(p.x1, p.y1);
                 ctx.stroke();
             },
             drawPreviewPlatfm = function (ctx, touch) { // Must be run after setupGenericPlatfmChars
                 ctx.beginPath();
-                ctx.strokeStyle = "grey";
+                ctx.strokeStyle = starfieldActive ? "white" : "grey";
                 ctx.moveTo(touch.x0, touch.y0);
                 ctx.lineTo(touch.x1, touch.y1);
                 ctx.stroke();
@@ -695,8 +709,13 @@ if (typeof Math.log2 !== "function") {
                     shadow: "rgba(178, 148, 138, 0.7)",
                     btn: "rgb(215, 188, 173)"
                 };
+                var starfieldClrs = {
+                    shadow: "rgb(0, 0, 50)",
+                    btn: "darkblue"
+                };
                 return function (ctx, edgeX, edgeY, width, height, pressed, reddish, radius) {
                     var clrs = reddish ? tintedClrs : stdClrs;
+                    clrs = starfieldActive ? starfieldClrs : clrs;
                     radius = radius || 8;
                     if (pressed) {
                         ctx.fillStyle = clrs.btn;
@@ -709,8 +728,8 @@ if (typeof Math.log2 !== "function") {
                     }
                 };
             }()),
-            drawPauseBars = function (ctx, y, btn) {
-                var leftX = btn.edgeX() + 9 + btn.textXOffset;
+            drawPauseBars = function (ctx, offsetX, y, btn) {
+                var leftX = btn.edgeX() + offsetX + 9 + btn.textXOffset;
                 var barsY = y + 9;
                 var barW = btn.w / 4 - 2 + btn.textWDiff;
                 var barH = btn.h + btn.textHDiff;
@@ -727,9 +746,11 @@ if (typeof Math.log2 !== "function") {
                     x -= btnShadowOffset;
                     y += btnShadowOffset;
                 }
-                ctx.fillStyle = btn.tintedRed ? "rgb(175, 145, 125)" : "rgb(120, 135, 130)";
+                ctx.fillStyle = starfieldActive ? "royalblue" :
+                                btn.tintedRed ? "rgb(175, 145, 125)" :
+                                "rgb(120, 135, 130)";
                 if (btn.text === ":pause") {
-                    drawPauseBars(ctx, y, btn);
+                    drawPauseBars(ctx, pressed ? -btnShadowOffset : 0, y, btn);
                 } else {
                     ctx.font = btn.font;
                     ctx.textAlign = "center";
@@ -745,18 +766,32 @@ if (typeof Math.log2 !== "function") {
                     drawBtn(btnCtx, pauseBtn);
                 }
             },
-            drawCloudBg = (function () {
+            drawMovingBg = (function () {
+                var cloudsSelected; // To keep track of value of fillStyle
                 var cloudImg = new Image(), cloudPattern;
                 cloudImg.onload = function () {
                     cloudPattern = bgCtx.createPattern(cloudImg, "repeat");
                     bgCtx.fillStyle = cloudPattern;
+                    cloudsSelected = true;
                 };
                 cloudImg.src = "img/bg-clouds-20-blurs.png";
+                var starImg = new Image(), starPattern;
+                starImg.onload = function () {
+                    starPattern = bgCtx.createPattern(starImg, "repeat");
+                };
+                starImg.src = "img/bg-star-field.png";
                 var xOffset = 0, yOffset = 0;
                 return function (doMovement) {
                     xOffset = modulo(xOffset, cloudImg.width);
                     yOffset = modulo(yOffset, cloudImg.height);
-                    if (cloudPattern) {
+                    if (cloudsSelected && starfieldActive) {
+                        cloudsSelected = false;
+                        bgCtx.fillStyle = starPattern;
+                    } else if (!cloudsSelected && !starfieldActive) {
+                        cloudsSelected = true;
+                        bgCtx.fillStyle = cloudPattern;
+                    }
+                    if (cloudPattern && starPattern) {
                         bgCtx.save();
                         bgCtx.translate(-xOffset, -yOffset);
                         bgCtx.fillRect(0, 0, gameWidth * 6, gameHeight * 4);
@@ -771,8 +806,8 @@ if (typeof Math.log2 !== "function") {
             drawMenu = function (menu) {
                 mainCtx.clearRect(0, 0, gameWidth, gameHeight);
                 drawFbs(mainCtx, menu.fbs);
-                drawFirebits(mainCtx, menu.firebitsRed, "red");
-                drawFirebits(mainCtx, menu.firebitsOrg, "darkOrange");
+                drawFirebits(mainCtx, menu.firebitsRed, starfieldActive ? "blue" : "red");
+                drawFirebits(mainCtx, menu.firebitsOrg, starfieldActive ? "royalblue" : "darkOrange");
                 drawMenuTitle(mainCtx);
                 drawBtn(mainCtx, menuPlayBtn);
             },
@@ -794,8 +829,8 @@ if (typeof Math.log2 !== "function") {
                     drawPreviewPlatfm(mainCtx, game.previewPlatfmTouch);
                 }
                 drawFbs(mainCtx, game.fbs);
-                drawFirebits(mainCtx, game.firebitsRed, "red");
-                drawFirebits(mainCtx, game.firebitsOrg, "darkOrange");
+                drawFirebits(mainCtx, game.firebitsRed, starfieldActive ? "blue" : "red");
+                drawFirebits(mainCtx, game.firebitsOrg, starfieldActive ? "royalblue" : "darkOrange");
                 drawCoins(mainCtx, game.coins);
                 game.powerups.forEach(function (powerup) {
                     drawPowerup(mainCtx, powerup.type, powerup.xPos(), powerup.yPos());
@@ -850,7 +885,7 @@ if (typeof Math.log2 !== "function") {
             },
             gameOverlayDrawer = (function () {
                 var vagueify = function (ctx) {
-                    ctx.fillStyle = "rgba(200, 200, 200, 0.75)";
+                    ctx.fillStyle = starfieldActive ? "rgba(0, 0, 0, 0.8)" : "rgba(200, 200, 200, 0.75)";
                     ctx.fillRect(0, 0, gameWidth, gameHeight);
                 };
                 return function (f) {
@@ -864,7 +899,7 @@ if (typeof Math.log2 !== "function") {
                 };
             }()),
             drawGamePaused = gameOverlayDrawer(function (ctx, game) {
-                ctx.fillStyle = "darkOrange";
+                ctx.fillStyle = starfieldActive ? "royalblue" : "darkOrange";
                 ctx.font = "64px r0";
                 ctx.textAlign = "center";
                 ctx.fillText("Paused", gameWidth / 2, gameHeight / 2 - 28);
@@ -874,7 +909,7 @@ if (typeof Math.log2 !== "function") {
                 var startY = 105;
 
                 // 'Game Over' text
-                ctx.fillStyle = "darkOrange";
+                ctx.fillStyle = starfieldActive ? "royalblue" : "darkOrange";
                 ctx.font = "bold italic 90px i0";
                 ctx.textAlign = "center";
                 ctx.fillText("Game", gameWidth / 2 - 4, startY);
@@ -888,7 +923,7 @@ if (typeof Math.log2 !== "function") {
 
                 // Line separator
                 ctx.beginPath();
-                ctx.strokeStyle = "darkOrange";
+                ctx.strokeStyle = starfieldActive ? "royalblue" : "darkOrange";
                 ctx.moveTo(30, startY + 260);
                 ctx.lineTo(gameWidth - 30, startY + 260);
                 ctx.moveTo(30, startY + 262);
@@ -917,7 +952,7 @@ if (typeof Math.log2 !== "function") {
             gameDead: drawGameDead,
             btnLayer: redrawBtnLayer,
             tutorial: drawTutorial,
-            cloudyBg: drawCloudBg
+            background: drawMovingBg
         };
     }());
 
@@ -1489,6 +1524,12 @@ if (typeof Math.log2 !== "function") {
             };
         }()),
         gEventHandlers = {
+            handleTouchForThemeSwitch: function (touch) {
+                var touchTime = Date.now() - touch.t0;
+                if (Math.abs(touch.x0 - touch.x1) >= gameWidth * 0.5 && touchTime < 400) {
+                    starfieldActive = !starfieldActive;
+                }
+            },
             handleTouchend: function (game, touch) {
                 if (!game.paused && !game.dead) {
                     maybeGetPlatfmFromTouch(touch, function (platfm) {
@@ -1498,6 +1539,8 @@ if (typeof Math.log2 !== "function") {
                         // lifts finger at same time preview is hit by player,
                         // two platfms would be created at that position.
                     });
+                } else {
+                    gEventHandlers.handleTouchForThemeSwitch(touch);
                 }
             },
             handleDocumentClick: function (game, event, restart, disallowPause) {
@@ -1574,7 +1617,7 @@ if (typeof Math.log2 !== "function") {
                 }
                 prevFrameTime = now;
 
-                Render.cloudyBg(!game.paused && !game.dead);
+                Render.background(!game.paused && !game.dead);
                 if (game.paused) {
                     Render.gamePaused(game);
                 } else if (game.dead) {
@@ -1681,7 +1724,7 @@ if (typeof Math.log2 !== "function") {
 
                 prevFrameTime = now;
 
-                Render.cloudyBg(!game.paused && !game.dead);
+                Render.background(!game.paused && !game.dead);
                 if (game.paused) {
                     Render.gamePaused(game);
                 } else if (game.dead) {
@@ -1744,7 +1787,7 @@ if (typeof Math.log2 !== "function") {
                 var now = Date.now(), dt = now - prevTime;
                 prevTime = now;
                 updateFbsGeneric(menu, dt);
-                Render.cloudyBg(true);
+                Render.background(true);
                 Render.menu(menu);
             }, 1000 / fps);
             document.body.onclick = function (event) {
@@ -1752,9 +1795,11 @@ if (typeof Math.log2 !== "function") {
                 if (menuPlayBtn.touchIsInside(tpos)) {
                     clearInterval(intervalId);
                     document.body.onclick = function () {};
+                    Touch.onTouchend = null;
                     runTutorial();
                 }
             };
+            Touch.onTouchend = gEventHandlers.handleTouchForThemeSwitch;
         };
     runMenu();
 }());
