@@ -509,19 +509,17 @@ if (typeof Math.log2 !== "function") {
                 ctx.strokeStyle = "orange";
                 ctx.stroke();
 
+                ctx.beginPath();
+                for (i = 0; i < coins.length; i += 1) {
+                    if (objIsVisible(2 * coinRadius, coins[i])) {
+                        ctx.rect(coins[i].x - coinSquareLen / 2, coins[i].y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
+                    }
+                }
                 ctx.fillStyle = "darkOrange";
-                for (i = 0; i < coins.length; i += 1) {
-                    if (objIsVisible(2 * coinRadius, coins[i])) {
-                        ctx.fillRect(coins[i].x - coinSquareLen / 2, coins[i].y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
-                    }
-                }
+                ctx.fill();
 
-                for (i = 0; i < coins.length; i += 1) {
-                    if (objIsVisible(2 * coinRadius, coins[i])) {
-                        // strokeStyle is still "orange"
-                        ctx.strokeRect(coins[i].x - coinSquareLen / 2, coins[i].y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
-                    }
-                }
+                // strokeStyle is still "orange"
+                ctx.stroke();
             },
             setupGenericPlatfmChars = function (ctx) {
                 ctx.strokeStyle = "black";
