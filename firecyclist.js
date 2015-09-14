@@ -485,12 +485,14 @@ if (typeof Math.log2 !== "function") {
             },
             drawFirebits = function (ctx, firebits, color) {
                 var i;
-                ctx.fillStyle = color;
+                ctx.beginPath();
                 for (i = 0; i < firebits.length; i += 1) {
                     if (objIsVisible(1.4, firebits[i])) {
-                        ctx.fillRect(firebits[i].x, firebits[i].y, 2.5, 2.5);
+                        ctx.rect(firebits[i].x, firebits[i].y, 2.5, 2.5);
                     }
                 }
+                ctx.fillStyle = color;
+                ctx.fill();
             },
             drawCoins = function (ctx, coins) {
                 var i;
