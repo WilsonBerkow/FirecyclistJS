@@ -316,6 +316,7 @@ if (typeof Math.log2 !== "function") {
             mainCtx = mainCanvas.getContext("2d"),
             btnCtx = btnCanvas.getContext("2d"),
             overlayCtx = overlayCanvas.getContext("2d");
+        bgCtx.scale(pageScaleFactor, pageScaleFactor);
         mainCtx.scale(pageScaleFactor, pageScaleFactor);
         btnCtx.scale(pageScaleFactor, pageScaleFactor);
         overlayCtx.scale(pageScaleFactor, pageScaleFactor);
@@ -749,7 +750,6 @@ if (typeof Math.log2 !== "function") {
                     bgCtx.fillStyle = cloudPattern;
                 };
                 cloudImg.src = "img/bg-clouds.png";
-                bgCtx.scale(0.5, 0.5);
                 var xOffset = 0, yOffset = 0;
                 return function () {
                     xOffset = modulo(xOffset, cloudImg.width);
