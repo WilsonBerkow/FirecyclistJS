@@ -714,8 +714,10 @@ if (typeof Math.log2 !== "function") {
                 var barsY = y + 9;
                 var barW = btn.w / 4 - 2 + btn.textWDiff;
                 var barH = btn.h + btn.textHDiff;
-                ctx.fillRect(leftX, barsY, barW, barH);
-                ctx.fillRect(leftX + barW * 5 / 3, barsY, barW, barH);
+                ctx.beginPath();
+                ctx.rect(leftX, barsY, barW, barH);
+                ctx.rect(leftX + barW * 5 / 3, barsY, barW, barH);
+                ctx.fill();
             },
             drawBtn = function (ctx, btn) {
                 var pressed = Touch.curTouch && btn.touchIsInside(Touch.curTouch);
