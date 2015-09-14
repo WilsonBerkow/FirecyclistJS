@@ -497,17 +497,17 @@ if (typeof Math.log2 !== "function") {
             drawCoins = function (ctx, coins) {
                 var i;
                 if (coins.length === 0) { return; }
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 3;
                 ctx.beginPath();
                 for (i = 0; i < coins.length; i += 1) {
                     if (objIsVisible(2 * coinRadius, coins[i])) {
                         circleAt(ctx, coins[i].x, coins[i].y, coinRadius);
                     }
                 }
-                ctx.fillStyle = "yellow";
-                ctx.fill();
                 ctx.strokeStyle = "orange";
                 ctx.stroke();
+                ctx.fillStyle = "yellow";
+                ctx.fill();
 
                 ctx.beginPath();
                 for (i = 0; i < coins.length; i += 1) {
