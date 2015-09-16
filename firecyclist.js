@@ -1720,7 +1720,7 @@ if (typeof Math.log2 !== "function") {
                 // a large noticable jump in on-screen objects:
                 dt = Math.min(dt, 1000 / fps * 3);
 
-                dt *= difficultyCurveFromPoints(game.points);
+                dt *= difficultyCurveFromPoints(0);
 
                 prevFrameTime = now;
 
