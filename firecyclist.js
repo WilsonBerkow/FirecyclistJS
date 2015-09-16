@@ -1102,7 +1102,8 @@ if (typeof Math.log2 !== "function") {
                     activePowerups: [],
                     points: 0,
                     paused: false,
-                    dead: false
+                    dead: false,
+                    stats: {} // For debugging aid
                 };
             };
         }());
@@ -1601,11 +1602,15 @@ if (typeof Math.log2 !== "function") {
                 var now = Date.now(),
                     realDt = now - prevFrameTime,
                     dt;
+                game.stats.literalTimeDiff = realDt;
                 // Cap realDt at 3 times the normal frame length to prevent
                 // a large noticable jump in on-screen objects:
                 realDt = Math.min(realDt, 1000 / fps * 3);
 
-                realDt *= difficultyCurveFromPoints(game.points);
+                game.stats.diffCurve = difficultyCurveFromPoints(game.points);
+                realDt *= game.stats.diffCurve;
+                game.stats.realDt = realDt;
+
 
                 // Handle effects of slow powerup
                 if (powerupObtained(game.activePowerups, "slow")) {
@@ -1615,6 +1620,10 @@ if (typeof Math.log2 !== "function") {
                 } else {
                     dt = realDt;
                 }
+                game.stats.dt = dt;
+                game.stats.prevFrameTime = prevFrameTime;
+                game.stats.now = now;
+                game.stats.startingFramePoints = game.points;
                 prevFrameTime = now;
 
                 Render.background(!game.paused && !game.dead);
