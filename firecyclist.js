@@ -1531,7 +1531,7 @@ if (typeof Math.log2 !== "function") {
                     starfieldActive = !starfieldActive;
                 }
             },
-            handleTouchend: function (game, touch) {
+            handleTouchendForPlatfmAdd: function (game, touch) {
                 if (!game.paused && !game.dead) {
                     maybeGetPlatfmFromTouch(touch, function (platfm) {
                         game.platfms.push(platfm);
@@ -1540,8 +1540,6 @@ if (typeof Math.log2 !== "function") {
                         // lifts finger at same time preview is hit by player,
                         // two platfms would be created at that position.
                     });
-                } else {
-                    gEventHandlers.handleTouchendForThemeSwitch(touch);
                 }
             },
             handleDocumentClick: function (game, event, restart, disallowPause) {
@@ -1656,7 +1654,10 @@ if (typeof Math.log2 !== "function") {
                 }
             }, 1000 / fps);
             Touch.onTouchend = function (touch) {
-                gEventHandlers.handleTouchend(game, touch);
+                gEventHandlers.handleTouchendForPlatfmAdd(game, touch);
+                if (game.paused || game.dead) {
+                    gEventHandlers.handleTouchendForThemeSwitch(touch);
+                }
             };
             document.body.onclick = function (event) {
                 gEventHandlers.handleDocumentClick(game, event, restart);
@@ -1772,7 +1773,10 @@ if (typeof Math.log2 !== "function") {
                 }
             }, 1000 / fps);
             Touch.onTouchend = function (touch) {
-                gEventHandlers.handleTouchend(game, touch);
+                gEventHandlers.handleTouchendForPlatfmAdd(game, touch);
+                if (game.paused || game.dead) {
+                    gEventHandlers.handleTouchendForThemeSwitch(touch);
+                }
             };
             document.body.onclick = function (event) {
                 gEventHandlers.handleDocumentClick(game, event, restartTut, true);
