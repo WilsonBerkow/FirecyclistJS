@@ -1525,7 +1525,7 @@ if (typeof Math.log2 !== "function") {
             };
         }()),
         gEventHandlers = {
-            handleTouchForThemeSwitch: function (touch) {
+            handleTouchendForThemeSwitch: function (touch) {
                 var touchTime = Date.now() - touch.t0;
                 if (Math.abs(touch.x0 - touch.x1) >= gameWidth * 0.5 && touchTime < 400) {
                     starfieldActive = !starfieldActive;
@@ -1541,7 +1541,7 @@ if (typeof Math.log2 !== "function") {
                         // two platfms would be created at that position.
                     });
                 } else {
-                    gEventHandlers.handleTouchForThemeSwitch(touch);
+                    gEventHandlers.handleTouchendForThemeSwitch(touch);
                 }
             },
             handleDocumentClick: function (game, event, restart, disallowPause) {
@@ -1808,7 +1808,7 @@ if (typeof Math.log2 !== "function") {
                     runTutorial();
                 }
             };
-            Touch.onTouchend = gEventHandlers.handleTouchForThemeSwitch;
+            Touch.onTouchend = gEventHandlers.handleTouchendForThemeSwitch;
         };
     runMenu();
 }());
