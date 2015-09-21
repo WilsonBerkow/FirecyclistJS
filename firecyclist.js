@@ -1638,8 +1638,8 @@ if (typeof Math.log2 !== "function") {
                     gUpdaters.powerups(game, dt);
                     gUpdaters.activePowerups(game, dt);
                     game.points += handleActivesPoints(game.activePowerups, timeBasedPointsVanilla(game.player.y, realDt));
-                    // Because timeBasedPoints takes 'realDt', when the slow
-                    // powerup is held, points still flow in at the normal
+                    // Because timeBasedPointsVanilla takes 'realDt', when the
+                    // slow powerup is held, points still flow in at the normal
                     // speed from the user's perspective.
 
                     if (game.dead) {
