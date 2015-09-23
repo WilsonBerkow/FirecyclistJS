@@ -1103,6 +1103,7 @@ if (typeof Math.log2 !== "function") {
                     points: 0,
                     paused: false,
                     dead: false,
+                    statsPrev: {},
                     stats: {} // For debugging aid
                 };
             };
@@ -1605,6 +1606,8 @@ if (typeof Math.log2 !== "function") {
                 // a large noticable jump in on-screen objects:
                 realDt = Math.min(realDt, 1000 / fps * 3);
 
+                game.statsPrev = game.stats;
+                game.stats = {};
                 game.stats.diffCurve = difficultyCurveFromPoints(game.points);
                 realDt *= game.stats.diffCurve;
                 game.stats.realDt = realDt;
