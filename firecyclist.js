@@ -1322,7 +1322,7 @@ if (typeof Math.log2 !== "function") {
             // during this frame. 'Vanilla' because powerup effects are
             // not considered.
             var depth = playerY / gameHeight;
-            var cappedDepth = Math.min(0.85, depth);
+            var cappedDepth = Math.max(-0.5, Math.min(0.85, depth));
             return 7 * (realDt / 1000) * (1 - Math.pow((cappedDepth + 0.1) * 1.1 - 1, 2));
             // To see shape of curve, use WolframAlpha query:
             //  plot y = 1 - ((min(x, .85) + .1) * 1.1 - 1) ^ 2
