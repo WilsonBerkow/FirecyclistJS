@@ -173,7 +173,7 @@ if (typeof Math.log2 !== "function") {
     // Config:
     var canvasBackground = "rgb(153, 217, 234)", // Same color used in CSS
         starfieldActive = false,
-        fps = 40,
+        fps = 60, // With requestAnimationFrame, this is very approximate
         playerGrav = 0.32 / 28,
         fbRiseRate = 0.1,
         fbRadius = 10,
@@ -184,7 +184,7 @@ if (typeof Math.log2 !== "function") {
         coinStartingY = gameHeight + coinRadius,
         platfmRiseRate = 0.15,
         totalFbHeight = 10,
-        platfmBounciness = 0.75,
+        platfmBounciness = 0.18,
         platfmThickness = 6,
         playerTorsoLen = 15 * 5/8,
         playerRadius = 10 * 6/8,
@@ -1250,8 +1250,8 @@ if (typeof Math.log2 !== "function") {
                 },
                 updateFirebits = function (firebits, dt) {
                     firebits.forEach(function (firebit, index) {
-                        firebit.y += Math.random() * 1.5 + 0.1;
-                        firebit.x += Math.random() * 1.5 - 1;
+                        firebit.y += Math.random() * 1.3 + 0.1;
+                        firebit.x += Math.round(Math.random() * 10) / 10 - 0.5;
                         firebit.lifespan += dt;
                         if (firebit.lifespan >= 100 && Math.random() < 0.3) {
                             firebits.splice(index, 1);
@@ -1358,12 +1358,12 @@ if (typeof Math.log2 !== "function") {
                         game.coinColumnsLowest[column] = newcoin;
                     }
                 },
-                velFromPlatfm = function (player, platfm) {
+                velFromPlatfm = function (player, platfm, dt) {
                     var slope = platfm.slope(),
-                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * 25 - platfmBounciness),
+                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * dt - platfmBounciness * dt),
                         calculatedMagSqd = cartesianVel.magnitudeSquared(),
                         playerMagSqd = player.magnitudeSquared();
-                    cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd, playerMagSqd)) + playerGrav * 25);
+                    cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd + 0.1, playerMagSqd)) + playerGrav * dt + 0.15);
                     return cartesianVel;
                 },
                 die = function (game) {
@@ -1401,7 +1401,7 @@ if (typeof Math.log2 !== "function") {
                     for (i = 0; i < game.platfms.length; i += 1) {
                         platfm = game.platfms[i];
                         if (Collision.player_platfm(game.player, platfm)) {
-                            tmpVel = velFromPlatfm(game.player, platfm);
+                            tmpVel = velFromPlatfm(game.player, platfm, dt);
                             game.player.vx = tmpVel.vx;
                             game.player.vy = tmpVel.vy;
                             collided = true;
@@ -1409,10 +1409,13 @@ if (typeof Math.log2 !== "function") {
                     }
                     if (!collided) {
                         if (powerupObtained(game.activePowerups, "weight")) {
-                            game.player.vy += playerGrav * 5 / 2 * 25;
+                            game.player.vy += playerGrav * 5 / 2 * dt;
                         } else {
-                            game.player.vy += playerGrav * 25;
+                            game.player.vy += playerGrav * dt;
                         }
+                        // In each of the above, the velocity addition must
+                        // be scaled by `dt` because it represents the
+                        // accumulation of gravity over `dt` milliseconds.
                     }
                     game.player.ducking = false;
                     for (i = 0; i < game.fbs.length; i += 1) {
@@ -1437,7 +1440,7 @@ if (typeof Math.log2 !== "function") {
                     });
                     game.player.x = modulo(game.player.x + game.player.vx * dt / 20, gameWidth);
                     game.player.y += game.player.vy * dt / 20;
-                    game.player.wheelAngle += signNum(game.player.vx) * 0.2 * dt;
+                    game.player.wheelAngle += signNum(game.player.vx) * 0.22 * dt;
                 },
                 fbs: updateFbsGeneric,
                 coins: function (game, dt) {
@@ -1592,14 +1595,15 @@ if (typeof Math.log2 !== "function") {
                     setCurGame(game);
                     Render.btnLayer(game);
                 },
-                prevFrameTime = Date.now();
+                prevFrameTime = performance.now();
             setCurGame(game);
-            setInterval(function () {
+            (function runFrame(now) {
+                requestAnimationFrame(runFrame);
+
                 window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
 
                 // Initialize time deltas
-                var now = Date.now(),
-                    realDt = now - prevFrameTime,
+                var realDt = now - prevFrameTime,
                     dt;
 
                 game.statsPrev = game.stats;
@@ -1612,7 +1616,7 @@ if (typeof Math.log2 !== "function") {
 
                 game.stats.diffCurve = difficultyCurveFromPoints(game.points);
                 realDt *= game.stats.diffCurve;
-                if (realDt <= 0 || !Number.isFinite(realDt)) {
+                if (realDt < 0 || !Number.isFinite(realDt)) {
                     // I have reason to believe that this situation may be a cause
                     // (or link in a chain of causes) for an error.
                     // If this ever happens, something went very wrong, so avoid
@@ -1668,7 +1672,7 @@ if (typeof Math.log2 !== "function") {
                     // Render
                     Render.game(game);
                 }
-            }, 1000 / fps);
+            }(performance.now()));
             Touch.onTouchend = function (touch) {
                 gEventHandlers.handleTouchendForPlatfmAdd(game, touch);
                 if (game.paused || game.dead) {
@@ -1713,7 +1717,7 @@ if (typeof Math.log2 !== "function") {
         timeBetweenAutoTouches = 600,
         runTutorial = function () {
             var game = createGame(),
-                prevFrameTime = Date.now(),
+                prevFrameTime = performance.now(),
                 autoTouchDir = 1,
                 curAutomatedTouch = createAutomatedTouch(autoTouchDir),
                 interTouchWait = 0,
@@ -1726,22 +1730,26 @@ if (typeof Math.log2 !== "function") {
                     interTouchWait = timeBetweenAutoTouches;
                 },
                 startRealGame = function () {
-                    clearInterval(intervalId);
                     document.body.onclick = function () {};
                     play(game);
                 },
+                realGameReady = false,
                 restartTut = function () {
                     game = createGame();
                     curAutomatedTouch = createAutomatedTouch(autoTouchDir);
-                },
-                intervalId;
+                };
             var prevX, prevY, midwayX, midwayY;
-            intervalId = setInterval(function () {
+            (function runFrame(now) {
+                if (realGameReady) {
+                    return startRealGame();
+                }
+
+                requestAnimationFrame(runFrame);
+
                 window.tutorial = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
 
-                // Initialize time deltas
-                var now = Date.now(),
-                    dt = now - prevFrameTime;
+                // Initialize time delta
+                var dt = now - prevFrameTime;
                 // Cap dt at 3 times the normal frame length to prevent
                 // a large noticable jump in on-screen objects:
                 dt = Math.min(dt, 1000 / fps * 3);
@@ -1761,7 +1769,7 @@ if (typeof Math.log2 !== "function") {
                     gUpdaters.platfms(game, dt);
                     if (Touch.curTouch) {
                         materializeAutoTouch();
-                        startRealGame();
+                        realGameReady = true;
                     }
                     if (curAutomatedTouch.y1 > 290) {
                         materializeAutoTouch();
@@ -1787,7 +1795,7 @@ if (typeof Math.log2 !== "function") {
                     }
                     Render.tutorial(game, midwayX, midwayY);
                 }
-            }, 1000 / fps);
+            }(performance.now()));
             Touch.onTouchend = function (touch) {
                 gEventHandlers.handleTouchendForPlatfmAdd(game, touch);
                 if (game.paused || game.dead) {
@@ -1809,23 +1817,29 @@ if (typeof Math.log2 !== "function") {
         },
         runMenu = function () {
             var menu = createMenu(),
-                intervalId,
-                prevTime = Date.now();
+                prevTime = performance.now(),
+                startGame = function () {
+                    document.body.onclick = function () {};
+                    Touch.onTouchend = null;
+                    runTutorial();
+                },
+                playPressed = false;
             window.menu = menu;
-            intervalId = setInterval(function () {
-                var now = Date.now(), dt = now - prevTime;
+            (function runFrame(now) {
+                if (playPressed) {
+                    return startGame();
+                }
+                requestAnimationFrame(runFrame);
+                var dt = now - prevTime;
                 prevTime = now;
                 updateFbsGeneric(menu, dt);
                 Render.background(true);
                 Render.menu(menu);
-            }, 1000 / fps);
+            }(performance.now()));
             document.body.onclick = function (event) {
                 var pos = calcTouchPos(event), tpos = {x1: pos.x, y1: pos.y};
                 if (menuPlayBtn.touchIsInside(tpos)) {
-                    clearInterval(intervalId);
-                    document.body.onclick = function () {};
-                    Touch.onTouchend = null;
-                    runTutorial();
+                    playPressed = true;
                 }
             };
             Touch.onTouchend = gEventHandlers.handleTouchendForThemeSwitch;
