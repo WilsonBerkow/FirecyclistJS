@@ -1601,13 +1601,15 @@ if (typeof Math.log2 !== "function") {
                 var now = Date.now(),
                     realDt = now - prevFrameTime,
                     dt;
+
+                game.statsPrev = game.stats;
+                game.stats = {};
+
                 game.stats.literalTimeDiff = realDt;
                 // Cap realDt at 3 times the normal frame length to prevent
                 // a large noticable jump in on-screen objects:
                 realDt = Math.min(realDt, 1000 / fps * 3);
 
-                game.statsPrev = game.stats;
-                game.stats = {};
                 game.stats.diffCurve = difficultyCurveFromPoints(game.points);
                 realDt *= game.stats.diffCurve;
                 game.stats.realDt = realDt;
