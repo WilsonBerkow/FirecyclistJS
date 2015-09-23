@@ -1656,6 +1656,10 @@ if (typeof Math.log2 !== "function") {
                     // slow powerup is held, points still flow in at the normal
                     // speed from the user's perspective.
 
+                    game.points = Math.max(0, game.points);
+                    // Although a user floating above the top of the screen
+                    // should lose points, negative points don't make sense.
+
                     if (game.dead) {
                         highscores.sendScore(Math.floor(game.points));
                     }
