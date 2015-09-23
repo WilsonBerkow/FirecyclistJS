@@ -1645,6 +1645,7 @@ if (typeof Math.log2 !== "function") {
                     Render.gameDead(game);
                 } else {
                     // Update state
+                    game.previewPlatfmTouch = Touch.curTouch;
                     gUpdaters.player(game, dt);
                     gUpdaters.coins(game, dt);
                     gUpdaters.fbs(game, dt);
@@ -1665,9 +1666,6 @@ if (typeof Math.log2 !== "function") {
                     }
 
                     // Render
-                    if (!game.dead && !game.paused) {
-                        game.previewPlatfmTouch = Touch.curTouch;
-                    }
                     Render.game(game);
                 }
             }, 1000 / fps);
