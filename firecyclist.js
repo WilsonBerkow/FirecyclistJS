@@ -1612,6 +1612,15 @@ if (typeof Math.log2 !== "function") {
 
                 game.stats.diffCurve = difficultyCurveFromPoints(game.points);
                 realDt *= game.stats.diffCurve;
+                if (realDt <= 0 || !Number.isFinite(realDt)) {
+                    // I have reason to believe that this situation may be a cause
+                    // (or link in a chain of causes) for an error.
+                    // If this ever happens, something went very wrong, so avoid
+                    // anything further and hope it was just for that frame.
+                    realDt = 1000 / fps;
+                    localStorage.setItem("error_log", (localStorage.getItem("error_log") || "") + "\n,\n" + JSON.stringify({t: Date.now(), game: game}) + '\n,"realDt is ' + realDt + " of type" + (typeof realDt) + '"');
+                    console.log("realDt toxic. info added to error_log at " + Date.now());
+                }
                 game.stats.realDt = realDt;
 
 
