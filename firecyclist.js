@@ -269,8 +269,8 @@ if (typeof Math.log2 !== "function") {
         powerupSlowRadius = 10,
         powerupWeightScaleUnit = 0.8,
         powerupWeightHandleHeight = 4,
-        powerupWeightBlockUpperXMargin = 4,
-        powerupWeightBlockLowerWidth = 32,
+        powerupWeightBlockUpperXMargin = 3,
+        powerupWeightBlockLowerWidth = 30,
         powerupWeightBlockHeight = 20,
         powerupWeightHeight = powerupWeightBlockHeight + powerupWeightHandleHeight,
         activePowerupLifespan = 10000;
@@ -600,8 +600,8 @@ if (typeof Math.log2 !== "function") {
                         ctx.beginPath();
                         ctx.moveTo(powerupWeightBlockUpperXMargin, handleHeight);
                         ctx.lineTo(w - powerupWeightBlockUpperXMargin, handleHeight);
-                        ctx.lineTo(w, handleHeight + blockHeight);
-                        ctx.lineTo(0, fullHeight);
+                        ctx.lineTo(w, handleHeight + blockHeight - 2);
+                        ctx.lineTo(0, fullHeight - 2);
                         ctx.fillStyle = "black";
                         ctx.fill();
 
@@ -616,10 +616,10 @@ if (typeof Math.log2 !== "function") {
                         ctx.stroke();
 
                         // '1000' weight marker:
-                        ctx.font = "bold 28px Courier New";
+                        ctx.font = "bold 26px Courier New";
                         ctx.fillStyle = "lightGrey";
                         ctx.textAlign = "center";
-                        ctx.fillText("1000", cx, fullHeight - 1, 24);
+                        ctx.fillText("1000", cx, fullHeight - 3, 24);
                     }),
                     "magnet": offScreenRender(powerupSlowRadius * 3, powerupSlowRadius * 3, function (ctx, w, h) {
                         var x = w / 2, y = h / 2;
@@ -638,6 +638,9 @@ if (typeof Math.log2 !== "function") {
                 };
                 return function (ctx, type, x, y) {
                     var canvas = canvases[type];
+                    if (type === "weight") {
+                        y -= 1;
+                    }
                     ctx.drawImage(canvas, x - canvas.width / 2, y - canvas.height / 2);
                 };
             }()),
