@@ -1555,7 +1555,9 @@ if (typeof Math.log2 !== "function") {
                 if (game.paused) {
                     if (resumeBtn.touchIsInside(p)) {
                         game.paused = false;
-                        Render.btnLayer(game);
+                        requestAnimationFrame(function () {
+                            return Render.btnLayer(game)
+                        });
                     }
                 } else if (game.dead) {
                     if (replayBtn.touchIsInside(p)) {
@@ -1563,7 +1565,9 @@ if (typeof Math.log2 !== "function") {
                     }
                 } else if (!disallowPause && pauseBtn.touchIsInside(p)) {
                     game.paused = true;
-                    Render.btnLayer(game);
+                    requestAnimationFrame(function () {
+                        return Render.btnLayer(game)
+                    });
                 }
             },
             handleBtnLayerUpdates: (function () {
@@ -1577,7 +1581,9 @@ if (typeof Math.log2 !== "function") {
                     if (dt > 30 && // To prevent way-too-inefficiently-frequent rerendering
                             touch.x > pauseBtn.edgeX() - sensitivityMarginX && 
                             touch.y < pauseBtn.y + pauseBtn.h + sensitivityMarginY) {
-                        Render.btnLayer(game);
+                        requestAnimationFrame(function () {
+                            return Render.btnLayer(game)
+                        });
                         return now; // Tell caller last redraw happened at 'now'
                     }
                     return lastRedraw; // Tell caller the time of the last redraw hasn't changed
