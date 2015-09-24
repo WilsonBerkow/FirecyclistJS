@@ -776,6 +776,8 @@ if (typeof Math.log2 !== "function") {
                 }
             },
             drawMovingBg = (function () {
+                var bgsWidth = 864;
+                var bgsHeight = 1024;
                 var cloudsSelected; // To keep track of value of fillStyle
                 var cloudImg = new Image(), cloudPattern;
                 cloudImg.onload = function () {
@@ -791,8 +793,8 @@ if (typeof Math.log2 !== "function") {
                 starImg.src = "img/bg-star-field.png";
                 var xOffset = 0, yOffset = 0;
                 return function (doMovement) {
-                    xOffset = modulo(xOffset, cloudImg.width);
-                    yOffset = modulo(yOffset, cloudImg.height);
+                    xOffset = modulo(xOffset, bgsWidth);
+                    yOffset = modulo(yOffset, bgsHeight);
                     if (cloudsSelected && starfieldActive) {
                         cloudsSelected = false;
                         bgCtx.fillStyle = starPattern;
