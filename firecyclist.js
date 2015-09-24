@@ -173,7 +173,7 @@ if (typeof Math.log2 !== "function") {
     // Config:
     var canvasBackground = "rgb(153, 217, 234)", // Same color used in CSS
         starfieldActive = false,
-        fps = 60, // With requestAnimationFrame, this is very approximate
+        approxFramelength = 1000 / 60, // With requestAnimationFrame, this is very approximate
         playerGrav = 0.32 / 28,
         fbRiseRate = 0.1,
         fbRadius = 10,
@@ -1612,7 +1612,7 @@ if (typeof Math.log2 !== "function") {
                 game.stats.literalTimeDiff = realDt;
                 // Cap realDt at 3 times the normal frame length to prevent
                 // a large noticable jump in on-screen objects:
-                realDt = Math.min(realDt, 1000 / fps * 3);
+                realDt = Math.min(realDt, approxFramelength * 3);
 
                 game.stats.diffCurve = difficultyCurveFromPoints(game.points);
                 realDt *= game.stats.diffCurve;
@@ -1621,7 +1621,7 @@ if (typeof Math.log2 !== "function") {
                     // (or link in a chain of causes) for an error.
                     // If this ever happens, something went very wrong, so avoid
                     // anything further and hope it was just for that frame.
-                    realDt = 1000 / fps;
+                    realDt = approxFramelength;
                     localStorage.setItem("error_log", (localStorage.getItem("error_log") || "") + "\n,\n" + JSON.stringify({t: Date.now(), game: game}) + '\n,"realDt is ' + realDt + " of type" + (typeof realDt) + '"');
                     console.log("realDt toxic. info added to error_log at " + Date.now());
                 }
@@ -1752,7 +1752,7 @@ if (typeof Math.log2 !== "function") {
                 var dt = now - prevFrameTime;
                 // Cap dt at 3 times the normal frame length to prevent
                 // a large noticable jump in on-screen objects:
-                dt = Math.min(dt, 1000 / fps * 3);
+                dt = Math.min(dt, approxFramelength * 3);
 
                 dt *= difficultyCurveFromPoints(0);
 
