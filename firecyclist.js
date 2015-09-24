@@ -266,7 +266,7 @@ if (typeof Math.log2 !== "function") {
         btnShadowOffset = 2,
         powerupX2Width = 36,
         powerupX2Height = 23,
-        powerupSlowRadius = 10,
+        powerupSlowRadius = 12,
         powerupMagnetRadius = 9,
         powerupMagnetThickness = 8,
         powerupWeightScaleUnit = 0.8,
@@ -583,14 +583,32 @@ if (typeof Math.log2 !== "function") {
                     }),
                     "slow": offScreenRender(powerupSlowRadius * 2 + 5, powerupSlowRadius * 2 + 5, function (ctx, w, h) {
                         var cx = w / 2, cy = h / 2;
-                        ctx.globalAlpha = 0.7;
-                        circle(ctx, cx, cy, powerupSlowRadius, "silver", "fill");
-                        ctx.globalAlpha = 1;
-                        ctx.lineWidth = 3;
-                        circle(ctx, cx, cy, powerupSlowRadius, "gray", "stroke");
+                        ctx.lineWidth = 2;
+                        circle(ctx, cx, cy, powerupSlowRadius, "black", "stroke");
+                        circle(ctx, cx, cy, powerupSlowRadius, "white", "fill");
+
+                        // Hour hand
+                        ctx.lineWidth = 1;
                         ctx.beginPath();
-                        lineFromTo(ctx, cx, cy, cx, cy - powerupSlowRadius * 0.75);
-                        lineFromTo(ctx, cx, cy, cx + powerupSlowRadius * 0.75, cy);
+                        lineFromTo(ctx, cx, cy, cx + powerupSlowRadius * 0.7, cy);
+                        ctx.stroke();
+
+                        // 12 tick marks
+                        var i, angle;
+                        var tickOuterR = powerupSlowRadius * 0.85;
+                        var tickInnerR = powerupSlowRadius * 0.8;
+                        ctx.beginPath();
+                        for (i = 0; i < 12; i += 1) {
+                            angle = Math.PI * 2 * (i / 12);
+                            lineFromTo(ctx, cx + trig.cos(angle) * tickOuterR, cy + trig.sin(angle) * tickOuterR,
+                                            cx + trig.cos(angle) * tickInnerR, cy + trig.sin(angle) * tickInnerR);
+                        }
+                        ctx.stroke();
+
+                        // Second hand
+                        ctx.beginPath();
+                        lineFromTo(ctx, cx, cy, cx, cy - powerupSlowRadius * 0.95);
+                        ctx.strokeStyle = "red";
                         ctx.stroke();
                     }),
                     "weight": offScreenRender(powerupWeightBlockLowerWidth, powerupWeightHeight, function (ctx, w, fullHeight) {
