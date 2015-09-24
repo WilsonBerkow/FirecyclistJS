@@ -184,7 +184,7 @@ if (typeof Math.log2 !== "function") {
         coinStartingY = gameHeight + coinRadius,
         platfmRiseRate = 0.15,
         totalFbHeight = 10,
-        platfmBounciness = 0.18,
+        platfmBounciness = 0.13,
         platfmThickness = 6,
         playerTorsoLen = 15 * 5/8,
         playerRadius = 10 * 6/8,
@@ -1352,8 +1352,9 @@ if (typeof Math.log2 !== "function") {
                     }
                 },
                 velFromPlatfm = function (player, platfm, dt) {
-                    var slope = platfm.slope(),
-                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * dt - platfmBounciness * dt),
+                    var cappedDt = Math.min(dt, approxFramelength), // To prevent slow frames from making the player launch forward
+                        slope = platfm.slope(),
+                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * cappedDt - platfmBounciness * cappedDt),
                         calculatedMagSqd = cartesianVel.magnitudeSquared(),
                         playerMagSqd = player.magnitudeSquared();
                     cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd + 0.1, playerMagSqd)) + playerGrav * dt + 0.15);
