@@ -562,6 +562,12 @@ if (typeof Math.log2 !== "function") {
                     fillShadowyText(ctx, Math.floor(game.points), 16, inGamePointsYPos);
                 }
             },
+            drawPowerupBubble = function (ctx, x, y) {
+                ctx.beginPath();
+                circleAt(ctx, x, y, activePowerupBubbleRadius);
+                ctx.fillStyle = "rgba(255, 215, 0, 0.35)";
+                ctx.fill();
+            },
             drawPowerup = (function () {
                 var canvases = {
                     "X2": offScreenRender(powerupX2Width, powerupX2Height, function (ctx, w, h) {
@@ -833,7 +839,10 @@ if (typeof Math.log2 !== "function") {
                 drawFirebits(mainCtx, game.firebitsOrg, starfieldActive ? "royalblue" : "darkOrange");
                 drawCoins(mainCtx, game.coins);
                 game.powerups.forEach(function (powerup) {
-                    drawPowerup(mainCtx, powerup.type, powerup.xPos(), powerup.yPos());
+                    var x = powerup.xPos();
+                    var y = powerup.yPos();
+                    drawPowerupBubble(mainCtx, x, y);
+                    drawPowerup(mainCtx, powerup.type, x, y);
                 });
                 drawActivePowerups(mainCtx, game.activePowerups);
                 drawInGamePoints(mainCtx, game);
@@ -1190,16 +1199,16 @@ if (typeof Math.log2 !== "function") {
         },
         player_powerup: function (player, powerup) {
             if (powerup.type === "X2") {
-                return Collision.player_rect(player, powerup.xPos(), powerup.yPos(), powerupX2Width, powerupX2Height);
+                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), activePowerupBubbleRadius);
             }
             if (powerup.type === "slow") {
-                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
+                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), activePowerupBubbleRadius);
             }
             if (powerup.type === "weight") {
-                return Collision.player_rect(player, powerup.xPos(), powerup.yPos(), powerupWeightBlockLowerWidth, powerupWeightHeight);
+                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), activePowerupBubbleRadius);
             }
             if (powerup.type === "magnet") {
-                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), powerupSlowRadius);
+                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), activePowerupBubbleRadius);
             }
         }
     };
@@ -1502,16 +1511,17 @@ if (typeof Math.log2 !== "function") {
                             game.powerups[key] = null;
                         }
                     });
-                    if (!game.powerups.X2 && Math.random() < 1 / 75000 * dt) { // 100 times less frequent than fireballs
+                    var chanceFactor = 1 / 75000;
+                    if (!game.powerups.X2 && Math.random() < chanceFactor * dt) { // 100 times less frequent than fireballs
                         game.powerups.X2 = makePowerupRandom("X2", 25, 145);
                     }
-                    if (!game.powerups.slow && Math.random() < 1 / 75000 * dt) {
+                    if (!game.powerups.slow && Math.random() < chanceFactor * dt) {
                         game.powerups.slow = makePowerupRandom("slow", 25, 145);
                     }
-                    if (!game.powerups.weight && game.points > 50 && Math.random() < 1 / 75000 * dt) {
+                    if (!game.powerups.weight && game.points > 50 && Math.random() < chanceFactor * dt) {
                         game.powerups.weight = makePowerupRandom("weight", 25, 145);
                     }
-                    if (!game.powerups.magnet && Math.random() < 1 / 75000 * dt) {
+                    if (!game.powerups.magnet && Math.random() < chanceFactor * dt) {
                         game.powerups.magnet = makePowerupRandom("magnet", 25, 145);
                     }
                 },
