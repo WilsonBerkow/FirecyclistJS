@@ -267,6 +267,8 @@ if (typeof Math.log2 !== "function") {
         powerupX2Width = 36,
         powerupX2Height = 23,
         powerupSlowRadius = 10,
+        powerupMagnetRadius = 9,
+        powerupMagnetThickness = 8,
         powerupWeightScaleUnit = 0.8,
         powerupWeightHandleHeight = 4,
         powerupWeightBlockUpperXMargin = 3,
@@ -621,19 +623,20 @@ if (typeof Math.log2 !== "function") {
                         ctx.textAlign = "center";
                         ctx.fillText("1000", cx, fullHeight - 3, 24);
                     }),
-                    "magnet": offScreenRender(powerupSlowRadius * 3, powerupSlowRadius * 3, function (ctx, w, h) {
+                    "magnet": offScreenRender(powerupMagnetRadius * 3, powerupMagnetRadius * 3, function (ctx, w, h) {
                         var x = w / 2, y = h / 2;
+                        var thick = powerupMagnetThickness;
                         ctx.beginPath();
-                        ctx.arc(x, y, powerupSlowRadius, 0, Math.PI, true);
+                        ctx.arc(x, y, powerupMagnetRadius, 0, Math.PI, true);
                         ctx.strokeStyle = "red";
-                        ctx.lineWidth = 10;
+                        ctx.lineWidth = powerupMagnetThickness;
                         ctx.stroke();
                         ctx.fillStyle = "red";
-                        ctx.fillRect(x - powerupSlowRadius - 5, y, 10, 5);
-                        ctx.fillRect(x + powerupSlowRadius - 5, y, 10, 5);
+                        ctx.fillRect(x - powerupMagnetRadius - thick / 2, y - 1, thick, thick / 2 + 1);
+                        ctx.fillRect(x + powerupMagnetRadius - thick / 2, y - 1, thick, thick / 2 + 1);
                         ctx.fillStyle = "white";
-                        ctx.fillRect(x - powerupSlowRadius - 5, y + 5, 10, 6);
-                        ctx.fillRect(x + powerupSlowRadius - 5, y + 5, 10, 6);
+                        ctx.fillRect(x - powerupMagnetRadius - thick / 2, y + thick / 2 - 1, thick, thick / 2 + 2);
+                        ctx.fillRect(x + powerupMagnetRadius - thick / 2, y + thick / 2 - 1, thick, thick / 2 + 2);
                     })
                 };
                 return function (ctx, type, x, y) {
