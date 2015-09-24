@@ -1166,25 +1166,6 @@ if (typeof Math.log2 !== "function") {
             var cy = player.y - playerTorsoLen  * 0.8;
             return distLT(player.x, cy, x, y, approxRadius + circleRadius);
         },
-        circle_rect: function (circX, circY, radius, rectX, rectY, rectWidth, rectHeight) { // Adapted from StackOverflow answer by 'e. James': http://stackoverflow.com/a/402010
-            var distX = Math.abs(circX - rectX),
-                distY = Math.abs(circY - rectY),
-                cornerDist_squared;
-            if (distX > (rectWidth/2 + radius) || distY > (rectHeight/2 + radius)) {
-                return false;
-            }
-            if (distX <= (rectWidth/2) || distY <= (rectHeight/2)) {
-                return true;
-            }
-            cornerDist_squared = Math.pow(distX - rectWidth/2, 2) +
-                                 Math.pow(distY - rectHeight/2, 2);
-            return cornerDist_squared <= (radius * radius);
-        },
-        player_rect: function (player, x, y, w, h) {
-            var headY = player.y - playerWheelToHeadDist;
-            return Collision.circle_rect(player.x, player.y, playerRadius, x, y, w, h)
-                || (!player.ducking && Collision.circle_rect(player.x, headY, playerHeadRadius, x, y, w, h));
-        },
         playerHeadNearFb: function (player, fb) {
             var headWithMargin = playerHeadRadius + 10;
             // Add a margin of 10 so he ducks a little early.
