@@ -1266,7 +1266,7 @@ if (typeof Math.log2 !== "function") {
                 },
                 updateFirebits = function (firebits, dt) {
                     firebits.forEach(function (firebit, index) {
-                        firebit.y += Math.random() * 1.3 + 0.1;
+                        firebit.y += Math.random() * 1.1 + 0.1;
                         firebit.x += Math.round(Math.random() * 10) / 10 - 0.5;
                         firebit.lifespan += dt;
                         if (firebit.lifespan >= 100 && Math.random() < 0.3) {
@@ -1303,7 +1303,7 @@ if (typeof Math.log2 !== "function") {
                 updateFirebits(obj.firebitsRed, dt);
                 updateFirebits(obj.firebitsOrg, dt);
                 var chanceFactor = 4 / 7;
-                if (Math.random() < 1 / 1000 * chanceFactor * dt || fewInLowerPortion(obj.fbs)) {
+                if (Math.random() < 1 / 7000 * chanceFactor * dt || fewInLowerPortion(obj.fbs)) {
                     obj.fbs.push(createFb(
                         randomXPosition(),
                         gameHeight + fbRadius
