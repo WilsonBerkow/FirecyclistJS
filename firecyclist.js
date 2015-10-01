@@ -1267,7 +1267,10 @@ if (typeof Math.log2 !== "function") {
                 updateFirebits = function (firebits, dt) {
                     firebits.forEach(function (firebit, index) {
                         firebit.y += Math.random() * 1.1 + 0.1;
-                        firebit.x += Math.round(Math.random() * 10) / 10 - 0.5;
+                        firebit.x += Math.round(Math.random() * 10) / 10 - 0.58;
+                        // The fact that (above) there needs to be leftward
+                        // compensation means there may be a systematic error
+                        // elsewhere.
                         firebit.lifespan += dt;
                         if (firebit.lifespan >= 100 && Math.random() < 0.3) {
                             firebits.splice(index, 1);
