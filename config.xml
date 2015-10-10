@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget id="com.wilsonberkow.firecyclist" version="0.0.1">
+    <preference name="phonegap-version" value="3.2.0" />
     <name>Firecyclist</name>
     <description>
         Maneuver around fireballs and capture coins as unicyclist falling from the sky! 
