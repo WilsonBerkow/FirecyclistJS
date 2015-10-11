@@ -323,6 +323,12 @@ if (typeof Math.log2 !== "function") {
         mainCtx.scale(pageScaleFactor, pageScaleFactor);
         btnCtx.scale(pageScaleFactor, pageScaleFactor);
         overlayCtx.scale(pageScaleFactor, pageScaleFactor);
+        // The following translations are a trick to make lines sharper:
+        // (No translation on bgCtx because clouds benefit
+        // from extra bluriness, and stars are unaffected.)
+        mainCtx.translate(0.5, 0.5);
+        btnCtx.translate(0.5, 0.5);
+        overlayCtx.translate(0.5, 0.5);
         var offScreenRender = function (width, height, render) {
                 var newCanvas = document.createElement('canvas');
                 newCanvas.width = width;
@@ -836,7 +842,7 @@ if (typeof Math.log2 !== "function") {
                 };
             }()),
             drawMenu = function (menu) {
-                mainCtx.clearRect(0, 0, gameWidth, gameHeight);
+                mainCtx.clearRect(-1, -1, gameWidth + 1, gameHeight + 1);
                 drawFbs(mainCtx, menu.fbs);
                 drawFirebits(mainCtx, menu.firebitsRed, starfieldActive ? "blue" : "red");
                 drawFirebits(mainCtx, menu.firebitsOrg, starfieldActive ? "royalblue" : "darkOrange");
@@ -845,8 +851,8 @@ if (typeof Math.log2 !== "function") {
             },
             drawGame = function (game) {
                 mainCtx.save();
-                mainCtx.clearRect(0, 0, gameWidth, gameHeight);
-                overlayCtx.clearRect(0, 0, gameWidth, gameHeight);
+                mainCtx.clearRect(-1, -1, gameWidth + 1, gameHeight + 1);
+                overlayCtx.clearRect(-1, -1, gameWidth + 1, gameHeight + 1);
                 if (game.player.ducking) {
                     drawPlayerDuckingAt(mainCtx, game.player.x, game.player.y, game.player.wheelAngle);
                 } else {
@@ -899,8 +905,8 @@ if (typeof Math.log2 !== "function") {
             }()),
             drawTutorial = function (game, handX, handY) {
                 mainCtx.save();
-                mainCtx.clearRect(0, 0, gameWidth, gameHeight);
-                overlayCtx.clearRect(0, 0, gameWidth, gameHeight);
+                mainCtx.clearRect(-1, -1, gameWidth + 1, gameHeight + 1);
+                overlayCtx.clearRect(-1, -1, gameWidth + 1, gameHeight + 1);
                 if (game.player.ducking) {
                     drawPlayerDuckingAt(mainCtx, game.player.x, game.player.y, game.player.wheelAngle);
                 } else {
