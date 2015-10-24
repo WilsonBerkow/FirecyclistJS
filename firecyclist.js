@@ -804,10 +804,7 @@ if (typeof Math.log2 !== "function") {
                     if (type === "weight") {
                         y -= 1;
                     }
-                    ctx.save();
-                    ctx.translate(-0.5, -0.5);
-                    ctx.drawImage(canvas, x - canvas.width / 2, y - canvas.height / 2);
-                    ctx.restore();
+                    ctx.drawImage(canvas, x - canvas.width / 2 - 0.5, y - canvas.height / 2 - 0.5);
                 };
             }()),
             drawActivePowerupBackground = function (ctx, lifeleft, totalLifetime, x, y) {
@@ -1068,7 +1065,7 @@ if (typeof Math.log2 !== "function") {
             gameOverlayDrawer = (function () {
                 var vagueify = function (ctx) {
                     ctx.fillStyle = starfieldActive ? "rgba(0, 0, 0, 0.8)" : "rgba(200, 200, 200, 0.75)";
-                    ctx.fillRect(0, 0, gameWidth, gameHeight);
+                    ctx.fillRect(-1, -1, gameWidth + 1, gameHeight + 1);
                 };
                 return function (f) {
                     return function (game) {
