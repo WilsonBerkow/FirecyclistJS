@@ -1,6 +1,6 @@
 {
     "name": "FIRECYLIST",
-    "xwalk_version": "0.0.12",
+    "xwalk_version": "0.0.13",
     "start_url": "index.html",
     "display": "fullscreen",
     "orientation": "portrait",

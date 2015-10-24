@@ -523,98 +523,124 @@ if (typeof Math.log2 !== "function") {
                     }
                 }
             },
-            wheelOutlineAt = function (ctx, x, y) {
+            wheelOutlineAt = function (ctx, x, y, useStarsStyle) {
                 // Wheel outline is drawn in two solid parts to get around
                 // Chrome-for-Android rendering bug.
                 var style = ctx.fillStyle;
                 ctx.beginPath();
                 circleAt(ctx, x, y, playerRadius);
-                ctx.fillStyle = starfieldActive ? "white" : "black";
+                ctx.fillStyle = useStarsStyle ? "white" : "black";
                 ctx.fill();
 
                 ctx.beginPath();
                 circleAt(ctx, x, y, playerRadius - 1);
-                ctx.fillStyle = starfieldActive ? "black" : canvasBackground;
+                ctx.fillStyle = useStarsStyle ? "black" : canvasBackground;
                 ctx.fill();
 
                 ctx.fillStyle = style;
             },
-            drawPlayerDuckingAt = function (ctx, x, y, wheelAngle) {
-                mainCtx.strokeStyle = starfieldActive ? "white" : "black";
+            drawPlayerDuckingAt = (function () {
+                var w = playerRadius * 3;
+                var h = playerRadius * 3 + 6;
+                var hToWheelCenter = h - 3 - playerRadius;
+                var drawStaticParts = function (useStarsStyle, ctx) {
+                    var cx = w / 2, cy = hToWheelCenter;
+                    ctx.strokeStyle = useStarsStyle ? "white" : "black";
 
-                wheelOutlineAt(ctx, x, y);
+                    wheelOutlineAt(ctx, cx, cy, useStarsStyle);
 
-                ctx.beginPath();
+                    ctx.beginPath();
 
-                var playerHeadX = x + playerDuckingXDiff;
-                var playerHeadY = y + playerDuckingYDiff;
+                    var playerHeadX = cx + playerDuckingXDiff;
+                    var playerHeadY = cy + playerDuckingYDiff;
 
-                // Torso:
-                var torsoStartX = playerHeadX + sqrt3 / 2 * playerHeadRadius;
-                var torsoStartY = playerHeadY + 0.5 * playerHeadRadius;
-                var torsoMidX = torsoStartX + 5;
-                var torsoMidY = torsoStartY + 2;
-                ctx.moveTo(torsoStartX, torsoStartY);
-                ctx.lineTo(torsoMidX, torsoMidY);
-                ctx.lineTo(x, y);
+                    // Torso:
+                    var torsoStartX = playerHeadX + sqrt3 / 2 * playerHeadRadius;
+                    var torsoStartY = playerHeadY + 0.5 * playerHeadRadius;
+                    var torsoMidX = torsoStartX + 5;
+                    var torsoMidY = torsoStartY + 2;
+                    ctx.moveTo(torsoStartX, torsoStartY);
+                    ctx.lineTo(torsoMidX, torsoMidY);
+                    ctx.lineTo(cx, cy);
 
-                // One arm (shadowed by head):
-                ctx.moveTo(torsoMidX, torsoMidY);
-                ctx.lineTo(torsoMidX - 1, playerHeadY - playerHeadRadius * 0.65);
-                ctx.lineTo(playerHeadX - playerHeadRadius * 1.4, playerHeadY - playerHeadRadius + 4);
+                    // One arm (shadowed by head):
+                    ctx.moveTo(torsoMidX, torsoMidY);
+                    ctx.lineTo(torsoMidX - 1, playerHeadY - playerHeadRadius * 0.65);
+                    ctx.lineTo(playerHeadX - playerHeadRadius * 1.4, playerHeadY - playerHeadRadius + 4);
 
-                // Spokes of wheel:
-                wheelSpokesAt(ctx, x, y, wheelAngle);
+                    ctx.stroke();
 
-                ctx.stroke();
+                    // Solid, background-colored body of head, with slight extra radius for outline:
+                    var style = ctx.fillStyle;
+                    ctx.beginPath();
+                    ctx.fillStyle = useStarsStyle ? "black" : canvasBackground;
+                    circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius + 1);
+                    ctx.fill();
+                    ctx.fillStyle = style;
 
+                    // Now for the lines to appear in front of head:
 
-                // Solid, background-colored body of head, with slight extra radius for outline:
-                var style = ctx.fillStyle;
-                ctx.beginPath();
-                ctx.fillStyle = starfieldActive ? "black" : canvasBackground;
-                circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius + 1);
-                ctx.fill();
-                ctx.fillStyle = style;
+                    ctx.beginPath();
 
-                // Now for the lines to appear in front of head:
+                    // Outline of head:
+                    circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius);
 
-                ctx.beginPath();
+                    // Final arm (not shadowed by head):
+                    ctx.moveTo(torsoMidX, torsoMidY);
+                    ctx.lineTo(cx, playerHeadY);
+                    ctx.lineTo(cx - playerHeadRadius - 3, playerHeadY + 3);
 
-                // Outline of head:
-                circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius);
+                    ctx.stroke();
+                };
+                var staticPartsClouds = offScreenRender(w, h, drawStaticParts.bind(null, false));
+                var staticPartsStars = offScreenRender(w, h, drawStaticParts.bind(null, true));
+                return function (ctx, x, y, wheelAngle) {
+                    var staticParts = starfieldActive ? staticPartsStars : staticPartsClouds;
+                    ctx.drawImage(staticParts, x - w / 2 - 0.5, y - hToWheelCenter - 0.5);
+                    ctx.beginPath();
+                    wheelSpokesAt(ctx, x, y, wheelAngle);
+                    ctx.strokeStyle = starfieldActive ? "white" : "black";
+                    ctx.stroke();
+                };
+            }()),
+            drawPlayerAt = (function () {
+                var w = 4 * playerElbowXDiff;
+                var h = playerHeadRadius * 2 + playerTorsoLen + playerRadius * 2 + 6;
+                var hToWheelCenter = playerHeadRadius * 2 + playerTorsoLen + playerRadius + 3;
+                var drawStaticParts = function (useStarsStyle, ctx) {
+                    var cx = w / 2, cy = hToWheelCenter; // (cx, cy) is the center of the wheel
+                    ctx.strokeStyle = useStarsStyle ? "white" : "black";
 
-                // Final arm (not shadowed by head):
-                ctx.moveTo(torsoMidX, torsoMidY);
-                ctx.lineTo(x, playerHeadY);
-                ctx.lineTo(x - playerHeadRadius - 3, playerHeadY + 3);
+                    // Circle of wheel:
+                    wheelOutlineAt(ctx, cx, cy, useStarsStyle);
 
-                ctx.stroke();
-            },
-            drawPlayerAt = function (ctx, x, y, wheelAngle) {
-                mainCtx.strokeStyle = starfieldActive ? "white" : "black";
+                    ctx.beginPath();
 
-                wheelOutlineAt(ctx, x, y);
+                    // Head and torso:
+                    circleAt(ctx, cx, cy - playerWheelToHeadDist, playerHeadRadius);
+                    ctx.moveTo(cx, cy - playerTorsoLen - playerRadius);
+                    ctx.lineTo(cx, cy);
 
-                ctx.beginPath();
+                    // Arms:
+                    ctx.save();
+                    ctx.translate(cx, cy - playerRadius - playerTorsoLen / 2);
+                    oneArm(ctx);
+                    oneArm(ctx, true);
+                    ctx.restore();
 
-                // Head and torso:
-                circleAt(ctx, x, y - playerWheelToHeadDist, playerHeadRadius);
-                ctx.moveTo(x, y - playerTorsoLen - playerRadius);
-                ctx.lineTo(x, y); // (x, y) is the center of the wheel
-
-                // Wheel spokes:
-                wheelSpokesAt(ctx, x, y, wheelAngle);
-
-                // Arms:
-                ctx.save();
-                ctx.translate(x, y - playerRadius - playerTorsoLen / 2);
-                oneArm(ctx);
-                oneArm(ctx, true);
-                ctx.restore();
-
-                ctx.stroke();
-            },
+                    ctx.stroke();
+                };
+                var staticPartsClouds = offScreenRender(w, h, drawStaticParts.bind(null, false));
+                var staticPartsStars = offScreenRender(w, h, drawStaticParts.bind(null, true));
+                return function (ctx, x, y, wheelAngle) {
+                    var staticParts = starfieldActive ? staticPartsStars : staticPartsClouds;
+                    ctx.drawImage(staticParts, x - w / 2 - 0.5, y - hToWheelCenter - 0.5);
+                    ctx.beginPath();
+                    wheelSpokesAt(ctx, x, y, wheelAngle);
+                    ctx.strokeStyle = starfieldActive ? "white" : "black";
+                    ctx.stroke();
+                };
+            }()),
             drawFbCircles = function (ctx, fbWidth) {
                 ctx.beginPath();
                 var i;
