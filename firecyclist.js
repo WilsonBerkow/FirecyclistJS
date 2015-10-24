@@ -173,10 +173,11 @@ if (typeof Math.log2 !== "function") {
     // Config:
     var canvasBackground = "rgb(153, 217, 234)", // Same color used in CSS
         starfieldActive = false,
-        approxFramelength = 1000 / 60, // With requestAnimationFrame, this is very approximate
+        approxFrameLen = 1000 / 60, // With requestAnimationFrame, this is approximate
         playerGrav = 0.32 / 28,
         fbRiseRate = 0.1,
         fbRadius = 10,
+        fbNumRecordedFrames = 300,
         coinRiseRate = 0.1,
         coinRadius = 10,
         coinSquareLen = 8.5,
@@ -184,7 +185,7 @@ if (typeof Math.log2 !== "function") {
         coinStartingY = gameHeight + coinRadius,
         platfmRiseRate = 0.15,
         totalFbHeight = 10,
-        platfmBounciness = 0.13,
+        platfmBounciness = 0.07,
         platfmThickness = 6,
         playerTorsoLen = 15 * 5/8,
         playerRadius = 10 * 6/8,
@@ -313,6 +314,133 @@ if (typeof Math.log2 !== "function") {
         },
         highscores = mkHighscores("highscores");
 
+    // Vector and line util:
+    var anglify = function (doCalc, f) {
+            // If 'doCalc' is true, the object in question ('this') has
+            //  properties x0, y0, x1, y1, and the anglify methods will
+            //  DO the CALCulation of converting those to length deltas.
+            // If 'doCalc' is false, the object has vx, vy properties.
+            var proto = {
+                angle: function () {
+                    return doCalc ? Math.atan2(this.y1 - this.y0, this.x1 - this.x0)
+                                  : Math.atan2(this.vy, this.vx);
+                },
+                magnitudeSquared: function () {
+                    return doCalc ? distanceSquared(this.x0, this.y0, this.x1, this.y1)
+                                  : (this.vx * this.vx + this.vy * this.vy);
+                },
+                slope: function () {
+                    return doCalc ? (this.y1 - this.y0) / (this.x1 - this.x0)
+                                  : this.vy / this.vx;
+                }
+            };
+            if (!doCalc) {
+                proto.setMagnitude = function (mag) {
+                    var angle = this.angle();
+                    this.vx = trig.cos(angle) * mag;
+                    this.vy = trig.sin(angle) * mag;
+                };
+            }
+            return function () {
+                return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
+            };
+        },
+        createVel = anglify(false, function (vx, vy) {
+            return {vx: vx, vy: vy};
+        }),
+        withAngularCtrls = (function () {
+            var proto = {
+                angleTo: function (xy) { // Currently unused, but as definition adds only constant time and may be useful in future, I'll leave it.
+                    return Math.atan2(xy.y - this.y, xy.x - this.x);
+                },
+                distanceTo: function (xy) {
+                    return dist(this.x, this.y, xy.x, xy.y);
+                },
+                setDistanceTo: function (xy, newd) {
+                    var vectorFromPlayer = createVel(this.x - xy.x, this.y - xy.y),
+                        newAbsoluteVector;
+                    vectorFromPlayer.setMagnitude(newd);
+                    newAbsoluteVector = createVel(xy.x + vectorFromPlayer.vx, xy.y + vectorFromPlayer.vy);
+                    this.x = newAbsoluteVector.vx;
+                    this.y = newAbsoluteVector.vy;
+                }
+            };
+            return function (f) {
+                return function () {
+                    return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
+                };
+            };
+        }());
+
+    // Constructors for in-game objects:
+    var createPlayer = anglify(false, function (x, y, vx, vy) {
+            return {x: x, y: y, vx: vx, vy: vy, wheelAngle: 0, ducking: false};
+        }),
+        createPlatfm = anglify(true, function (x0, y0, x1, y1) {
+            return {x0: x0, y0: y0, x1: x1, y1: y1, time_left: 800};
+        }),
+        createCoin = withAngularCtrls(function (x, y) {
+            return {x: x, y: y};
+        }),
+        createFb = function (x, y) {
+            return {x: x, y: y, frame: Math.floor(Math.random() * fbNumRecordedFrames)};
+        },
+        createPowerup = (function () {
+            var proto = {
+                xDistanceTravelled: function () {
+                    return this.lifetime / powerupTotalLifespan * gameWidth;
+                },
+                xPos: function () {
+                    return this.xDistanceTravelled();
+                },
+                yPos: function () {
+                    return this.offsetY + trig.sin(this.xDistanceTravelled() / 20) * 40;
+                }
+            };
+            return function (y, powerupType) {
+                return makeObject(proto, {offsetY: y, lifetime: 0, type: powerupType});
+            };
+        }()),
+        createActivePowerup = function (type, srcX, srcY) {
+            var lifetime = type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan;
+            return {
+                type: type,
+                width: type === "X2" ? powerupX2Width :
+                       type === "slow" ? powerupSlowRadius * 2 :
+                       type === "weight" ? 40 :
+                       type === "magnet" ? powerupSlowRadius * 2 + 15 :
+                       40,
+                totalLifetime: lifetime,
+                lifetime: lifetime,
+                srcX: srcX,
+                srcY: srcY,
+                timeSinceAcquired: 0
+            };
+        },
+        createGame = (function () {
+            var mkPowerupsObj = iterableObjectFactory(["X2", "slow", "weight", "magnet"]);
+            return function () {
+                return {
+                    player: createPlayer(gameWidth / 2, 50, 0, 0),
+                    platfms: [],
+                    previewPlatfmTouch: null,
+                    fbs: [],
+                    firebitsRed: [],
+                    firebitsOrg: [],
+                    coins: [],
+                    coinColumnsLowest: [],
+                    coinGridOffset: 0,
+                    powerups: mkPowerupsObj({}),
+                    activePowerups: [],
+                    points: 0,
+                    paused: false,
+                    dead: false,
+                    statsPrev: {},
+                    stats: {} // For debugging aid
+                };
+            };
+        }());
+
     // Rendering:
     var Render = (function () {
         var bgCtx = bgCanvas.getContext("2d"),
@@ -335,9 +463,6 @@ if (typeof Math.log2 !== "function") {
                 newCanvas.height = height;
                 render(newCanvas.getContext('2d'), width, height);
                 return newCanvas;
-            },
-            objIsVisible = function (xradius, obj) {
-                return obj.x > -xradius && obj.x < gameWidth + xradius;
             };
         // Renderers:
         var fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) {
@@ -488,57 +613,66 @@ if (typeof Math.log2 !== "function") {
 
                 ctx.stroke();
             },
-            drawFbs = function (ctx, fbs) {
+            drawFbCircles = function (ctx, fbWidth) {
                 ctx.beginPath();
-                fbs.forEach(function (fb) {
-                    if (objIsVisible(2 * fbRadius, fb)) {
-                        circleAt(ctx, fb.x, fb.y, fbRadius);
-                    }
-                });
+                var i;
+                for (i = 0; i < fbNumRecordedFrames; i += 1) {
+                    circleAt(ctx, i * fbWidth + fbWidth / 2, fbWidth / 2, fbRadius);
+                }
                 ctx.fillStyle = starfieldActive ? "blue" : "orange";
                 ctx.fill();
             },
-            drawFirebits = function (ctx, firebits, color) {
+            drawFirebits = function (ctx, xs, ys, color) {
                 var i;
+                var s = 2.5;
                 ctx.beginPath();
-                for (i = 0; i < firebits.length; i += 1) {
-                    if (objIsVisible(1.4, firebits[i])) {
-                        ctx.rect(firebits[i].x, firebits[i].y, 2.5, 2.5);
-                    }
+                for (i = 0; i < xs.length; i += 1) {
+                    ctx.rect(xs[i], ys[i], s, s);
                 }
                 ctx.fillStyle = color;
                 ctx.fill();
             },
-            drawCoins = function (ctx, coins) {
-                var i;
-                if (coins.length === 0) { return; }
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                for (i = 0; i < coins.length; i += 1) {
-                    if (objIsVisible(2 * coinRadius, coins[i])) {
-                        circleAt(ctx, coins[i].x, coins[i].y, coinRadius);
-                    }
-                }
-                ctx.strokeStyle = starfieldActive ? "darkgreen" : "orange";
-                ctx.stroke();
-                ctx.fillStyle = starfieldActive ? "palegreen" : "yellow";
-                ctx.fill();
+            drawFb = (function () {
+                var w = 30; // Width occupied by each frame in spritesCtx
+                var h = 70; // Height of each frame in spritesCtx
+                var offsetRadius = w / 2;
+                // window.frames from frames.js is used
+                var sprites = document.createElement("canvas");
+                sprites.width = fbNumRecordedFrames * w;
+                sprites.height = h;
+                var spritesCtx = sprites.getContext('2d');
+                drawFbCircles(spritesCtx, w, fbNumRecordedFrames);
+                drawFirebits(spritesCtx, frames.rx, frames.ry, "red");
+                drawFirebits(spritesCtx, frames.ox, frames.oy, "darkOrange");
+                return function (ctx, fb) {
+                    var i = fb.frame % fbNumRecordedFrames; // In case of e.g. off by one error
+                    ctx.drawImage(sprites, i * w, 0, w, h, fb.x - offsetRadius, fb.y - offsetRadius, w, h);
+                };
+            }()),
+            drawCoin = (function () {
+                var s = coinRadius * 2.5;
+                var doRender = function (useStarsStyle, ctx) {
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    circleAt(ctx, s / 2, s / 2, coinRadius);
+                    ctx.strokeStyle = useStarsStyle ? "darkgreen" : "orange";
+                    ctx.stroke();
+                    ctx.fillStyle = useStarsStyle ? "palegreen" : "yellow";
+                    ctx.fill();
 
-                ctx.beginPath();
-                for (i = 0; i < coins.length; i += 1) {
-                    if (objIsVisible(2 * coinRadius, coins[i])) {
-                        ctx.rect(coins[i].x - coinSquareLen / 2, coins[i].y - coinSquareLen / 2, coinSquareLen, coinSquareLen);
+                    ctx.fillStyle = useStarsStyle ? "palegreen" : "darkOrange";
+                    ctx.fillRect(s / 2 - coinSquareLen / 2, s / 2 - coinSquareLen / 2, coinSquareLen, coinSquareLen);
+                    if (useStarsStyle) {
+                        ctx.lineWidth = 1;
                     }
-                }
-                ctx.fillStyle = starfieldActive ? "palegreen" : "darkOrange";
-                ctx.fill();
-
-                if (starfieldActive) {
-                    ctx.lineWidth = 1;
-                }
-                // strokeStyle is still "orange"
-                ctx.stroke();
-            },
+                    ctx.strokeRect(s / 2 - coinSquareLen / 2, s / 2 - coinSquareLen / 2, coinSquareLen, coinSquareLen);
+                };
+                var gold = offScreenRender(s, s, doRender.bind(null, false));
+                var green = offScreenRender(s, s, doRender.bind(null, true));
+                return function (ctx, coin) {
+                    ctx.drawImage(starfieldActive ? green : gold, coin.x - s / 2, coin.y - s / 2);
+                };
+            }()),
             setupGenericPlatfmChars = function (ctx) {
                 ctx.strokeStyle = starfieldActive ? "white" : "black";
                 ctx.lineWidth = platfmThickness;
@@ -618,7 +752,7 @@ if (typeof Math.log2 !== "function") {
                         ctx.stroke();
                     }),
                     "weight": offScreenRender(powerupWeightBlockLowerWidth, powerupWeightHeight, function (ctx, w, fullHeight) {
-                        var cx = w / 2, cy = fullHeight / 2;
+                        var cx = w / 2;
                         var blockHeight = powerupWeightBlockHeight;
                         var handleHeight = powerupWeightHandleHeight;
 
@@ -843,9 +977,9 @@ if (typeof Math.log2 !== "function") {
             }()),
             drawMenu = function (menu) {
                 mainCtx.clearRect(-1, -1, gameWidth + 1, gameHeight + 1);
-                drawFbs(mainCtx, menu.fbs);
-                drawFirebits(mainCtx, menu.firebitsRed, starfieldActive ? "blue" : "red");
-                drawFirebits(mainCtx, menu.firebitsOrg, starfieldActive ? "royalblue" : "darkOrange");
+                menu.fbs.forEach(function (fb) {
+                    drawFb(mainCtx, fb);
+                });
                 drawMenuTitle(mainCtx);
                 drawBtn(mainCtx, menuPlayBtn);
             },
@@ -866,10 +1000,12 @@ if (typeof Math.log2 !== "function") {
                 if (game.previewPlatfmTouch) {
                     drawPreviewPlatfm(mainCtx, game.previewPlatfmTouch);
                 }
-                drawFbs(mainCtx, game.fbs);
-                drawFirebits(mainCtx, game.firebitsRed, starfieldActive ? "blue" : "red");
-                drawFirebits(mainCtx, game.firebitsOrg, starfieldActive ? "royalblue" : "darkOrange");
-                drawCoins(mainCtx, game.coins);
+                game.fbs.forEach(function (fb) {
+                    drawFb(mainCtx, fb);
+                });
+                game.coins.forEach(function (coin) {
+                    drawCoin(mainCtx, coin);
+                });
                 game.powerups.forEach(function (powerup) {
                     var x = powerup.xPos();
                     var y = powerup.yPos();
@@ -1020,136 +1156,6 @@ if (typeof Math.log2 !== "function") {
         };
     }());
 
-    // Vector and line util:
-    var anglify = function (doCalc, f) {
-            // If 'doCalc' is true, the object in question ('this') has
-            //  properties x0, y0, x1, y1, and the anglify methods will
-            //  DO the CALCulation of converting those to length deltas.
-            // If 'doCalc' is false, the object has vx, vy properties.
-            var proto = {
-                angle: function () {
-                    return doCalc ? Math.atan2(this.y1 - this.y0, this.x1 - this.x0)
-                                  : Math.atan2(this.vy, this.vx);
-                },
-                magnitudeSquared: function () {
-                    return doCalc ? distanceSquared(this.x0, this.y0, this.x1, this.y1)
-                                  : (this.vx * this.vx + this.vy * this.vy);
-                },
-                slope: function () {
-                    return doCalc ? (this.y1 - this.y0) / (this.x1 - this.x0)
-                                  : this.vy / this.vx;
-                }
-            };
-            if (!doCalc) {
-                proto.setMagnitude = function (mag) {
-                    var angle = this.angle();
-                    this.vx = trig.cos(angle) * mag;
-                    this.vy = trig.sin(angle) * mag;
-                };
-            }
-            return function () {
-                return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
-            };
-        },
-        createVel = anglify(false, function (vx, vy) {
-            return {vx: vx, vy: vy};
-        }),
-        withAngularCtrls = (function () {
-            var proto = {
-                angleTo: function (xy) { // Currently unused, but as definition adds only constant time and may be useful in future, I'll leave it.
-                    return Math.atan2(xy.y - this.y, xy.x - this.x);
-                },
-                distanceTo: function (xy) {
-                    return dist(this.x, this.y, xy.x, xy.y);
-                },
-                setDistanceTo: function (xy, newd) {
-                    var vectorFromPlayer = createVel(this.x - xy.x, this.y - xy.y),
-                        newAbsoluteVector;
-                    vectorFromPlayer.setMagnitude(newd);
-                    newAbsoluteVector = createVel(xy.x + vectorFromPlayer.vx, xy.y + vectorFromPlayer.vy);
-                    this.x = newAbsoluteVector.vx;
-                    this.y = newAbsoluteVector.vy;
-                }
-            };
-            return function (f) {
-                return function () {
-                    return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
-                };
-            };
-        }());
-
-    // Constructors for in-game objects:
-    var createPlayer = anglify(false, function (x, y, vx, vy) {
-            return {x: x, y: y, vx: vx, vy: vy, wheelAngle: 0, ducking: false};
-        }),
-        createPlatfm = anglify(true, function (x0, y0, x1, y1) {
-            return {x0: x0, y0: y0, x1: x1, y1: y1, time_left: 800};
-        }),
-        createCoin = withAngularCtrls(function (x, y) {
-            return {x: x, y: y};
-        }),
-        createFb = function (x, y) {
-            return {x: x, y: y};
-        },
-        createFirebit = function (x, y) {
-            return {x: x, y: y, lifespan: 0};
-        },
-        createPowerup = (function () {
-            var proto = {
-                xDistanceTravelled: function () {
-                    return this.lifetime / powerupTotalLifespan * gameWidth;
-                },
-                xPos: function () {
-                    return this.xDistanceTravelled();
-                },
-                yPos: function () {
-                    return this.offsetY + trig.sin(this.xDistanceTravelled() / 20) * 40;
-                }
-            };
-            return function (y, powerupType) {
-                return makeObject(proto, {offsetY: y, lifetime: 0, type: powerupType});
-            };
-        }()),
-        createActivePowerup = function (type, srcX, srcY) {
-            var lifetime = type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan;
-            return {
-                type: type,
-                width: type === "X2" ? powerupX2Width :
-                       type === "slow" ? powerupSlowRadius * 2 :
-                       type === "weight" ? 40 :
-                       type === "magnet" ? powerupSlowRadius * 2 + 15 :
-                       40,
-                totalLifetime: lifetime,
-                lifetime: lifetime,
-                srcX: srcX,
-                srcY: srcY,
-                timeSinceAcquired: 0
-            };
-        },
-        createGame = (function () {
-            var mkPowerupsObj = iterableObjectFactory(["X2", "slow", "weight", "magnet"]);
-            return function () {
-                return {
-                    player: createPlayer(gameWidth / 2, 50, 0, 0),
-                    platfms: [],
-                    previewPlatfmTouch: null,
-                    fbs: [],
-                    firebitsRed: [],
-                    firebitsOrg: [],
-                    coins: [],
-                    coinColumnsLowest: [],
-                    coinGridOffset: 0,
-                    powerups: mkPowerupsObj({}),
-                    activePowerups: [],
-                    points: 0,
-                    paused: false,
-                    dead: false,
-                    statsPrev: {},
-                    stats: {} // For debugging aid
-                };
-            };
-        }());
-
     // Collision predicates:
     var Collision = {
         player_platfm: function (player, platfm) {
@@ -1246,43 +1252,18 @@ if (typeof Math.log2 !== "function") {
         },
         // 'fb' is short for 'fireball'
         updateFbsGeneric = (function () {
-            var // firebits: the little slivers that fall around a fireball
-                makeFirebitAround = function (fbX, fbY) {
-                    var relX = Math.random() * 2 * fbRadius - fbRadius,
-                        absoluteX = fbX + relX,
-                        // Now, place the y close to the top edge of the
-                        // fireball with a quadratic approximation. See graph
-                        // at http://wolfr.am/6LvgDMu~ for what I'm going for.
-                        highestRelY = (fbRadius + 3) - relX * relX / 19,
-                        relY = Math.random() * -highestRelY,
-                        absoluteY = fbY + relY;
-                    return createFirebit(absoluteX, absoluteY);
-                },
-                fewInLowerPortion = function (fbArray) {
-                    // Predicate asks: are there few enough fbs in bottom
-                    // of screen that more should be made?
-                    var i, fb;
-                    for (i = 0; i < fbArray.length; i += 1) {
-                        fb = fbArray[i];
-                        if (fb.y > gameHeight * 3 / 4) {
-                            return false;
-                        }
+            var fewInLowerPortion = function (fbArray) {
+                // Predicate asks: are there few enough fbs in bottom
+                // of screen that more should be made?
+                var i, fb;
+                for (i = 0; i < fbArray.length; i += 1) {
+                    fb = fbArray[i];
+                    if (fb.y > gameHeight * 3 / 4) {
+                        return false;
                     }
-                    return true;
-                },
-                updateFirebits = function (firebits, dt) {
-                    firebits.forEach(function (firebit, index) {
-                        firebit.y += Math.random() * 1.1 + 0.1;
-                        firebit.x += Math.round(Math.random() * 10) / 10 - 0.58;
-                        // The fact that (above) there needs to be leftward
-                        // compensation means there may be a systematic error
-                        // elsewhere.
-                        firebit.lifespan += dt;
-                        if (firebit.lifespan >= 100 && Math.random() < 0.3) {
-                            firebits.splice(index, 1);
-                        }
-                    });
-                };
+                }
+                return true;
+            };
             return function (obj, dt) {
                 // Can be passed a menu object or game object, and
                 // thus is not directly placed in gUpdaters.
@@ -1291,26 +1272,11 @@ if (typeof Math.log2 !== "function") {
                     if (fb.y < -totalFbHeight - 20) {
                         obj.fbs.splice(index, 1);
                     }
-                    obj.firebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsRed.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
-                    obj.firebitsOrg.push(makeFirebitAround(fb.x, fb.y));
+                    fb.frame += 1;
+                    if (fb.frame >= fbNumRecordedFrames) {
+                        fb.frame = 0;
+                    }
                 });
-                updateFirebits(obj.firebitsRed, dt);
-                updateFirebits(obj.firebitsOrg, dt);
                 var chanceFactor = 4 / 7;
                 if (Math.random() < 1 / 7000 * chanceFactor * dt || fewInLowerPortion(obj.fbs)) {
                     obj.fbs.push(createFb(
@@ -1384,7 +1350,7 @@ if (typeof Math.log2 !== "function") {
                     }
                 },
                 velFromPlatfm = function (player, platfm, dt) {
-                    var cappedDt = Math.min(dt, approxFramelength), // To prevent slow frames from making the player launch forward
+                    var cappedDt = Math.min(dt, approxFrameLen), // To prevent slow frames from making the player launch forward
                         slope = platfm.slope(),
                         cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * cappedDt - platfmBounciness * cappedDt),
                         calculatedMagSqd = cartesianVel.magnitudeSquared(),
@@ -1583,7 +1549,7 @@ if (typeof Math.log2 !== "function") {
                     if (resumeBtn.touchIsInside(p)) {
                         game.paused = false;
                         requestAnimationFrame(function () {
-                            return Render.btnLayer(game)
+                            return Render.btnLayer(game);
                         });
                     }
                 } else if (game.dead) {
@@ -1593,7 +1559,7 @@ if (typeof Math.log2 !== "function") {
                 } else if (!disallowPause && pauseBtn.touchIsInside(p)) {
                     game.paused = true;
                     requestAnimationFrame(function () {
-                        return Render.btnLayer(game)
+                        return Render.btnLayer(game);
                     });
                 }
             },
@@ -1606,10 +1572,10 @@ if (typeof Math.log2 !== "function") {
                         dt = now - lastRedraw,
                         touch = calcTouchPos(event);
                     if (dt > 30 && // To prevent way-too-inefficiently-frequent rerendering
-                            touch.x > pauseBtn.edgeX() - sensitivityMarginX && 
+                            touch.x > pauseBtn.edgeX() - sensitivityMarginX &&
                             touch.y < pauseBtn.y + pauseBtn.h + sensitivityMarginY) {
                         requestAnimationFrame(function () {
-                            return Render.btnLayer(game)
+                            return Render.btnLayer(game);
                         });
                         return now; // Tell caller last redraw happened at 'now'
                     }
@@ -1622,22 +1588,29 @@ if (typeof Math.log2 !== "function") {
     var play = function (existingGame) {
             var game = existingGame || createGame(),
                 restart = function () {
-                    // The interval isn't cleared because the same interval
-                    // is used for the next game (after the restart).
                     game = createGame();
                     setCurGame(game);
                     Render.btnLayer(game);
                 },
-                prevFrameTime = performance.now();
+                prevFrameTime = performance.now() - approxFrameLen,
+                startTime = performance.now();
             setCurGame(game);
-            (function runFrame(now) {
-                requestAnimationFrame(runFrame);
+            window.deltas = window.deltas || [];
 
+            requestAnimationFrame(function runFrame(now) {
                 window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
 
+                requestAnimationFrame(runFrame);
+
                 // Initialize time deltas
-                var realDt = now - prevFrameTime,
-                    dt;
+                var realDt = now - prevFrameTime;
+                if (!game.paused && !game.dead) {
+                    if (startTime !== now) {
+                        // To prevent the first time delta (manufactured to
+                        // always be approxFrameLen) from confusing the data
+                        window.deltas.push(realDt);
+                    }
+                }
 
                 game.statsPrev = game.stats;
                 game.stats = {};
@@ -1645,7 +1618,7 @@ if (typeof Math.log2 !== "function") {
                 game.stats.literalTimeDiff = realDt;
                 // Cap realDt at 3 times the normal frame length to prevent
                 // a large noticable jump in on-screen objects:
-                realDt = Math.min(realDt, approxFramelength * 3);
+                realDt = Math.min(realDt, approxFrameLen * 3);
 
                 game.stats.diffCurve = difficultyCurveFromPoints(game.points);
                 realDt *= game.stats.diffCurve;
@@ -1654,7 +1627,7 @@ if (typeof Math.log2 !== "function") {
                     // (or link in a chain of causes) for an error.
                     // If this ever happens, something went very wrong, so avoid
                     // anything further and hope it was just for that frame.
-                    realDt = approxFramelength;
+                    realDt = approxFrameLen;
                     localStorage.setItem("error_log", (localStorage.getItem("error_log") || "") + "\n,\n" + JSON.stringify({t: Date.now(), game: game}) + '\n,"realDt is ' + realDt + " of type" + (typeof realDt) + '"');
                     console.log("realDt toxic. info added to error_log at " + Date.now());
                 }
@@ -1662,6 +1635,7 @@ if (typeof Math.log2 !== "function") {
 
 
                 // Handle effects of slow powerup
+                var dt;
                 if (powerupObtained(game.activePowerups, "slow")) {
                     dt = realDt * 2/3;
                     // Any functions given 'dt' as the time delta will thus
@@ -1705,7 +1679,7 @@ if (typeof Math.log2 !== "function") {
                     // Render
                     Render.game(game);
                 }
-            }(performance.now()));
+            });
             Touch.onTouchend = function (touch) {
                 gEventHandlers.handleTouchendForPlatfmAdd(game, touch);
                 if (game.paused || game.dead) {
@@ -1750,7 +1724,7 @@ if (typeof Math.log2 !== "function") {
         timeBetweenAutoTouches = 600,
         runTutorial = function () {
             var game = createGame(),
-                prevFrameTime = performance.now(),
+                prevFrameTime = performance.now() - approxFrameLen,
                 autoTouchDir = 1,
                 curAutomatedTouch = createAutomatedTouch(autoTouchDir),
                 interTouchWait = 0,
@@ -1772,11 +1746,10 @@ if (typeof Math.log2 !== "function") {
                     curAutomatedTouch = createAutomatedTouch(autoTouchDir);
                 };
             var prevX, prevY, midwayX, midwayY;
-            (function runFrame(now) {
+            requestAnimationFrame(function runFrame(now) {
                 if (realGameReady) {
                     return startRealGame();
                 }
-
                 requestAnimationFrame(runFrame);
 
                 window.tutorial = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
@@ -1785,7 +1758,7 @@ if (typeof Math.log2 !== "function") {
                 var dt = now - prevFrameTime;
                 // Cap dt at 3 times the normal frame length to prevent
                 // a large noticable jump in on-screen objects:
-                dt = Math.min(dt, approxFramelength * 3);
+                dt = Math.min(dt, approxFrameLen * 3);
 
                 dt *= difficultyCurveFromPoints(0);
 
@@ -1828,7 +1801,7 @@ if (typeof Math.log2 !== "function") {
                     }
                     Render.tutorial(game, midwayX, midwayY);
                 }
-            }(performance.now()));
+            });
             Touch.onTouchend = function (touch) {
                 gEventHandlers.handleTouchendForPlatfmAdd(game, touch);
                 if (game.paused || game.dead) {
@@ -1850,7 +1823,7 @@ if (typeof Math.log2 !== "function") {
         },
         runMenu = function () {
             var menu = createMenu(),
-                prevTime = performance.now(),
+                prevFrameTime = performance.now() - approxFrameLen,
                 startGame = function () {
                     document.body.onclick = function () {};
                     Touch.onTouchend = null;
@@ -1858,17 +1831,17 @@ if (typeof Math.log2 !== "function") {
                 },
                 playPressed = false;
             window.menu = menu;
-            (function runFrame(now) {
+            requestAnimationFrame(function runFrame(now) {
                 if (playPressed) {
                     return startGame();
                 }
                 requestAnimationFrame(runFrame);
-                var dt = now - prevTime;
-                prevTime = now;
+                var dt = now - prevFrameTime;
+                prevFrameTime = now;
                 updateFbsGeneric(menu, dt);
                 Render.background(true);
                 Render.menu(menu);
-            }(performance.now()));
+            });
             document.body.onclick = function (event) {
                 var pos = calcTouchPos(event), tpos = {x1: pos.x, y1: pos.y};
                 if (menuPlayBtn.touchIsInside(tpos)) {
