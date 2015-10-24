@@ -461,7 +461,9 @@ if (typeof Math.log2 !== "function") {
                 var newCanvas = document.createElement('canvas');
                 newCanvas.width = width;
                 newCanvas.height = height;
-                render(newCanvas.getContext('2d'), width, height);
+                var ctx = newCanvas.getContext('2d');
+                ctx.translate(0.5, 0.5);
+                render(ctx, width, height);
                 return newCanvas;
             };
         // Renderers:
@@ -802,7 +804,10 @@ if (typeof Math.log2 !== "function") {
                     if (type === "weight") {
                         y -= 1;
                     }
+                    ctx.save();
+                    ctx.translate(-0.5, -0.5);
                     ctx.drawImage(canvas, x - canvas.width / 2, y - canvas.height / 2);
+                    ctx.restore();
                 };
             }()),
             drawActivePowerupBackground = function (ctx, lifeleft, totalLifetime, x, y) {
