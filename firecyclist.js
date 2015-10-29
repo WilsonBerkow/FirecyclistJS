@@ -572,13 +572,16 @@ if (typeof Math.log2 !== "function") {
 
                     ctx.stroke();
 
-                    // Solid, background-colored body of head, with slight extra radius for outline:
-                    var style = ctx.fillStyle;
+                    // Solid, transparent body of head, with slight extra radius for transparent border:
+                    ctx.save();
                     ctx.beginPath();
-                    ctx.fillStyle = useStarsStyle ? "black" : canvasBackground;
                     circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius + 1);
-                    ctx.fill();
-                    ctx.fillStyle = style;
+                    ctx.clip();
+                    ctx.clearRect(playerHeadX - playerHeadRadius - 1,
+                                  playerHeadY - playerHeadRadius - 1,
+                                  playerHeadRadius * 2,
+                                  playerHeadRadius * 2);
+                    ctx.restore();
 
                     // Now for the lines to appear in front of head:
 
