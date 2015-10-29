@@ -171,8 +171,7 @@ if (typeof Math.log2 !== "function") {
         }());
 
     // Config:
-    var canvasBackground = "rgb(153, 217, 234)", // Same color used in CSS
-        starfieldActive = false,
+    var starfieldActive = false,
         approxFrameLen = 1000 / 60, // With requestAnimationFrame, this is approximate
         playerGrav = 0.32 / 28,
         fbRiseRate = 0.1,
