@@ -525,8 +525,10 @@ if (typeof Math.log2 !== "function") {
             },
             wheelOutlineAt = function (ctx, x, y, useStarsStyle) {
                 // Wheel outline is drawn in two solid parts to get around
-                // Chrome-for-Android rendering bug.
-                var style = ctx.fillStyle;
+                // Chrome-for-Android rendering bug for outlined arcs of
+                // a certian size.
+                ctx.save();
+
                 ctx.beginPath();
                 circleAt(ctx, x, y, playerRadius);
                 ctx.fillStyle = useStarsStyle ? "white" : "black";
@@ -534,10 +536,10 @@ if (typeof Math.log2 !== "function") {
 
                 ctx.beginPath();
                 circleAt(ctx, x, y, playerRadius - 1);
-                ctx.fillStyle = useStarsStyle ? "black" : canvasBackground;
-                ctx.fill();
+                ctx.clip();
+                ctx.clearRect(x - playerRadius, y - playerRadius, playerRadius * 2, playerRadius * 2);
 
-                ctx.fillStyle = style;
+                ctx.restore();
             },
             drawPlayerDuckingAt = (function () {
                 var w = playerRadius * 3;
