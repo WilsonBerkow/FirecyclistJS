@@ -1044,14 +1044,15 @@ if (typeof Math.log2 !== "function") {
                 drawInGamePoints(mainCtx, game);
                 mainCtx.restore();
             },
-            drawTutorialHand = function (ctx, x, y) {
-                ctx.font = "80px r0";
-                ctx.fillStyle = "tan";
-                ctx.fillText("☚", x + 36, y + 36);
-                ctx.strokeStyle = "brown";
-                ctx.lineWidth = 3;
-                ctx.strokeText("☚", x + 36, y + 36);
-            },
+            drawTutorialHand = (function () {
+                var handClouds = new Image();
+                handClouds.src = "img/hand-on-blue.png";
+                var handStars = new Image();
+                handStars.src = "img/hand-on-black.png";
+                return function (ctx, x, y) {
+                    ctx.drawImage(starfieldActive ? handStars : handClouds, x, y);
+                };
+            }()),
             drawSwipeHelpText = (function () {
                 var t0 = "Swipe to draw",
                     t1 = "platforms";
