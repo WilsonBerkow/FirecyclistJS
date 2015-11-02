@@ -1,6 +1,6 @@
 {
     "name": "Firecyclist",
-    "xwalk_version": "0.0.16",
+    "xwalk_version": "0.0.17",
     "start_url": "index.html",
     "display": "fullscreen",
     "orientation": "portrait",

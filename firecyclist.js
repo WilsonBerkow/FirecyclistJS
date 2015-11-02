@@ -173,7 +173,7 @@ if (typeof Math.log2 !== "function") {
     // Config:
     var starfieldActive = false,
         approxFrameLen = 1000 / 60, // With requestAnimationFrame, this is approximate
-        playerGrav = 0.32 / 28,
+        playerGrav = 0.3 / 28,
         fbRiseRate = 0.1,
         fbRadius = 10,
         fbNumRecordedFrames = 300,
@@ -432,6 +432,7 @@ if (typeof Math.log2 !== "function") {
                     powerups: mkPowerupsObj({}),
                     activePowerups: [],
                     points: 0,
+                    pointsFromCoins: 0,
                     paused: false,
                     dead: false,
                     statsPrev: {},
@@ -1329,9 +1330,36 @@ if (typeof Math.log2 !== "function") {
             return false;
         },
 
-        difficultyCurveFromPoints = function (x) {
+        // The following difficulty curve functions are based on "time points",
+        // which are (game.points - game.pointsFromCoins), i.e. the number
+        // of points gotten from just time spent in the game. Doing it based
+        // on this and not straight points prevents clear jumps in difficulty
+        // after getting a bunch of coins at once, and not on straight time
+        // playing so that people struggling at the top of the screen don't
+        // get overwhelmed too quickly.
+        difficultyCurveFromTimePoints = function (x) {
             x = Math.max(x, 0); // Just in case (i.e. strongly avoiding NaN)
-            return Math.log2(x + 100) / 37 + 0.67;
+            return x < 20 ? 0.8 :
+                   // x < 50 ? same as below :
+                   x < 100 ? 0.8 + (x - 20) * 0.001 : // (increase linearly)
+                   x < 300 ? 0.83 + (x - 100) * 0.0005 : // (increase linearly)
+                   x < 600 ? 0.98 : // (level off)
+                   0.98 + (x - 600) * 0.0001; // (slowly, increase linearly)
+        },
+        unitsOfPlayerGrav = function (x) {
+            return x * playerGrav * 88;
+        },
+        maxVyFromTimePoints = function (x) {
+            x = Math.max(x, 0);
+            var mvy =
+                x < 20 ? 6 :
+                x < 50 ? 6 :
+                x < 100 ? 7 :
+                x < 300 ? 7 + (x - 100) * 0.01 : // (increase linearly)
+                x < 500 ? 9 : // (level off)
+                x < 700 ? 9 + (x - 500) * 0.01 : // (increase linearly)
+                11; // (level off)
+            return unitsOfPlayerGrav(mvy);
         },
         handleActivesPoints = function (activePowerups, pointsReceived) {
             // Handle the effect that active powerups have on the amount of
@@ -1382,13 +1410,13 @@ if (typeof Math.log2 !== "function") {
                         game.coinColumnsLowest[column] = newcoin;
                     }
                 },
-                velFromPlatfm = function (player, platfm, dt) {
-                    var cappedDt = Math.min(dt, approxFrameLen), // To prevent slow frames from making the player launch forward
+                velFromPlatfm = function (player, platfm, dt, uncurvedDt) {
+                    var cappedDt = Math.min(uncurvedDt, approxFrameLen), // To prevent slow frames from making the player launch forward
                         slope = platfm.slope(),
-                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * cappedDt - platfmBounciness * cappedDt),
+                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * dt - platfmBounciness * cappedDt),
                         calculatedMagSqd = cartesianVel.magnitudeSquared(),
                         playerMagSqd = player.magnitudeSquared();
-                    cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd + 0.1, playerMagSqd)) + playerGrav * dt + 0.15);
+                    cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd + 0.1, playerMagSqd)) + playerGrav * uncurvedDt + 0.15);
                     return cartesianVel;
                 },
                 die = function (game) {
@@ -1400,7 +1428,7 @@ if (typeof Math.log2 !== "function") {
                     Render.btnLayer(game);
                 };
             return {
-                player: function (game, dt) {
+                player: function (game, dt, uncurvedDt) {
                     var i, platfm, tmpVel, collided = false;
                     if (game.previewPlatfmTouch && Collision.player_platfm(game.player, game.previewPlatfmTouch)) {
                         // Use game.previewPlatfmTouch rather than Touch.curTouch
@@ -1426,7 +1454,7 @@ if (typeof Math.log2 !== "function") {
                     for (i = 0; i < game.platfms.length; i += 1) {
                         platfm = game.platfms[i];
                         if (Collision.player_platfm(game.player, platfm)) {
-                            tmpVel = velFromPlatfm(game.player, platfm, dt);
+                            tmpVel = velFromPlatfm(game.player, platfm, dt, uncurvedDt);
                             game.player.vx = tmpVel.vx;
                             game.player.vy = tmpVel.vy;
                             collided = true;
@@ -1434,14 +1462,15 @@ if (typeof Math.log2 !== "function") {
                     }
                     if (!collided) {
                         if (powerupObtained(game.activePowerups, "weight")) {
-                            game.player.vy += playerGrav * 5 / 2 * dt;
+                            game.player.vy += playerGrav * 5 / 2 * uncurvedDt;
                         } else {
-                            game.player.vy += playerGrav * dt;
+                            game.player.vy += playerGrav * uncurvedDt;
                         }
                         // In each of the above, the velocity addition must
-                        // be scaled by `dt` because it represents the
-                        // accumulation of gravity over `dt` milliseconds.
+                        // be scaled by `uncurvedDt` because it represents the
+                        // accumulation of gravity over `uncurvedDt` milliseconds.
                     }
+                    game.player.vy = Math.min(game.player.vy, maxVyFromTimePoints(game.points - game.pointsFromCoins));
                     game.player.ducking = false;
                     for (i = 0; i < game.fbs.length; i += 1) {
                         if (game.player.ducking === false && Collision.playerHeadNearFb(game.player, game.fbs[i])) {
@@ -1454,7 +1483,9 @@ if (typeof Math.log2 !== "function") {
                     game.coins.forEach(function (coin, index) {
                         if (Collision.player_coin(game.player, coin)) {
                             game.coins.splice(index, 1);
-                            game.points += handleActivesPoints(game.activePowerups, coinValue * difficultyCurveFromPoints(game.points));
+                            var newPoints = handleActivesPoints(game.activePowerups, coinValue * difficultyCurveFromTimePoints(game.points - game.pointsFromCoins));
+                            game.points += newPoints;
+                            game.pointsFromCoins += newPoints; // Needs to be kept track of for difficulty curve, which is not affected by coin points
                         }
                     });
                     game.powerups.forEach(function (powerup, key) {
@@ -1463,9 +1494,9 @@ if (typeof Math.log2 !== "function") {
                             addToActivePowerups(game, powerup.type, powerup.xPos(), powerup.yPos());
                         }
                     });
-                    game.player.x = modulo(game.player.x + game.player.vx * dt / 20, gameWidth);
-                    game.player.y += game.player.vy * dt / 20;
-                    game.player.wheelAngle += signNum(game.player.vx) * 0.22 * dt;
+                    game.player.x = modulo(game.player.x + game.player.vx * uncurvedDt / 20, gameWidth);
+                    game.player.y += game.player.vy * uncurvedDt / 20;
+                    game.player.wheelAngle += signNum(game.player.vx) * 0.22 * uncurvedDt;
                 },
                 fbs: updateFbsGeneric,
                 coins: function (game, dt) {
@@ -1653,7 +1684,8 @@ if (typeof Math.log2 !== "function") {
                 // a large noticable jump in on-screen objects:
                 realDt = Math.min(realDt, approxFrameLen * 3);
 
-                game.stats.diffCurve = difficultyCurveFromPoints(game.points);
+                game.stats.diffCurve = difficultyCurveFromTimePoints(game.points - game.pointsFromCoins);
+                var uncurvedDt = realDt;
                 realDt *= game.stats.diffCurve;
                 if (realDt < 0 || !Number.isFinite(realDt)) {
                     // I have reason to believe that this situation may be a cause
@@ -1671,6 +1703,7 @@ if (typeof Math.log2 !== "function") {
                 var dt;
                 if (powerupObtained(game.activePowerups, "slow")) {
                     dt = realDt * 2/3;
+                    uncurvedDt *= 2/3;
                     // Any functions given 'dt' as the time delta will thus
                     // behave as if 2/3 as much time has passed.
                 } else {
@@ -1690,7 +1723,7 @@ if (typeof Math.log2 !== "function") {
                 } else {
                     // Update state
                     game.previewPlatfmTouch = Touch.curTouch;
-                    gUpdaters.player(game, dt);
+                    gUpdaters.player(game, dt, Math.min(dt, uncurvedDt * 0.83));
                     gUpdaters.coins(game, dt);
                     gUpdaters.fbs(game, dt);
                     gUpdaters.platfms(game, dt);
@@ -1793,7 +1826,8 @@ if (typeof Math.log2 !== "function") {
                 // a large noticable jump in on-screen objects:
                 dt = Math.min(dt, approxFrameLen * 3);
 
-                dt *= difficultyCurveFromPoints(0);
+                var uncurvedDt = dt;
+                dt *= difficultyCurveFromTimePoints(0);
 
                 prevFrameTime = now;
 
@@ -1804,7 +1838,7 @@ if (typeof Math.log2 !== "function") {
                     Render.gameDead(game);
                 } else {
                     // Update state
-                    gUpdaters.player(game, dt);
+                    gUpdaters.player(game, dt, uncurvedDt * 0.83);
                     gUpdaters.platfms(game, dt);
                     if (Touch.curTouch) {
                         materializeAutoTouch();
@@ -1871,7 +1905,7 @@ if (typeof Math.log2 !== "function") {
                 requestAnimationFrame(runFrame);
                 var dt = now - prevFrameTime;
                 prevFrameTime = now;
-                updateFbsGeneric(menu, dt);
+                updateFbsGeneric(menu, dt * 0.83);
                 Render.background(true);
                 Render.menu(menu);
             });
