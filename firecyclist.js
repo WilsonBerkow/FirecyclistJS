@@ -427,7 +427,8 @@ if (typeof Math.log2 !== "function") {
                     firebitsRed: [],
                     firebitsOrg: [],
                     coins: [],
-                    coinColumnsLowest: [],
+                    coinReleaseMode: "random",
+                    coinReleaseModeTimeLeft: null, // In "random" mode, mode switch is random, not timed
                     coinGridOffset: 0,
                     powerups: mkPowerupsObj({}),
                     activePowerups: [],
@@ -1033,11 +1034,11 @@ if (typeof Math.log2 !== "function") {
                 if (game.previewPlatfmTouch) {
                     drawPreviewPlatfm(mainCtx, game.previewPlatfmTouch);
                 }
-                game.fbs.forEach(function (fb) {
-                    drawFb(mainCtx, fb);
-                });
                 game.coins.forEach(function (coin) {
                     drawCoin(mainCtx, coin);
+                });
+                game.fbs.forEach(function (fb) {
+                    drawFb(mainCtx, fb);
                 });
                 game.powerups.forEach(function (powerup) {
                     var x = powerup.xPos();
@@ -1397,18 +1398,56 @@ if (typeof Math.log2 !== "function") {
                 makePowerupRandom = function (type, start, range) {
                     return createPowerup(Math.random() * range + start, type);
                 },
+
+                // Constants for handling the grid of coins:
+                coinColumnsStd = 8,
+                coinColWidthStd = gameWidth / coinColumnsStd,
+                // When making "blocks" of coins, denser column mode is used:
+                coinColumnsDense = 10,
+                coinColWidthDense = gameWidth / coinColumnsDense,
+                // So that random-released coins don't overlap with early pattern-released ones:
+                patternCoinStartingY = coinStartingY + coinColWidthStd,
+
                 addDiagCoinPattern = function (game, do_rtl) {
                     // If do_rtl is truthy, the diag pattern
                     // will go down-and-left from the right.
-                    var columns = 8;
                     var column, xPos, newcoin;
-                    for (column = 0; column < columns; column += 1) {
-                        xPos = (column + 0.5) * 35;
+                    for (column = 0; column < coinColumnsStd; column += 1) {
+                        xPos = (column + 0.5) * coinColWidthStd;
                         if (do_rtl) { xPos = gameWidth - xPos; }
-                        newcoin = createCoin(xPos, coinStartingY + column * 35);
+                        newcoin = createCoin(xPos, patternCoinStartingY + column * coinColWidthStd);
                         game.coins.push(newcoin);
-                        game.coinColumnsLowest[column] = newcoin;
                     }
+                    game.coinReleaseMode = do_rtl ? "diagRTL" : "diagLTR";
+                    game.coinReleaseModeTimeLeft = (coinColumnsStd + 1) * coinColWidthStd / (coinRiseRate * 0.9); // Approximate time the coins will take to be fully visible
+                },
+                addCoinBlock = function (game, w, h, row, col) {
+                    var curRow, curCol, xPos, yPos, newCoin;
+                    for (curRow = row; curRow < row + h; curRow += 1) {
+                        for (curCol = col; curCol < col + w; curCol += 1) {
+                            xPos = (curCol + 0.5) * coinColWidthDense;
+                            yPos = patternCoinStartingY + (curRow + 0.5) * coinColWidthDense;
+                            newCoin = createCoin(xPos, yPos);
+                            game.coins.push(newCoin);
+                        }
+                    }
+                },
+                addBlocksCoinPattern = function (game) {
+                    // Generate a width and height between 2*2 and 4*4,
+                    // heavily weighted against w=4 or h=4.
+                    var w = 2 + Math.floor(Math.random() * 2 + 0.1);
+                    var h = 2 + Math.floor(Math.random() * 2 + 0.1);
+                    // Generate appropriate position of block.
+                    var col = Math.floor(Math.random() * (coinColumnsDense - w));
+                    addCoinBlock(game, w, h, 0, col);
+                    game.coinReleaseMode = "blocks";
+                    game.coinReleaseModeTimeLeft = (h + 1) * coinColWidthDense / (coinRiseRate * 0.9);
+                },
+                addCoinRandom = function (game) {
+                    var column = Math.floor(Math.random() * coinColumnsStd);
+                    var pos = (column + 0.5) * coinColWidthStd;
+                    var newcoin = createCoin(pos, coinStartingY + coinColWidthStd - game.coinGridOffset);
+                    game.coins.push(newcoin);
                 },
                 velFromPlatfm = function (player, platfm, dt, uncurvedDt) {
                     var cappedDt = Math.min(uncurvedDt, approxFrameLen), // To prevent slow frames from making the player launch forward
@@ -1507,7 +1546,7 @@ if (typeof Math.log2 !== "function") {
                     // to the bottom on-screen invisible line of that grid
                     // from the base of the screen.
                     game.coinGridOffset += dy;
-                    game.coinGridOffset = game.coinGridOffset % 35;
+                    game.coinGridOffset = game.coinGridOffset % coinColWidthStd;
                     game.coins.forEach(function (coin, index) {
                         coin.y -= dy;
                         var distance;
@@ -1521,21 +1560,45 @@ if (typeof Math.log2 !== "function") {
                             game.coins.splice(index, 1);
                         }
                     });
-                    var chanceFactor = 10 / 7;
-                    if (Math.random() < 1 / (1000 * 25) * dt) {
-                        addDiagCoinPattern(game, Math.random() < 0.5);
-                    } else {
-                        if (Math.random() < 1 / 1000 * chanceFactor * dt) {
-                            var column = Math.floor(Math.random() * 8);
-                            var pos = (column + 0.5) * 35;
-                            var newcoin = createCoin(pos, coinStartingY + 35 - game.coinGridOffset);
-                            game.coinColumnsLowest[column] = game.coinColumnsLowest[column] || newcoin;
-                            if (newcoin.y - game.coinColumnsLowest[column].y <= 35) {
-                                newcoin.y += 35;
-                                game.coinColumnsLowest[column] = newcoin;
+                    // Release modes are: "random", "blocks", "diagLTR", "diagRTL"
+                    var random = Math.random(); // Used in all following if/else branches
+                    if (game.coinReleaseMode === "random") {
+                        if (Math.random() < (dt / 1000) / 3) {
+                            if (random < 0.5) {
+                                // Do nothing, leaving "random" as the release mode
+                            } else if (random < 0.6) {
+                                addDiagCoinPattern(game, Math.random() < 0.5);
+                            } else {
+                                addBlocksCoinPattern(game);
                             }
-                            game.coins.push(newcoin);
+                        } else if (random < 1 / 1500 * dt) {
+                            // In this case "random" mode is still going and
+                            // a coin is due to be added (due to random condition)
+                            addCoinRandom(game);
                         }
+                    } else if (game.coinReleaseMode === "blocks") {
+                        if (game.coinReleaseModeTimeLeft <= 0) {
+                            if (random < 0.5) {
+                                addBlocksCoinPattern(game);
+                            } else if (random < 0.9) {
+                                game.coinReleaseMode = "random";
+                            } else {
+                                addDiagCoinPattern(game, Math.random() < 0.5);
+                            }
+                        }
+                    } else { // For diagLTR and diagRTL
+                        if (game.coinReleaseModeTimeLeft <= 0) {
+                            if (random < 0.25) {
+                                addDiagCoinPattern(game, game.coinReleaseMode === "diagLTR");
+                            } else if (random < 0.8) {
+                                game.coinReleaseMode = "random";
+                            } else {
+                                addBlocksCoinPattern(game);
+                            }
+                        }
+                    }
+                    if (Number.isFinite(game.coinReleaseModeTimeLeft)) {
+                        game.coinReleaseModeTimeLeft -= dt;
                     }
                 },
                 platfms: function (game, dt) {
