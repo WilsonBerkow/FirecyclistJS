@@ -1553,10 +1553,10 @@ if (typeof Math.log2 !== "function") {
                     var newcoin = createCoin(pos, coinStartingY + coinColWidthStd - game.coinGridOffset);
                     game.coins.push(newcoin);
                 },
-                velFromPlatfm = function (player, platfm, dt, uncurvedDt) {
+                velFromPlatfm = function (player, platfm, realDt, uncurvedDt) {
                     var cappedDt = Math.min(uncurvedDt, approxFrameLen), // To prevent slow frames from making the player launch forward
                         slope = platfm.slope(),
-                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * dt - platfmBounciness * cappedDt),
+                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * realDt - platfmBounciness * cappedDt),
                         calculatedMagSqd = cartesianVel.magnitudeSquared(),
                         playerMagSqd = player.magnitudeSquared();
                     cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd + 0.1, playerMagSqd)) + playerGrav * uncurvedDt + 0.15);
@@ -1571,7 +1571,7 @@ if (typeof Math.log2 !== "function") {
                     Render.btnLayer(game);
                 };
             return {
-                player: function (game, dt, uncurvedDt) {
+                player: function (game, realDt, dt, uncurvedDt) {
                     var i, platfm, tmpVel, collided = false;
                     if (game.previewPlatfmTouch && Collision.player_platfm(game.player, game.previewPlatfmTouch)) {
                         // Use game.previewPlatfmTouch rather than Touch.curTouch
@@ -1597,7 +1597,7 @@ if (typeof Math.log2 !== "function") {
                     for (i = 0; i < game.platfms.length; i += 1) {
                         platfm = game.platfms[i];
                         if (Collision.player_platfm(game.player, platfm)) {
-                            tmpVel = velFromPlatfm(game.player, platfm, dt, uncurvedDt);
+                            tmpVel = velFromPlatfm(game.player, platfm, realDt, uncurvedDt);
                             game.player.vx = tmpVel.vx;
                             game.player.vy = tmpVel.vy;
                             collided = true;
@@ -1890,7 +1890,7 @@ if (typeof Math.log2 !== "function") {
                 } else {
                     // Update state
                     game.previewPlatfmTouch = Touch.curTouch;
-                    gUpdaters.player(game, dt, Math.min(dt, uncurvedDt * 0.83));
+                    gUpdaters.player(game, realDt, dt, Math.min(dt, uncurvedDt * 0.83));
                     gUpdaters.coins(game, dt);
                     gUpdaters.fbs(game, dt);
                     gUpdaters.platfms(game, dt);
@@ -2005,7 +2005,7 @@ if (typeof Math.log2 !== "function") {
                     Render.gameDead(game);
                 } else {
                     // Update state
-                    gUpdaters.player(game, dt, uncurvedDt * 0.83);
+                    gUpdaters.player(game, dt, dt, uncurvedDt * 0.83);
                     gUpdaters.platfms(game, dt);
                     if (Touch.curTouch) {
                         materializeAutoTouch();
