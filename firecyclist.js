@@ -371,16 +371,15 @@ if (typeof Math.log2 !== "function") {
                 angleTo: function (xy) { // Currently unused, but as definition adds only constant time and may be useful in future, I'll leave it.
                     return Math.atan2(xy.y - this.y, xy.x - this.x);
                 },
-                distanceTo: function (xy) {
-                    return dist(this.x, this.y, xy.x, xy.y);
+                distanceSqdTo: function (xy) {
+                    return distanceSquared(this.x, this.y, xy.x, xy.y);
                 },
-                setDistanceTo: function (xy, newd) {
-                    var vectorFromPlayer = createVel(this.x - xy.x, this.y - xy.y),
-                        newAbsoluteVector;
-                    vectorFromPlayer.setMagnitude(newd);
-                    newAbsoluteVector = createVel(xy.x + vectorFromPlayer.vx, xy.y + vectorFromPlayer.vy);
-                    this.x = newAbsoluteVector.vx;
-                    this.y = newAbsoluteVector.vy;
+                setDistanceTo: function (obj, newDist) {
+                    var posRelToPlayer = createVel(this.x - obj.x, this.y - obj.y);
+                    posRelToPlayer.setMagnitude(newDist);
+                    this.x = obj.x + posRelToPlayer.vx;
+                    this.y = obj.y + posRelToPlayer.vy;
+                    // .vx and .vy are just position deltas, not velocities
                 }
             };
             return function (f) {
@@ -1653,10 +1652,12 @@ if (typeof Math.log2 !== "function") {
                     game.coinGridOffset = game.coinGridOffset % coinColWidthStd;
                     game.coins.forEach(function (coin, index) {
                         coin.y -= dy;
+                        var distanceSqd;
                         var distance;
                         if (magnetOn) {
-                            distance = coin.distanceTo(game.player);
-                            if (distance < 100 && distance !== 0) {
+                            distanceSqd = coin.distanceSqdTo(game.player);
+                            if (distanceSqd < 100 * 100) {
+                                distance = Math.sqrt(distanceSqd);
                                 coin.setDistanceTo(game.player, distance - (100 / distance));
                             }
                         }
@@ -1735,7 +1736,7 @@ if (typeof Math.log2 !== "function") {
                     if (!game.powerups.weight && game.points > 50 && Math.random() < chanceFactor * dt) {
                         game.powerups.weight = makePowerupRandom("weight", 25, 145);
                     }
-                    if (!game.powerups.magnet && Math.random() < chanceFactor * dt) {
+                    if (!game.powerups.magnet && Math.random() < chanceFactor * dt * 100) {
                         game.powerups.magnet = makePowerupRandom("magnet", 25, 145);
                     }
                 },
