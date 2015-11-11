@@ -168,7 +168,26 @@ if (typeof Math.log2 !== "function") {
                 cosines[i] = Math.cos(i * oneDegree);
             }
             return {sin: sin, cos: cos};
-        }());
+        }()),
+        // For dealing with periods (sets of 3 digits, read RTL) in a natural number:
+        getPeriodsReverse = function (num) {
+            // Returns an array of the periods in num, from least
+            // to greatest significance.
+            var pds = [];
+            var pdNum = 0;
+            do {
+                pds.push(num % 1000); // push the first period in `num`
+                pdNum += 1;
+                num = Math.floor(num / 1000); // discard first period in `num` and slide rest over
+            } while (num > 0);
+            return pds;
+        },
+        padNumericPeriod = function (num) {
+            // E.g., if given 34, returns "034"
+            return num < 10 ? "00" + num :
+                   num < 100 ? "0" + num :
+                   "" + num;
+        };
 
     // Config:
     var starfieldActive = false,
@@ -196,7 +215,7 @@ if (typeof Math.log2 !== "function") {
         playerDuckingYDiff = -10,
         powerupTotalLifespan = 5500, // in milliseconds
         inGamePointsPxSize = 30,
-        inGamePointsYPos = 39,
+        inGamePointsYPos = 9,
         activePowerupsStartingXPos = gameWidth - 78,
         activePowerupTravelTime = 250,
         activePowerupBubbleRadius = 18,
@@ -731,13 +750,92 @@ if (typeof Math.log2 !== "function") {
                 ctx.lineTo(touch.x1, touch.y1);
                 ctx.stroke();
             },
-            drawInGamePoints = function (ctx, game) {
-                if (!game.dead) {
+            populateSheetWithScores = function (sheet, sectW, sectH, scoreMin, scoreMax, scoreWidths, pad) {
+                sheet.setAttribute("width", sectW * (scoreMax - scoreMin + 1));
+                sheet.setAttribute("height", sectH);
+                var sheetCtx = sheet.getContext("2d");
+                sheetCtx.textAlign = "left";
+                sheetCtx.font = "bold " + inGamePointsPxSize + "px r0";
+                (function () {
+                    // Draw numbers scoreMin to scoreMax on the sheet
+                    var i, text;
+                    for (i = scoreMin; i <= scoreMax; i += 1) {
+                        text = pad ? padNumericPeriod(i) : i + "";
+                        scoreWidths[i] = sheetCtx.measureText(text).width + 1; // `+ 1` is for shadow
+                        fillShadowyText(sheetCtx,
+                            text, // points
+                            (i - scoreMin) * sectW, // x
+                            inGamePointsPxSize); // y
+                    }
+                }());
+            },
+            drawInGamePoints = (function () {
+                // Cache images of all numbers from 0 to 999
+                var sheetSectionWidth = 60;
+                var sheetHeight = 30;
+                // Due to limits of <canvas> size, must be split into two spritesheets
+                var scoreWidths = []; // Value at index `i` is width of `i` when rendered as a score
+                // sheetA covers 000 to 499
+                var sheetA = document.createElement("canvas");
+                populateSheetWithScores(sheetA, sheetSectionWidth, sheetHeight, 0, 499, scoreWidths, true);
+                // sheetB covers 500 to 999
+                var sheetB = document.createElement("canvas");
+                populateSheetWithScores(sheetB, sheetSectionWidth, sheetHeight, 500, 999, scoreWidths, true);
+                // sheetPartial covers 0 to 99, without padding with 0s (e.g. 7 as '7', not '007')
+                var nonpaddedScoreWidths = scoreWidths.slice(); // Will be the same as scoreWidths for all i > 99
+                var sheetPartial = document.createElement("canvas");
+                populateSheetWithScores(sheetPartial, sheetSectionWidth, sheetHeight, 0, 99, nonpaddedScoreWidths, false);
+
+                // Use the above to draw any given period
+                var drawPeriod = function (ctx, score, x, y, doPartial) { // draw three digits
+                    // `score` is the value of the period (number under 1000) to be drawn
+                    var sheet, position;
+                    if (doPartial && score < 100) {
+                        sheet = sheetPartial;
+                        position = score;
+                    } else if (score < 500) {
+                        sheet = sheetA;
+                        position = score;
+                    } else {
+                        sheet = sheetB;
+                        position = score - 500;
+                        // Subtract 500 because sheetB starts with '500' at x=0
+                    }
+                    ctx.drawImage(sheet,
+                        position * sheetSectionWidth, 0,
+                        sheetSectionWidth, sheetHeight,
+                        x, y,
+                        sheetSectionWidth, sheetHeight);
+                };
+
+                // Use the above to draw any number as a sequence of comma-separated periods
+                var commaWidth = 7;
+                var comma = offScreenRender(commaWidth, sheetHeight + 10, function (ctx) {
                     ctx.textAlign = "left";
                     ctx.font = "bold " + inGamePointsPxSize + "px r0";
-                    fillShadowyText(ctx, Math.floor(game.points), 16, inGamePointsYPos);
-                }
-            },
+                    fillShadowyText(ctx, ",", -3, inGamePointsPxSize);
+                });
+                var drawPeriods = function (ctx, score, x, y) {
+                    var periods = getPeriodsReverse(score);
+                    var i;
+                    var xDisplacement = 0;
+                    // For the first (most significant) period:
+                    var fstPeriod = periods[periods.length - 1];
+                    drawPeriod(ctx, fstPeriod, x, y, true);
+                    xDisplacement += nonpaddedScoreWidths[fstPeriod];
+                    // For the rest of them:
+                    for (i = periods.length - 2; i >= 0; i -= 1) {
+                        ctx.drawImage(comma, x + xDisplacement - 2, y);
+                        xDisplacement += commaWidth;
+                        drawPeriod(ctx, periods[i], x + xDisplacement, y);
+                        xDisplacement += scoreWidths[periods[i]];
+                    }
+                };
+
+                return function (ctx, game) {
+                    drawPeriods(ctx, Math.floor(game.points), 16, inGamePointsYPos);
+                };
+            }()),
             drawPowerupBubble = function (ctx, x, y) {
                 ctx.beginPath();
                 circleAt(ctx, x, y, activePowerupBubbleRadius);
@@ -864,7 +962,9 @@ if (typeof Math.log2 !== "function") {
                 }
             },
             drawActivePowerups = function (ctx, actives) {
-                var xPos = activePowerupsStartingXPos, yPos = inGamePointsYPos - 9, i;
+                var xPos = activePowerupsStartingXPos;
+                var yPos = inGamePointsYPos + 21;
+                var i;
                 var tempX, tempY;
                 for (i = 0; i < actives.length; i += 1) { // Start with the last activepowerups, which have been around the longest.
                     if (actives[i].timeSinceAcquired < activePowerupTravelTime) {
@@ -1047,7 +1147,9 @@ if (typeof Math.log2 !== "function") {
                     drawPowerup(mainCtx, powerup.type, x, y);
                 });
                 drawActivePowerups(mainCtx, game.activePowerups);
-                drawInGamePoints(mainCtx, game);
+                if (!game.dead) {
+                    drawInGamePoints(mainCtx, game);
+                }
                 mainCtx.restore();
             },
             drawTutorialHand = (function () {
