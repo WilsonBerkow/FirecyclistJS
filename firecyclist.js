@@ -1135,7 +1135,9 @@ if (typeof Math.log2 !== "function") {
                     drawPreviewPlatfm(mainCtx, game.previewPlatfmTouch);
                 }
                 game.coins.forEach(function (coin) {
-                    drawCoin(mainCtx, coin);
+                    if (coin.y < gameHeight + coinRadius) {
+                        drawCoin(mainCtx, coin);
+                    }
                 });
                 game.fbs.forEach(function (fb) {
                     drawFb(mainCtx, fb);
