@@ -394,7 +394,15 @@ if (typeof Math.log2 !== "function") {
             return {x: x, y: y, vx: vx, vy: vy, wheelAngle: 0, ducking: false};
         }),
         createPlatfm = anglify(true, function (x0, y0, x1, y1) {
-            return {x0: x0, y0: y0, x1: x1, y1: y1, time_left: 800};
+            return {
+                x0: x0,
+                y0: y0,
+                x1: x1,
+                y1: y1,
+                time_left: 800,
+                bounceVx: undefined,
+                bounceVy: undefined
+            };
         }),
         createCoin = withAngularCtrls(function (x, y, groupId) {
             return {x: x, y: y, groupId: groupId};
@@ -1612,13 +1620,12 @@ if (typeof Math.log2 !== "function") {
                     var newcoin = createCoin(pos, coinStartingY + coinColWidthStd - game.coinGridOffset);
                     game.coins.push(newcoin);
                 },
-                velFromPlatfm = function (player, platfm, realDt, uncurvedDt) {
+                velFromPlatfm = function (playerVelMagnitudeSqd, platfm, realDt, uncurvedDt) {
                     var cappedDt = Math.min(uncurvedDt, approxFrameLen), // To prevent slow frames from making the player launch forward
                         slope = platfm.slope(),
                         cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * realDt - platfmBounciness * cappedDt),
-                        calculatedMagSqd = cartesianVel.magnitudeSquared(),
-                        playerMagSqd = player.magnitudeSquared();
-                    cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd + 0.1, playerMagSqd)) + playerGrav * uncurvedDt + 0.15);
+                        calculatedMagSqd = cartesianVel.magnitudeSquared();
+                    cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd + 0.1, playerVelMagnitudeSqd)) + playerGrav * uncurvedDt + 0.15);
                     return cartesianVel;
                 },
                 die = function (game) {
@@ -1631,7 +1638,7 @@ if (typeof Math.log2 !== "function") {
                 };
             return {
                 player: function (game, realDt, dt, uncurvedDt) {
-                    var i, platfm, tmpVel, collided = false;
+                    var i, platfm, tmpVel, playerMagSqd, collided = false;
                     if (game.previewPlatfmTouch && Collision.player_platfm(game.player, game.previewPlatfmTouch)) {
                         // Use game.previewPlatfmTouch rather than Touch.curTouch
                         // so that in runTutorial, the automated touch still
@@ -1656,10 +1663,18 @@ if (typeof Math.log2 !== "function") {
                     for (i = 0; i < game.platfms.length; i += 1) {
                         platfm = game.platfms[i];
                         if (Collision.player_platfm(game.player, platfm)) {
-                            tmpVel = velFromPlatfm(game.player, platfm, realDt, uncurvedDt);
-                            game.player.vx = tmpVel.vx;
-                            game.player.vy = tmpVel.vy;
                             collided = true;
+                            if (platfm.bounceVx !== undefined) {
+                                game.player.vx = platfm.bounceVx;
+                                game.player.vy = platfm.bounceVy;
+                            } else {
+                                if (!playerMagSqd) {
+                                    playerMagSqd = game.player.magnitudeSquared();
+                                }
+                                tmpVel = velFromPlatfm(playerMagSqd, platfm, realDt, uncurvedDt);
+                                platfm.bounceVx = game.player.vx = tmpVel.vx;
+                                platfm.bounceVy = game.player.vy = tmpVel.vy;
+                            }
                         }
                     }
                     if (!collided) {
