@@ -396,8 +396,8 @@ if (typeof Math.log2 !== "function") {
         createPlatfm = anglify(true, function (x0, y0, x1, y1) {
             return {x0: x0, y0: y0, x1: x1, y1: y1, time_left: 800};
         }),
-        createCoin = withAngularCtrls(function (x, y) {
-            return {x: x, y: y};
+        createCoin = withAngularCtrls(function (x, y, groupId) {
+            return {x: x, y: y, groupId: groupId};
         }),
         createFb = function (x, y) {
             return {x: x, y: y, frame: Math.floor(Math.random() * fbNumRecordedFrames)};
@@ -445,6 +445,12 @@ if (typeof Math.log2 !== "function") {
                     firebitsRed: [],
                     firebitsOrg: [],
                     coins: [],
+                    coinGroups: {},
+                    // `game.coinGroups[i]` holds the number of still-living coins in the coinGroup with ID `i`
+                    coinGroupBonuses: {},
+                    // `game.coinGroupBonuses[i]` holds the points gained from getting all coins in group `i`
+                    coinGroupGottenNotifs: [],
+                    nextCoinGroupId: 0,
                     coinReleaseMode: "random",
                     coinReleaseModeTimeLeft: null, // In "random" mode, mode switch is random, not timed
                     coinGridOffset: 0,
@@ -723,6 +729,45 @@ if (typeof Math.log2 !== "function") {
                 var green = offScreenRender(s, s, doRender.bind(null, true));
                 return function (ctx, coin) {
                     ctx.drawImage(starfieldActive ? green : gold, coin.x - s / 2, coin.y - s / 2);
+                };
+            }()),
+            drawCoinGroupGottenNotif = (function () {
+                var notif = document.createElement("canvas");
+                var pxSize = 15;
+                var txt1Offset = 12;
+                notif.width = pxSize * 8;
+                notif.height = pxSize * 3;
+                window.addEventListener("load", function () {
+                    var txt0 = "Full";
+                    var txt1 = "Set!";
+                    var clrOuter = "#DD0B11";
+                    var clrInner = "#ECB435";
+                    var x = 8;
+                    var y = 12;
+                    var ctx = notif.getContext("2d");
+                    ctx.font = "bold italic " + pxSize + "px r0";
+
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = clrOuter;
+                    ctx.strokeText(txt0, x, y);
+                    ctx.strokeText(txt1, x + 5, y + txt1Offset);
+
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = clrInner;
+                    ctx.strokeText(txt0, x, y);
+                    ctx.strokeText(txt1, x + 5, y + txt1Offset);
+
+                    // Draw line between upper line and lower square of
+                    // excalamation point (the stroked text lines above
+                    // overlap and cover up the space):
+                    ctx.beginPath();
+                    ctx.moveTo(x + 27, y + 8.5);
+                    ctx.lineTo(x + 32, y + 8.5);
+                    ctx.strokeStyle = clrOuter;
+                    ctx.stroke();
+                }, false);
+                return function (ctx, x, y) {
+                    ctx.drawImage(notif, x, y);
                 };
             }()),
             setupGenericPlatfmChars = function (ctx) {
@@ -1138,6 +1183,9 @@ if (typeof Math.log2 !== "function") {
                         drawCoin(mainCtx, coin);
                     }
                 });
+                game.coinGroupGottenNotifs.forEach(function (notif) {
+                    drawCoinGroupGottenNotif(mainCtx, notif.x, notif.y);
+                });
                 game.fbs.forEach(function (fb) {
                     drawFb(mainCtx, fb);
                 });
@@ -1163,18 +1211,17 @@ if (typeof Math.log2 !== "function") {
                 };
             }()),
             drawSwipeHelpText = (function () {
-                var t0 = "Swipe to draw",
-                    t1 = "platforms";
+                var lines = ["Swipe to draw", "platforms"];
+                var pxSize =  25;
                 return function (ctx, x, y) {
-                    var helpTextPxSize = 25;
-                    ctx.font = "italic " + helpTextPxSize + "px i0";
+                    ctx.font = "italic " + pxSize + "px i0";
                     ctx.lineWidth = 4;
                     ctx.strokeStyle = "tan";
-                    ctx.strokeText(t0, x, y);
-                    ctx.strokeText(t1, x, y + helpTextPxSize);
+                    ctx.strokeText(lines[0], x, y);
+                    ctx.strokeText(lines[1], x, y + pxSize);
                     ctx.fillStyle = "brown";
-                    ctx.fillText(t0, x, y);
-                    ctx.fillText(t1, x, y + helpTextPxSize);
+                    ctx.fillText(lines[0], x, y);
+                    ctx.fillText(lines[1], x, y + pxSize);
                 };
             }()),
             drawTutorial = function (game, handX, handY) {
@@ -1511,40 +1558,53 @@ if (typeof Math.log2 !== "function") {
                 // So that random-released coins don't overlap with early pattern-released ones:
                 patternCoinStartingY = coinStartingY + coinColWidthStd,
 
-                addDiagCoinPattern = function (game, do_rtl) {
+                addDiagCoinPattern = function (game, do_rtl, eachCoinValue) {
                     // If do_rtl is truthy, the diag pattern
                     // will go down-and-left from the right.
                     var column, xPos, newcoin;
+                    var groupId = game.nextCoinGroupId;
+                    var coinsCreated = 0;
+                    game.nextCoinGroupId += 1;
                     for (column = 0; column < coinColumnsStd; column += 1) {
                         xPos = (column + 0.5) * coinColWidthStd;
                         if (do_rtl) { xPos = gameWidth - xPos; }
-                        newcoin = createCoin(xPos, patternCoinStartingY + column * coinColWidthStd);
+                        newcoin = createCoin(xPos, patternCoinStartingY + column * coinColWidthStd, groupId);
                         game.coins.push(newcoin);
+                        coinsCreated += 1;
                     }
                     game.coinReleaseMode = do_rtl ? "diagRTL" : "diagLTR";
                     game.coinReleaseModeTimeLeft = (coinColumnsStd + 1) * coinColWidthStd / (coinRiseRate * 0.9); // Approximate time the coins will take to be fully visible
+                    game.coinGroups[groupId] = coinsCreated;
+                    game.coinGroupBonuses[groupId] = coinsCreated * eachCoinValue * 0.5;
                 },
-                addCoinBlock = function (game, w, h, row, col) {
+                addCoinBlock = function (game, w, h, row, col, groupId) {
                     var curRow, curCol, xPos, yPos, newCoin;
+                    var coinsCreated = 0;
                     for (curRow = row; curRow < row + h; curRow += 1) {
                         for (curCol = col; curCol < col + w; curCol += 1) {
                             xPos = (curCol + 0.5) * coinColWidthDense;
                             yPos = patternCoinStartingY + (curRow + 0.5) * coinColWidthDense;
-                            newCoin = createCoin(xPos, yPos);
+                            newCoin = createCoin(xPos, yPos, groupId);
                             game.coins.push(newCoin);
+                            coinsCreated += 1;
                         }
                     }
+                    return coinsCreated;
                 },
-                addBlocksCoinPattern = function (game) {
+                addBlocksCoinPattern = function (game, eachCoinValue) {
                     // Generate a width and height between 2*2 and 4*4,
                     // heavily weighted against w=4 or h=4.
                     var w = 2 + Math.floor(Math.random() * 2 + 0.1);
                     var h = 2 + Math.floor(Math.random() * 2 + 0.1);
                     // Generate appropriate position of block.
                     var col = Math.floor(Math.random() * (coinColumnsDense - w));
-                    addCoinBlock(game, w, h, 0, col);
+                    var groupId = game.nextCoinGroupId;
+                    game.nextCoinGroupId += 1;
+                    var numCoinsCreated = addCoinBlock(game, w, h, 0, col, groupId);
+                    game.coinGroups[groupId] = numCoinsCreated;
                     game.coinReleaseMode = "blocks";
                     game.coinReleaseModeTimeLeft = (h + 1) * coinColWidthDense / (coinRiseRate * 0.9);
+                    game.coinGroupBonuses[groupId] = numCoinsCreated * eachCoinValue * 0.5;
                 },
                 addCoinRandom = function (game) {
                     var column = Math.floor(Math.random() * coinColumnsStd);
@@ -1622,13 +1682,40 @@ if (typeof Math.log2 !== "function") {
                             die(game);
                         }
                     }
+                    var curCoinValue = handleActivesPoints(game.activePowerups, coinValue * difficultyCurveFromTimePoints(game.points - game.pointsFromCoins));
                     game.coins.forEach(function (coin, index) {
                         if (Collision.player_coin(game.player, coin)) {
+                            if (Number.isFinite(coin.groupId) && game.coinGroups.hasOwnProperty(coin.groupId)) {
+                                game.coinGroups[coin.groupId] -= 1;
+                                if (game.coinGroups[coin.groupId] <= 0) {
+                                    delete game.coinGroups[coin.groupId];
+                                    game.points += game.coinGroupBonuses[coin.groupId];
+                                    delete game.coinGroupBonuses[coin.groupId];
+                                    game.coinGroupGottenNotifs.push({
+                                        x: game.player.x,
+                                        y: game.player.y,
+                                        x0: game.player.x,
+                                        y0: game.player.y,
+                                        t0: Date.now()
+                                    });
+                                }
+                            }
                             game.coins.splice(index, 1);
-                            var newPoints = handleActivesPoints(game.activePowerups, coinValue * difficultyCurveFromTimePoints(game.points - game.pointsFromCoins));
-                            game.points += newPoints;
-                            game.pointsFromCoins += newPoints; // Needs to be kept track of for difficulty curve, which is not affected by coin points
+                            game.points += curCoinValue;
+                            game.pointsFromCoins += curCoinValue; // Needs to be kept track of for difficulty curve, which is not affected by coin points
                         }
+                    });
+                    game.coinGroupGottenNotifs.forEach(function (notif, i) {
+                        if (Date.now() - notif.t0 > 1000) {
+                            return game.coinGroupGottenNotifs.splice(i, 1);
+                        }
+                        var dx = 0.02 * dt;
+                        var dy = -(coinRiseRate + 0.03) * dt;
+                        if (notif.x0 > gameWidth * 0.5) {
+                            dx *= -1;
+                        }
+                        notif.x += dx;
+                        notif.y += dy;
                     });
                     game.powerups.forEach(function (powerup, key) {
                         if (Collision.player_powerup(game.player, powerup)) {
@@ -1662,19 +1749,24 @@ if (typeof Math.log2 !== "function") {
                             }
                         }
                         if (coin.y < -2 * coinRadius) {
+                            if (Number.isFinite(coin.groupId)) {
+                                delete game.coinGroups[coin.groupId];
+                                delete game.coinGroupBonuses[coin.groupId];
+                                // Since a coin has escaped, the group data
+                                // can be discarded entirely.
+                            }
                             game.coins.splice(index, 1);
                         }
                     });
                     // Release modes are: "random", "blocks", "diagLTR", "diagRTL"
+                    var curCoinValue = handleActivesPoints(game.activePowerups, coinValue * difficultyCurveFromTimePoints(game.points - game.pointsFromCoins));
                     var random = Math.random(); // Used in all following if/else branches
                     if (game.coinReleaseMode === "random") {
-                        if (Math.random() < (dt / 1000) / 3) {
-                            if (random < 0.5) {
-                                // Do nothing, leaving "random" as the release mode
-                            } else if (random < 0.6) {
-                                addDiagCoinPattern(game, Math.random() < 0.5);
+                        if (Math.random() < (dt / 1000) / 6) {
+                            if (random < 0.2) {
+                                addDiagCoinPattern(game, Math.random() < 0.5, curCoinValue);
                             } else {
-                                addBlocksCoinPattern(game);
+                                addBlocksCoinPattern(game, curCoinValue);
                             }
                         } else if (random < 1 / 1500 * dt) {
                             // In this case "random" mode is still going and
@@ -1684,21 +1776,21 @@ if (typeof Math.log2 !== "function") {
                     } else if (game.coinReleaseMode === "blocks") {
                         if (game.coinReleaseModeTimeLeft <= 0) {
                             if (random < 0.5) {
-                                addBlocksCoinPattern(game);
+                                addBlocksCoinPattern(game, curCoinValue);
                             } else if (random < 0.9) {
                                 game.coinReleaseMode = "random";
                             } else {
-                                addDiagCoinPattern(game, Math.random() < 0.5);
+                                addDiagCoinPattern(game, Math.random() < 0.5, curCoinValue);
                             }
                         }
                     } else { // For diagLTR and diagRTL
                         if (game.coinReleaseModeTimeLeft <= 0) {
                             if (random < 0.25) {
-                                addDiagCoinPattern(game, game.coinReleaseMode === "diagLTR");
+                                addDiagCoinPattern(game, game.coinReleaseMode === "diagLTR", curCoinValue);
                             } else if (random < 0.8) {
                                 game.coinReleaseMode = "random";
                             } else {
-                                addBlocksCoinPattern(game);
+                                addBlocksCoinPattern(game, curCoinValue);
                             }
                         }
                     }
@@ -1736,7 +1828,7 @@ if (typeof Math.log2 !== "function") {
                     if (!game.powerups.weight && game.points > 50 && Math.random() < chanceFactor * dt) {
                         game.powerups.weight = makePowerupRandom("weight", 25, 145);
                     }
-                    if (!game.powerups.magnet && Math.random() < chanceFactor * dt * 100) {
+                    if (!game.powerups.magnet && Math.random() < chanceFactor * dt) {
                         game.powerups.magnet = makePowerupRandom("magnet", 25, 145);
                     }
                 },
