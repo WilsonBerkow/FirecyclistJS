@@ -169,6 +169,20 @@ if (typeof Math.log2 !== "function") {
             }
             return {sin: sin, cos: cos};
         }()),
+        quickSqrt = (function () {
+            var sqrts = {}; // square root of x is at sqrts[x * 2]
+            var i;
+            for (i = 0; i < 200; i += 1) {
+                sqrts[i] = Math.sqrt(i / 2);
+            }
+            return function (x) {
+                var i = Math.round(x * 2);
+                if (!Number.isFinite(sqrts[i])) {
+                    sqrts[i] = Math.sqrt(i / 2);
+                }
+                return sqrts[i];
+            };
+        }()),
         // For dealing with periods (sets of 3 digits, read RTL) in a natural number:
         getPeriodsReverse = function (num) {
             // Returns an array of the periods in num, from least
@@ -1625,7 +1639,7 @@ if (typeof Math.log2 !== "function") {
                         slope = platfm.slope(),
                         cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * realDt - platfmBounciness * cappedDt),
                         calculatedMagSqd = cartesianVel.magnitudeSquared();
-                    cartesianVel.setMagnitude(Math.sqrt(Math.min(calculatedMagSqd + 0.1, playerVelMagnitudeSqd)) + playerGrav * uncurvedDt + 0.15);
+                    cartesianVel.setMagnitude(quickSqrt(Math.min(calculatedMagSqd, playerVelMagnitudeSqd)) + playerGrav * uncurvedDt + 0.15);
                     return cartesianVel;
                 },
                 die = function (game) {
@@ -1759,7 +1773,7 @@ if (typeof Math.log2 !== "function") {
                         if (magnetOn) {
                             distanceSqd = coin.distanceSqdTo(game.player);
                             if (distanceSqd < 100 * 100) {
-                                distance = Math.sqrt(distanceSqd);
+                                distance = quickSqrt(distanceSqd);
                                 coin.setDistanceTo(game.player, distance - (100 / distance));
                             }
                         }
