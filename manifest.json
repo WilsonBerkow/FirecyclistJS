@@ -1,6 +1,6 @@
 {
-    "name": "Firecyclist-novis-nodraw",
-    "xwalk_version": "0.0.19",
+    "name": "FC-collis-optim",
+    "xwalk_version": "0.0.22",
     "start_url": "index.html",
     "display": "fullscreen",
     "orientation": "portrait",

@@ -139,16 +139,11 @@ if (typeof Math.log2 !== "function") {
             return dx * dx + dy * dy;
         },
         dist = function (x0, y0, x1, y1) {
-            return Math.sqrt(distanceSquared(x0, y0, x1, y1));
+            return quickSqrt(distanceSquared(x0, y0, x1, y1));
         },
         distLT = function (x0, y0, x1, y1, compareWith) {
             var distSquared = distanceSquared(x0, y0, x1, y1);
             return distSquared < compareWith * compareWith;
-        },
-        signNum = function (num) {
-            return num > 0 ? 1 :
-                   num < 0 ? -1 :
-                   0;
         },
         sqrt3 = Math.sqrt(3),
         oneDegree = Math.PI / 180,
@@ -172,12 +167,12 @@ if (typeof Math.log2 !== "function") {
         quickSqrt = (function () {
             var sqrts = {}; // square root of x is at sqrts[x * 2]
             var i;
-            for (i = 0; i < 200; i += 1) {
+            for (i = 0; i < 500; i += 1) {
                 sqrts[i] = Math.sqrt(i / 2);
             }
             return function (x) {
                 var i = Math.round(x * 2);
-                if (!Number.isFinite(sqrts[i])) {
+                if (sqrts[i] === undefined) {
                     sqrts[i] = Math.sqrt(i / 2);
                 }
                 return sqrts[i];
@@ -347,37 +342,25 @@ if (typeof Math.log2 !== "function") {
         highscores = mkHighscores("highscores");
 
     // Vector and line util:
-    var anglify = function (doCalc, f) {
-            // If 'doCalc' is true, the object in question ('this') has
-            //  properties x0, y0, x1, y1, and the anglify methods will
-            //  DO the CALCulation of converting those to length deltas.
-            // If 'doCalc' is false, the object has vx, vy properties.
-            var proto = {
+    var relativeVector = function (f) {
+            var proto = Object.freeze({
                 angle: function () {
-                    return doCalc ? Math.atan2(this.y1 - this.y0, this.x1 - this.x0)
-                                  : Math.atan2(this.vy, this.vx);
+                    return Math.atan2(this.vy, this.vx);
                 },
                 magnitudeSquared: function () {
-                    return doCalc ? distanceSquared(this.x0, this.y0, this.x1, this.y1)
-                                  : (this.vx * this.vx + this.vy * this.vy);
+                    return this.vx * this.vx + this.vy * this.vy;
                 },
-                slope: function () {
-                    return doCalc ? (this.y1 - this.y0) / (this.x1 - this.x0)
-                                  : this.vy / this.vx;
-                }
-            };
-            if (!doCalc) {
-                proto.setMagnitude = function (mag) {
+                setMagnitude: function (mag) {
                     var angle = this.angle();
                     this.vx = trig.cos(angle) * mag;
                     this.vy = trig.sin(angle) * mag;
-                };
-            }
+                }
+            });
             return function () {
                 return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
             };
         },
-        createVel = anglify(false, function (vx, vy) {
+        createVel = relativeVector(function (vx, vy) {
             return {vx: vx, vy: vy};
         }),
         withAngularCtrls = (function () {
@@ -404,20 +387,24 @@ if (typeof Math.log2 !== "function") {
         }());
 
     // Constructors for in-game objects:
-    var createPlayer = anglify(false, function (x, y, vx, vy) {
+    var createPlayer = relativeVector(function (x, y, vx, vy) {
             return {x: x, y: y, vx: vx, vy: vy, wheelAngle: 0, ducking: false};
         }),
-        createPlatfm = anglify(true, function (x0, y0, x1, y1) {
+        createPlatfm = function (x0, y0, x1, y1) {
             return {
                 x0: x0,
                 y0: y0,
                 x1: x1,
                 y1: y1,
                 time_left: 800,
+                lengthSquared: distanceSquared(x0, y0, x1, y1),
                 bounceVx: undefined,
-                bounceVy: undefined
+                bounceVy: undefined,
+                bounceSpeed: undefined
+                // bounceSpeed is a cache of the magnitude of
+                // the vector (bounceVx, bounceVy)
             };
-        }),
+        },
         createCoin = withAngularCtrls(function (x, y, groupId) {
             return {x: x, y: y, groupId: groupId};
         }),
@@ -1375,18 +1362,12 @@ if (typeof Math.log2 !== "function") {
                 starty = Math.min(platfm.y0, platfm.y1),
                 endx = Math.max(platfm.x0, platfm.x1),
                 endy = Math.max(platfm.y0, platfm.y1);
-            if (player.x + rad < startx || player.x - rad > endx || player.y + rad < starty || player.y - rad > endy) {
+            if (player.y + rad < starty || player.y > endy || player.x + rad < startx || player.x - rad > endx) {
                 return false;
             }
-
             // Algorithm adapted from http://mathworld.wolfram.com/Circle-LineIntersection.html
-            var offsetStartX = platfm.x0 - player.x,
-                offsetStartY = platfm.y0 - player.y,
-                offsetEndX = platfm.x1 - player.x,
-                offsetEndY = platfm.y1 - player.y,
-                platLengthSquared = distanceSquared(platfm.x0, platfm.y0, platfm.x1, platfm.y1),
-                bigD = offsetStartX * offsetEndY - offsetEndX * offsetStartY;
-            return rad * rad * platLengthSquared >= bigD * bigD;
+            var lengthSquared = platfm.lengthSquared || distanceSquared(platfm.x0, platfm.y0, platfm.x1, platfm.y1);
+            return Math.pow(rad, 2) * lengthSquared >= Math.pow((platfm.x0 - player.x) * (platfm.y1 - player.y) - (platfm.x1 - player.x) * (platfm.y0 - player.y), 2);
         },
         playerWheel_circle: function (player, x, y, circleRadius) {
             return distLT(player.x, player.y, x, y, playerRadius + circleRadius);
@@ -1424,18 +1405,7 @@ if (typeof Math.log2 !== "function") {
             return Collision.player_circle(player, coin.x, coin.y, coinRadius);
         },
         player_powerup: function (player, powerup) {
-            if (powerup.type === "X2") {
-                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), activePowerupBubbleRadius);
-            }
-            if (powerup.type === "slow") {
-                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), activePowerupBubbleRadius);
-            }
-            if (powerup.type === "weight") {
-                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), activePowerupBubbleRadius);
-            }
-            if (powerup.type === "magnet") {
-                return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), activePowerupBubbleRadius);
-            }
+            return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), activePowerupBubbleRadius);
         }
     };
 
@@ -1634,13 +1604,11 @@ if (typeof Math.log2 !== "function") {
                     var newcoin = createCoin(pos, coinStartingY + coinColWidthStd - game.coinGridOffset);
                     game.coins.push(newcoin);
                 },
-                velFromPlatfm = function (playerVelMagnitudeSqd, platfm, realDt, uncurvedDt) {
-                    var cappedDt = Math.min(uncurvedDt, approxFrameLen), // To prevent slow frames from making the player launch forward
-                        slope = platfm.slope(),
-                        cartesianVel = createVel(signNum(slope) * 3, Math.abs(slope) * 3 - platfmRiseRate * realDt - platfmBounciness * cappedDt),
-                        calculatedMagSqd = cartesianVel.magnitudeSquared();
-                    cartesianVel.setMagnitude(quickSqrt(Math.min(calculatedMagSqd, playerVelMagnitudeSqd)) + playerGrav * uncurvedDt + 0.15);
-                    return cartesianVel;
+                setBounceVelForPlatfm = function (platfm, uncurvedDt) {
+                    var platfmSlope = (platfm.y1 - platfm.y0) / (platfm.x1 - platfm.x0);
+                    platfm.bounceVx = Math.sign(platfmSlope) * 3.2;
+                    platfm.bounceVy = Math.abs(platfmSlope) * 3.2 - platfmBounciness * uncurvedDt;
+                    platfm.bounceSpeed = dist(0, 0, platfm.bounceVx, platfm.bounceVy);
                 },
                 die = function (game) {
                     if (game.dead) { return; }
@@ -1652,7 +1620,7 @@ if (typeof Math.log2 !== "function") {
                 };
             return {
                 player: function (game, realDt, dt, uncurvedDt) {
-                    var i, platfm, tmpVel, playerMagSqd, collided = false;
+                    var i, platfm, playerSpeed, collided = false;
                     if (game.previewPlatfmTouch && Collision.player_platfm(game.player, game.previewPlatfmTouch)) {
                         // Use game.previewPlatfmTouch rather than Touch.curTouch
                         // so that in runTutorial, the automated touch still
@@ -1674,21 +1642,26 @@ if (typeof Math.log2 !== "function") {
                         // so does the player's position. This is why there is
                         // no 'return;' here.
                     }
-                    for (i = 0; i < game.platfms.length; i += 1) {
+                    // Iterate backwards through game.platfms in the following
+                    // recently created platfms take precedence
+                    for (i = game.platfms.length - 1; i >= 0; i -= 1) {
                         platfm = game.platfms[i];
                         if (Collision.player_platfm(game.player, platfm)) {
                             collided = true;
-                            if (platfm.bounceVx !== undefined) {
-                                game.player.vx = platfm.bounceVx;
-                                game.player.vy = platfm.bounceVy;
-                            } else {
-                                if (!playerMagSqd) {
-                                    playerMagSqd = game.player.magnitudeSquared();
-                                }
-                                tmpVel = velFromPlatfm(playerMagSqd, platfm, realDt, uncurvedDt);
-                                platfm.bounceVx = game.player.vx = tmpVel.vx;
-                                platfm.bounceVy = game.player.vy = tmpVel.vy;
+                            if (!playerSpeed) {
+                                playerSpeed = quickSqrt(game.player.magnitudeSquared());
                             }
+                            if (!platfm.bounceVx) {
+                                setBounceVelForPlatfm(platfm, uncurvedDt);
+                            }
+                            game.player.vx = platfm.bounceVx;
+                            game.player.vy = platfm.bounceVy;
+                            if (platfm.bounceSpeed > playerSpeed + 2) {
+                                game.player.vx *= (playerSpeed + 2) / platfm.bounceSpeed;
+                                game.player.vy *= (playerSpeed + 2) / platfm.bounceSpeed;
+                            }
+                            game.player.vy -= platfmRiseRate * realDt;
+                            break;
                         }
                     }
                     if (!collided) {
@@ -1754,7 +1727,7 @@ if (typeof Math.log2 !== "function") {
                     });
                     game.player.x = modulo(game.player.x + game.player.vx * uncurvedDt / 20, gameWidth);
                     game.player.y += game.player.vy * uncurvedDt / 20;
-                    game.player.wheelAngle += signNum(game.player.vx) * 0.22 * uncurvedDt;
+                    game.player.wheelAngle += Math.sign(game.player.vx) * 0.22 * uncurvedDt;
                 },
                 fbs: updateFbsGeneric,
                 coins: function (game, dt) {
@@ -1971,7 +1944,7 @@ if (typeof Math.log2 !== "function") {
                 game.stats.literalTimeDiff = realDt;
                 // Cap realDt at 3 times the normal frame length to prevent
                 // a large noticable jump in on-screen objects:
-                realDt = Math.min(realDt, approxFrameLen * 3);
+                realDt = Math.min(realDt, approxFrameLen);
 
                 game.stats.diffCurve = difficultyCurveFromTimePoints(game.points - game.pointsFromCoins);
                 var uncurvedDt = realDt;
@@ -2113,7 +2086,7 @@ if (typeof Math.log2 !== "function") {
                 var dt = now - prevFrameTime;
                 // Cap dt at 3 times the normal frame length to prevent
                 // a large noticable jump in on-screen objects:
-                dt = Math.min(dt, approxFrameLen * 3);
+                dt = Math.min(dt, approxFrameLen);
 
                 var uncurvedDt = dt;
                 dt *= difficultyCurveFromTimePoints(0);
