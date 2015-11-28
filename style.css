@@ -1,3 +1,4 @@
+/* Fonts: */
 @font-face {
     font-family: 'i0';
     src: url('fonts/ComicNeue-Angular_Oblique.otf');
@@ -14,13 +15,16 @@
     font-style: normal;
     font-weight: normal;
 }
+
+/* Canvases and styles for once game has loaded: */
 html, body {
     margin: 0;
     padding: 0;
     user-select: none;
     cursor: default;
-    background: black;
-    width: 288px;
+    background-color: rgb(153, 217, 233); /* Same blue as in clouds background */
+    width: 100%;
+    height: 100%;
 }
 #Main {
     position: fixed;

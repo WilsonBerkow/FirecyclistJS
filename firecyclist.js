@@ -34,6 +34,10 @@ if (typeof Math.log2 !== "function") {
             // If the game is as tall as the screen but not as wide, center it
             moduleOffsetX = (windowDims.width - gameWidth * pageScaleFactor) / 2;
             htmlModule.setAttribute("style", "position: fixed; left: " + Math.floor(moduleOffsetX) + "px;");
+            // <body> is sky-blue while page is loading, but once it has loaded,
+            // the canvas handles all color in the 288x576 so for the sake of
+            // those playing in the browser, set body background back to black:
+            document.body.setAttribute("style", "background-color: black;");
         }
         calcTouchPos = function (event) {
             return {
