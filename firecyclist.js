@@ -1656,7 +1656,7 @@ if (typeof Math.log2 !== "function") {
                                 game.player.vx *= (playerSpeed + 2) / platfm.bounceSpeed;
                                 game.player.vy *= (playerSpeed + 2) / platfm.bounceSpeed;
                             }
-                            game.player.vy -= platfmRiseRate * realDt;
+                            game.player.vy -= platfmRiseRate * dt;
                             break;
                         }
                     }
