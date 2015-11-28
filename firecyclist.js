@@ -742,38 +742,30 @@ if (typeof Math.log2 !== "function") {
             }()),
             drawCoinGroupGottenNotif = (function () {
                 var notif = document.createElement("canvas");
-                var pxSize = 15;
+                var pxSize = 18;
                 var txt1Offset = 12;
-                notif.width = pxSize * 8;
-                notif.height = pxSize * 3;
+                notif.width = pxSize * 4;
+                notif.height = pxSize * 1.5;
+                var message = "100%";
+                var clrOuter = "#DD0B11";
+                var clrInner = "#ECB435";
+                var innerX = 8;
+                var innerY = 20;
+                var ctx = notif.getContext("2d");
+
+                // Set up styling of first text-draw immediately:
+                ctx.lineWidth = 5;
+                ctx.strokeStyle = clrOuter;
+
+                // Wait for onload to ensure that the correct font has loaded:
                 window.addEventListener("load", function () {
-                    var txt0 = "Full";
-                    var txt1 = "Set!";
-                    var clrOuter = "#DD0B11";
-                    var clrInner = "#ECB435";
-                    var x = 8;
-                    var y = 12;
-                    var ctx = notif.getContext("2d");
                     ctx.font = "bold italic " + pxSize + "px r0";
 
+                    ctx.strokeText(message, innerX, innerY);
+
                     ctx.lineWidth = 3;
-                    ctx.strokeStyle = clrOuter;
-                    ctx.strokeText(txt0, x, y);
-                    ctx.strokeText(txt1, x + 5, y + txt1Offset);
-
-                    ctx.lineWidth = 1;
                     ctx.strokeStyle = clrInner;
-                    ctx.strokeText(txt0, x, y);
-                    ctx.strokeText(txt1, x + 5, y + txt1Offset);
-
-                    // Draw line between upper line and lower square of
-                    // excalamation point (the stroked text lines above
-                    // overlap and cover up the space):
-                    ctx.beginPath();
-                    ctx.moveTo(x + 27, y + 8.5);
-                    ctx.lineTo(x + 32, y + 8.5);
-                    ctx.strokeStyle = clrOuter;
-                    ctx.stroke();
+                    ctx.strokeText(message, innerX, innerY);
                 }, false);
                 return function (ctx, x, y) {
                     ctx.drawImage(notif, x, y);
