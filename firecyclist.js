@@ -1,25 +1,21 @@
 // (c) Wilson Berkow
 // Firecyclist.js
 
-if (typeof Math.log2 !== "function") {
-    Math.log2 = function (e) {
-        "use strict";
-        return Math.log(e) / Math.LN2;
-    };
-}
+/*globals
+    window requestAnimationFrame performance
+*/
 
 (function () {
     "use strict";
-    var bgCanvas = document.getElementById("bgCanvas"),
-        mainCanvas = document.getElementById("canvas"),
-        btnCanvas = document.getElementById("btnCanvas"),
-        overlayCanvas = document.getElementById("overlayCanvas"),
-        gameWidth = 576 / 2,
-        gameHeight = 1024 / 2;
+    var bgCanvas = document.getElementById("bgCanvas");
+    var mainCanvas = document.getElementById("canvas");
+    var btnCanvas = document.getElementById("btnCanvas");
+    var overlayCanvas = document.getElementById("overlayCanvas");
+    var gameWidth = 576 / 2;
+    var gameHeight = 1024 / 2;
 
     // Resize and center game canvases:
-    var pageScaleFactor = 1,
-        calcTouchPos;
+    var pageScaleFactor = 1, calcTouchPos;
     (function () {
         var htmlModule = document.getElementById("Main"),
             windowDims = {
@@ -40,12 +36,20 @@ if (typeof Math.log2 !== "function") {
             document.body.setAttribute("style", "background-color: black;");
         }
         calcTouchPos = function (event) {
+            var literalX, literalY;
+            if (typeof event.clientX === "number") {
+                // These are tried to allow mouse to be instead of touches
+                literalX = event.clientX;
+                literalY = event.clientY;
+            } else {
+                literalX = event.changedTouches[0].clientX;
+                literalY = event.changedTouches[0].clientY;
+                // `event.changedTouches[0]` works when handling touchend,
+                // at which point `event.touches[0]` would be undefined.
+            }
             return {
-                x: ((typeof event.clientX === "number" ? event.clientX : event.changedTouches[0].clientX) - moduleOffsetX) / pageScaleFactor,
-                y: (typeof event.clientY === "number" ? event.clientY : event.changedTouches[0].clientY) / pageScaleFactor
-                // event.changedTouches[0] still works when handling touchend,
-                // while event.touches[0] will be undefined.
-                // event.clientX/Y are tried to allow mouse use in testing.
+                x: (literalX - moduleOffsetX) / pageScaleFactor,
+                y: literalY / pageScaleFactor
             };
         };
         [bgCanvas, mainCanvas, btnCanvas, overlayCanvas].forEach(function (canvas) {
@@ -85,8 +89,9 @@ if (typeof Math.log2 !== "function") {
             // Do not use preventDefault here, it prevents
             // triggering of the 'tap' event.
         };
-        return {
+        return Object.seal({
             curTouch: null,
+            // `onTouchend' can be set, specifying a custom handler
             onTouchend: null,
             copy: function (t) {
                 return {
@@ -101,32 +106,22 @@ if (typeof Math.log2 !== "function") {
             zeroLength: function (t) {
                 return t.x0 === t.x1 && t.y0 === t.y1;
             }
-        };
+        });
     }());
 
     // Generic util:
-    var makeObject = function (proto, props) {
+    var
+        forEachInObject = function (obj, f) {
+            Object.keys(obj).forEach(function (key) {
+                f(key, obj[key]);
+            });
+        },
+        makeObject = function (proto, props) {
             var o = Object.create(proto);
-            Object.keys(props).forEach(function (key) {
-                o[key] = props[key];
+            forEachInObject(props, function (key, value) {
+                o[key] = value;
             });
             return o;
-        },
-        iterableObjectFactory = function (propsToIter) {
-            var proto = {
-                forEach: function (f) {
-                    var obj = this;
-                    propsToIter.forEach(function (prop) {
-                        var val = obj[prop];
-                        if (val !== undefined && val !== null) {
-                            f(val, prop);
-                        }
-                    });
-                }
-            };
-            return function (props) {
-                return makeObject(proto, props);
-            };
         },
         modulo = function (num, modBy) {
             if (num < 0) {
@@ -134,32 +129,20 @@ if (typeof Math.log2 !== "function") {
             }
             return num % modBy;
         },
-        pythag = function (a, b) {
-            return Math.sqrt(a * a + b * b);
-        },
-        distanceSquared = function (x0, y0, x1, y1) {
-            var dx = x1 - x0;
-            var dy = y1 - y0;
-            return dx * dx + dy * dy;
-        },
-        dist = function (x0, y0, x1, y1) {
-            return quickSqrt(distanceSquared(x0, y0, x1, y1));
-        },
-        distLT = function (x0, y0, x1, y1, compareWith) {
-            var distSquared = distanceSquared(x0, y0, x1, y1);
-            return distSquared < compareWith * compareWith;
-        },
         sqrt3 = Math.sqrt(3),
         oneDegree = Math.PI / 180,
         trig = (function () {
-            var sines = [],   // Sine and cosine tables are used so that the approximation work doesn't
-                cosines = [], // have to be done more than once for any given angle. The angles of the
-                              // spokes are rounded down to the nearest degree.
+            var
+                // Sine and cosine tables are used so that the approximation
+                // doesn't have to be done more than once for any given angle.
+                // The angle inputs are rounded down to the nearest degree.
+                sines = [],
+                cosines = [],
                 sin = function (radians) {
-                    return sines[modulo(Math.floor(radians / oneDegree), 360)];
+                    return sines[modulo(Math.round(radians / oneDegree), 360)];
                 },
                 cos = function (radians) {
-                    return cosines[modulo(Math.floor(radians / oneDegree), 360)];
+                    return cosines[modulo(Math.round(radians / oneDegree), 360)];
                 },
                 i;
             for (i = 0; i < 360; i += 1) {
@@ -175,13 +158,25 @@ if (typeof Math.log2 !== "function") {
                 sqrts[i] = Math.sqrt(i / 2);
             }
             return function (x) {
-                var i = Math.round(x * 2);
-                if (sqrts[i] === undefined) {
-                    sqrts[i] = Math.sqrt(i / 2);
+                var pos = Math.round(x * 2);
+                if (sqrts[pos] === undefined) {
+                    sqrts[pos] = Math.sqrt(pos / 2);
                 }
-                return sqrts[i];
+                return sqrts[pos];
             };
         }()),
+        distanceSquared = function (x0, y0, x1, y1) {
+            var dx = x1 - x0;
+            var dy = y1 - y0;
+            return dx * dx + dy * dy;
+        },
+        distLT = function (x0, y0, x1, y1, compareWith) {
+            var distSquared = distanceSquared(x0, y0, x1, y1);
+            return distSquared < compareWith * compareWith;
+        },
+        dist = function (x0, y0, x1, y1) {
+            return quickSqrt(distanceSquared(x0, y0, x1, y1));
+        },
         // For dealing with periods (sets of 3 digits, read RTL) in a natural number:
         getPeriodsReverse = function (num) {
             // Returns an array of the periods in num, from least
@@ -203,12 +198,14 @@ if (typeof Math.log2 !== "function") {
         };
 
     // Config:
-    var starfieldActive = false,
+    var
+        starfieldActive = false,
         approxFrameLen = 1000 / 60, // With requestAnimationFrame, this is approximate
-        playerGrav = 0.3 / 28,
+        playerGrav = 0.01,
         fbRiseRate = 0.1,
         fbRadius = 10,
         fbNumRecordedFrames = 300,
+        fbCreationChanceFactor = 1 / 12250,
         coinRiseRate = 0.1,
         coinRadius = 10,
         coinSquareLen = 8.5,
@@ -218,20 +215,33 @@ if (typeof Math.log2 !== "function") {
         totalFbHeight = 10,
         platfmBounciness = 0.07,
         platfmThickness = 6,
-        playerTorsoLen = 15 * 5/8,
-        playerRadius = 10 * 6/8,
-        playerHeadRadius = 9 * 5/8,
-        playerElbowXDiff = 8 * 5/8,
-        playerElbowYDiff = 2 * 5/8,
+        playerTorsoLen = 9.375,
+        playerRadius = 7.5,
+        playerHeadRadius = 5.625,
+        playerElbowXDiff = 5,
+        playerElbowYDiff = 1.25,
         playerWheelToHeadDist = playerTorsoLen + playerRadius + playerHeadRadius,
         playerDuckingXDiff = -3,
         playerDuckingYDiff = -10,
-        powerupTotalLifespan = 5500, // in milliseconds
         inGamePointsPxSize = 30,
         inGamePointsYPos = 9,
         activePowerupsStartingXPos = gameWidth - 78,
         activePowerupTravelTime = 250,
-        activePowerupBubbleRadius = 18,
+        activePowerupLifespan = 10000,
+        powerupBubbleRadius = 18,
+        powerupCreationChanceFactor = 1 / 75000,
+        powerupTotalLifespan = 5500, // in milliseconds
+        powerupX2Width = 36,
+        powerupX2Height = 23,
+        powerupSlowRadius = 12,
+        powerupMagnetRadius = 9,
+        powerupMagnetThickness = 8,
+        powerupWeightHandleHeight = 4,
+        powerupWeightBlockUpperXMargin = 3,
+        powerupWeightBlockLowerWidth = 30,
+        powerupWeightBlockHeight = 20,
+        powerupWeightHeight = powerupWeightBlockHeight + powerupWeightHandleHeight,
+        btnShadowOffset = 2,
         mkBtn = (function () {
             var proto = {
                 edgeX: function () {
@@ -244,11 +254,14 @@ if (typeof Math.log2 !== "function") {
                 }
             };
             return function (o) {
-                o.redTint = !!o.redTint;
-                o.textWDiff = o.textWDiff || 0;
-                o.textHDiff = o.textHDiff || 0;
-                o.textXOffset = o.textXOffset || 0;
-                return makeObject(proto, o);
+                var btn = makeObject(proto, o);
+                btn.tintedRed = !!o.tintedRed;
+                btn.textWDiff = o.textWDiff || 0;
+                btn.textHDiff = o.textHDiff || 0;
+                btn.textXOffset = o.textXOffset || 0;
+                // `textXOffset' is for small adjustments to alignment
+                // which make the button text *appear* better centered
+                return Object.freeze(btn);
             };
         }()),
         menuPlayBtn = mkBtn({
@@ -294,39 +307,32 @@ if (typeof Math.log2 !== "function") {
                 h: s,
                 textHDiff: -17
             });
-        }()),
-        btnShadowOffset = 2,
-        powerupX2Width = 36,
-        powerupX2Height = 23,
-        powerupSlowRadius = 12,
-        powerupMagnetRadius = 9,
-        powerupMagnetThickness = 8,
-        powerupWeightScaleUnit = 0.8,
-        powerupWeightHandleHeight = 4,
-        powerupWeightBlockUpperXMargin = 3,
-        powerupWeightBlockLowerWidth = 30,
-        powerupWeightBlockHeight = 20,
-        powerupWeightHeight = powerupWeightBlockHeight + powerupWeightHandleHeight,
-        activePowerupLifespan = 10000;
+        }());
 
     // Highscore update and storage:
-    var mkHighscores = function (identifier) {
-            var scores = [null, null, null], // Highest scores are at the beginning, null represents an empty slot.
-                fromLocal = localStorage.getItem(identifier);
+    var
+        mkHighscores = function (identifier) {
+            // In `scores', highest scores are at the beginning, `null'
+            // represents an empty slot (when fewer than 3 games have
+            // been played)
+            // By default, `scores' is three empty slots
+            var scores = [null, null, null];
+
+            var fromLocal = localStorage.getItem(identifier);
             if (fromLocal !== null) {
                 fromLocal = JSON.parse(fromLocal);
                 if (fromLocal) {
+                    // Update `scores' with the stored highscores
                     scores = fromLocal;
                 }
             }
-            return {
-                highest: function (n) { // Note that the nulls of empty slots are included
-                    var arr = [], i;
-                    n = n || scores.length;
-                    for (i = 0; i < Math.min(n, scores.length); i += 1) {
-                        arr.push(scores[i]);
-                    }
-                    return arr;
+            return Object.freeze({
+                each: function (f) {
+                    scores.forEach(function (score) {
+                        if (score !== null) {
+                            f(score);
+                        }
+                    });
                 },
                 sendScore: function (score) {
                     var i, result = false;
@@ -341,59 +347,38 @@ if (typeof Math.log2 !== "function") {
                     localStorage.setItem(identifier, JSON.stringify(scores));
                     return result;
                 }
-            };
+            });
         },
         highscores = mkHighscores("highscores");
 
+
     // Vector and line util:
-    var relativeVector = function (f) {
-            var proto = Object.freeze({
-                angle: function () {
-                    return Math.atan2(this.vy, this.vx);
-                },
-                magnitudeSquared: function () {
-                    return this.vx * this.vx + this.vy * this.vy;
-                },
-                setMagnitude: function (mag) {
-                    var angle = this.angle();
-                    this.vx = trig.cos(angle) * mag;
-                    this.vy = trig.sin(angle) * mag;
-                }
-            });
-            return function () {
-                return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
-            };
+    var Vector = Object.freeze({
+        create: function (x, y) {
+            return {vx: x, vy: y};
         },
-        createVel = relativeVector(function (vx, vy) {
-            return {vx: vx, vy: vy};
-        }),
-        withAngularCtrls = (function () {
-            var proto = {
-                angleTo: function (xy) { // Currently unused, but as definition adds only constant time and may be useful in future, I'll leave it.
-                    return Math.atan2(xy.y - this.y, xy.x - this.x);
-                },
-                distanceSqdTo: function (xy) {
-                    return distanceSquared(this.x, this.y, xy.x, xy.y);
-                },
-                setDistanceTo: function (obj, newDist) {
-                    var posRelToPlayer = createVel(this.x - obj.x, this.y - obj.y);
-                    posRelToPlayer.setMagnitude(newDist);
-                    this.x = obj.x + posRelToPlayer.vx;
-                    this.y = obj.y + posRelToPlayer.vy;
-                    // .vx and .vy are just position deltas, not velocities
-                }
-            };
-            return function (f) {
-                return function () {
-                    return makeObject(proto, f.apply(this, [].slice.apply(arguments)));
-                };
-            };
-        }());
+        findMagnitude: function (vect) {
+            return quickSqrt(vect.vx * vect.vx + vect.vy * vect.vy);
+        },
+        setMagnitude: function (vect, mag) {
+            var angle = Math.atan2(vect.vy, vect.vx);
+            vect.vx = trig.cos(angle) * mag;
+            vect.vy = trig.sin(angle) * mag;
+        }
+    });
 
     // Constructors for in-game objects:
-    var createPlayer = relativeVector(function (x, y, vx, vy) {
-            return {x: x, y: y, vx: vx, vy: vy, wheelAngle: 0, ducking: false};
-        }),
+    var
+        createPlayer = function (x, y, vx, vy) {
+            return {
+                x: x,
+                y: y,
+                vx: vx,
+                vy: vy,
+                wheelAngle: 0, // in degrees
+                ducking: false
+            };
+        },
         createPlatfm = function (x0, y0, x1, y1) {
             return {
                 x0: x0,
@@ -409,37 +394,31 @@ if (typeof Math.log2 !== "function") {
                 // the vector (bounceVx, bounceVy)
             };
         },
-        createCoin = withAngularCtrls(function (x, y, groupId) {
+        createCoin = function (x, y, groupId) {
             return {x: x, y: y, groupId: groupId};
-        }),
+        },
         createFb = function (x, y) {
             return {x: x, y: y, frame: Math.floor(Math.random() * fbNumRecordedFrames)};
         },
-        createPowerup = (function () {
-            var proto = {
-                xDistanceTravelled: function () {
-                    return this.lifetime / powerupTotalLifespan * gameWidth;
-                },
-                xPos: function () {
-                    return this.xDistanceTravelled();
-                },
-                yPos: function () {
-                    return this.offsetY + trig.sin(this.xDistanceTravelled() / 20) * 40;
-                }
+        createPowerup = function (y, powerupType) {
+            return {
+                offsetY: y,
+                lifetime: 0,
+                type: powerupType
             };
-            return function (y, powerupType) {
-                return makeObject(proto, {offsetY: y, lifetime: 0, type: powerupType});
-            };
-        }()),
+        },
+        calcPowerupXPos = function (powerup) {
+            return powerup.lifetime / powerupTotalLifespan * gameWidth;
+        },
+        calcPowerupYPos = function (powerup) {
+            return powerup.offsetY + trig.sin(calcPowerupXPos(powerup) / 20) * 40;
+        },
         createActivePowerup = function (type, srcX, srcY) {
-            var lifetime = type === "slow" ? activePowerupLifespan / 2 : activePowerupLifespan;
+            var lifetime = type === "slow"
+                ? activePowerupLifespan * 2 / 3
+                : activePowerupLifespan;
             return {
                 type: type,
-                width: type === "X2" ? powerupX2Width :
-                       type === "slow" ? powerupSlowRadius * 2 :
-                       type === "weight" ? 40 :
-                       type === "magnet" ? powerupSlowRadius * 2 + 15 :
-                       40,
                 totalLifetime: lifetime,
                 lifetime: lifetime,
                 srcX: srcX,
@@ -447,44 +426,70 @@ if (typeof Math.log2 !== "function") {
                 timeSinceAcquired: 0
             };
         },
-        createGame = (function () {
-            var mkPowerupsObj = iterableObjectFactory(["X2", "slow", "weight", "magnet"]);
-            return function () {
-                return {
-                    player: createPlayer(gameWidth / 2, 50, 0, 0),
-                    platfms: [],
-                    previewPlatfmTouch: null,
-                    fbs: [],
-                    firebitsRed: [],
-                    firebitsOrg: [],
-                    coins: [],
-                    coinGroups: {},
-                    // `game.coinGroups[i]` holds the number of still-living coins in the coinGroup with ID `i`
-                    coinGroupBonuses: {},
-                    // `game.coinGroupBonuses[i]` holds the points gained from getting all coins in group `i`
-                    coinGroupGottenNotifs: [],
-                    nextCoinGroupId: 0,
-                    coinReleaseMode: "random",
-                    coinReleaseModeTimeLeft: null, // In "random" mode, mode switch is random, not timed
-                    coinGridOffset: 0,
-                    powerups: mkPowerupsObj({}),
-                    activePowerups: [],
-                    points: 0,
-                    pointsFromCoins: 0,
-                    paused: false,
-                    dead: false,
-                    statsPrev: {},
-                    stats: {} // For debugging aid
-                };
+        createGame = function () {
+            return {
+                player: createPlayer(gameWidth / 2, 50, 0, 0),
+
+                platfms: [],
+
+                // `previewPlatfmTouch' holds the current touch object, if a
+                // platfm is being drawn. Otherwise, it holds `null'
+                previewPlatfmTouch: null,
+
+                // 'fb' is short for 'fireball'
+                fbs: [],
+
+                coins: [],
+
+                // `game.coinGroups[i]` holds the number of still-living
+                // coins in the coinGroup with ID `i'
+                coinGroups: {},
+
+                // The id to use for the next coin group:
+                nextCoinGroupId: 0,
+
+                // `game.coinGroupBonuses[i]` holds the extra points to be
+                // gained once the every coin in group `i' has been obtained
+                coinGroupBonuses: {},
+
+                // Holds the current on-screen congratulatory notifications:
+                coinGroupGottenNotifs: [],
+
+                coinReleaseMode: "random",
+
+                // In "random" coin mode, whether to switch modes is determined
+                // randomly, without a timeout, so the following is `null'
+                coinReleaseModeTimeLeft: null,
+
+                // Explained in `gUpdaters.coins()':
+                coinGridOffset: 0,
+
+                powerups: {},
+
+                activePowerups: [],
+
+                points: 0,
+                // How many of those points were gotten from coins directly:
+                pointsFromCoins: 0,
+                // `pointsFromCoins' is kept track of because the difficulty
+                // curve is a function of points not gotten from coins directly
+
+                paused: false,
+                dead: false,
+
+                // For debugging
+                statsPrev: {},
+                stats: {}
             };
-        }());
+        };
 
     // Rendering:
     var Render = (function () {
-        var bgCtx = bgCanvas.getContext("2d"),
-            mainCtx = mainCanvas.getContext("2d"),
-            btnCtx = btnCanvas.getContext("2d"),
-            overlayCtx = overlayCanvas.getContext("2d");
+        var bgCtx = bgCanvas.getContext("2d");
+        var mainCtx = mainCanvas.getContext("2d");
+        var btnCtx = btnCanvas.getContext("2d");
+        var overlayCtx = overlayCanvas.getContext("2d");
+
         bgCtx.scale(pageScaleFactor, pageScaleFactor);
         mainCtx.scale(pageScaleFactor, pageScaleFactor);
         btnCtx.scale(pageScaleFactor, pageScaleFactor);
@@ -495,25 +500,29 @@ if (typeof Math.log2 !== "function") {
         mainCtx.translate(0.5, 0.5);
         btnCtx.translate(0.5, 0.5);
         overlayCtx.translate(0.5, 0.5);
+
+        // For caching drawings on an off-screen canvas:
         var offScreenRender = function (width, height, render) {
-                var newCanvas = document.createElement('canvas');
-                newCanvas.width = width;
-                newCanvas.height = height;
-                var ctx = newCanvas.getContext('2d');
-                ctx.translate(0.5, 0.5);
-                render(ctx, width, height);
-                return newCanvas;
-            };
+            var newCanvas = document.createElement('canvas');
+            newCanvas.width = width;
+            newCanvas.height = height;
+            var ctx = newCanvas.getContext('2d');
+            ctx.translate(0.5, 0.5);
+            render(ctx, width, height);
+            return newCanvas;
+        };
+
         // Renderers:
-        var fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) {
+        var
+            fillShadowyText = function (ctx, text, x, y, reverse, offsetAmt, w, h) {
                 // Doesn't set things like ctx.font and ctx.textAlign so that they
                 // can be set on ctx by the caller, before invoking.
                 var neutralClr = starfieldActive ? "white" : "black";
                 var brightClr = starfieldActive ? "royalblue" : "darkOrange";
-                var clr0 = reverse ? neutralClr : brightClr,
-                    clr1 = reverse ? brightClr : neutralClr,
-                    offset = offsetAmt || 1,
-                    setW = w !== undefined;
+                var clr0 = reverse ? neutralClr : brightClr;
+                var clr1 = reverse ? brightClr : neutralClr;
+                var offset = offsetAmt || 1;
+                var setW = w !== undefined;
                 ctx.fillStyle = clr0;
                 if (setW) {
                     ctx.fillText(text, x, y, w, h);
@@ -527,14 +536,16 @@ if (typeof Math.log2 !== "function") {
                     ctx.fillText(text, x + offset, y - offset);
                 }
             },
-            circle = function (ctx, x, y, radius, color, fillOrStroke) {
+            drawCircle = function (ctx, x, y, radius, color, fillOrStroke) {
                 ctx.beginPath();
                 ctx[fillOrStroke + "Style"] = color;
                 ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
                 ctx[fillOrStroke]();
             },
             circleAt = function (ctx, x, y, radius) {
-                ctx.moveTo(x + radius, y); // A line is always drawn from the current position to the start of the drawing of the circle, so the '+ radius' puts the brush at that point on the circle, (x+radius, y), to prevent extraneous lines from being painted.
+                // The `+ radius' in the `moveTo' call below prevents a line
+                // from being drawn from the edge of the circle to its center
+                ctx.moveTo(x + radius, y);
                 ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
             },
             lineFromTo = function (ctx, x0, y0, x1, y1) {
@@ -549,16 +560,14 @@ if (typeof Math.log2 !== "function") {
                 ctx.lineTo(-playerElbowXDiff, -playerElbowYDiff);
                 ctx.lineTo(-2 * playerElbowXDiff, playerElbowYDiff);
             },
-            wheelSpokesAt = function (ctx, x, y, angle) {
-                var spokeAngle = 0, spinOffset = angle * oneDegree, relX, relY, i;
+            wheelSpokesAt = function (ctx, x, y, angleInDegrees) {
+                var spokeAngle, spinOffset = angleInDegrees * oneDegree, relX, relY, i;
                 for (i = 0; i < 6; i += 1) {
+                    spokeAngle = i / 3 * Math.PI;
                     relX = trig.cos(spinOffset + spokeAngle) * playerRadius;
                     relY = trig.sin(spinOffset + spokeAngle) * playerRadius;
                     ctx.moveTo(x + relX, y + relY);
                     ctx.lineTo(x - relX, y - relY);
-                    if (i !== 5) {
-                        spokeAngle += 1/3 * Math.PI;
-                    }
                 }
             },
             wheelOutlineAt = function (ctx, x, y, useStarsStyle) {
@@ -615,10 +624,12 @@ if (typeof Math.log2 !== "function") {
                     ctx.beginPath();
                     circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius + 1);
                     ctx.clip();
-                    ctx.clearRect(playerHeadX - playerHeadRadius - 1,
-                                  playerHeadY - playerHeadRadius - 1,
-                                  playerHeadRadius * 2,
-                                  playerHeadRadius * 2);
+                    ctx.clearRect(
+                        playerHeadX - playerHeadRadius - 1,
+                        playerHeadY - playerHeadRadius - 1,
+                        playerHeadRadius * 2,
+                        playerHeadRadius * 2
+                    );
                     ctx.restore();
 
                     // Now for the lines to appear in front of head:
@@ -747,7 +758,6 @@ if (typeof Math.log2 !== "function") {
             drawCoinGroupGottenNotif = (function () {
                 var notif = document.createElement("canvas");
                 var pxSize = 18;
-                var txt1Offset = 12;
                 notif.width = pxSize * 4;
                 notif.height = pxSize * 1.5;
                 var message = "100%";
@@ -806,15 +816,17 @@ if (typeof Math.log2 !== "function") {
                 sheetCtx.textAlign = "left";
                 sheetCtx.font = "bold " + inGamePointsPxSize + "px r0";
                 (function () {
-                    // Draw numbers scoreMin to scoreMax on the sheet
+                    // Draw numbers from `scoreMin' to `scoreMax' on the sheet
                     var i, text;
                     for (i = scoreMin; i <= scoreMax; i += 1) {
                         text = pad ? padNumericPeriod(i) : i + "";
-                        scoreWidths[i] = sheetCtx.measureText(text).width + 1; // `+ 1` is for shadow
-                        fillShadowyText(sheetCtx,
+                        scoreWidths[i] = sheetCtx.measureText(text).width + 1; // `+ 1' is to include shadow
+                        fillShadowyText(
+                            sheetCtx,
                             text, // points
-                            (i - scoreMin) * sectW, // x
-                            inGamePointsPxSize); // y
+                            (i - scoreMin) * sectW, // text x position
+                            inGamePointsPxSize // text y position
+                        );
                     }
                 }());
             },
@@ -851,10 +863,11 @@ if (typeof Math.log2 !== "function") {
                         // Subtract 500 because sheetB starts with '500' at x=0
                     }
                     ctx.drawImage(sheet,
-                        position * sheetSectionWidth, 0,
-                        sheetSectionWidth, sheetHeight,
-                        x, y,
-                        sheetSectionWidth, sheetHeight);
+                        position * sheetSectionWidth, 0, // x,y in source canvas
+                        sheetSectionWidth, sheetHeight, // w,h in source canvas
+                        x, y, // x,y on target canvas
+                        sheetSectionWidth, sheetHeight // w,h on target canvas
+                    );
                 };
 
                 // Use the above to draw any number as a sequence of comma-separated periods
@@ -887,7 +900,7 @@ if (typeof Math.log2 !== "function") {
             }()),
             drawPowerupBubble = function (ctx, x, y) {
                 ctx.beginPath();
-                circleAt(ctx, x, y, activePowerupBubbleRadius);
+                circleAt(ctx, x, y, powerupBubbleRadius);
                 ctx.fillStyle = "rgba(255, 215, 0, 0.35)";
                 ctx.fill();
             },
@@ -905,8 +918,8 @@ if (typeof Math.log2 !== "function") {
                     "slow": offScreenRender(powerupSlowRadius * 2 + 5, powerupSlowRadius * 2 + 5, function (ctx, w, h) {
                         var cx = w / 2, cy = h / 2;
                         ctx.lineWidth = 2;
-                        circle(ctx, cx, cy, powerupSlowRadius, "black", "stroke");
-                        circle(ctx, cx, cy, powerupSlowRadius, "white", "fill");
+                        drawCircle(ctx, cx, cy, powerupSlowRadius, "black", "stroke");
+                        drawCircle(ctx, cx, cy, powerupSlowRadius, "white", "fill");
 
                         // Hour hand
                         ctx.lineWidth = 1;
@@ -915,14 +928,21 @@ if (typeof Math.log2 !== "function") {
                         ctx.stroke();
 
                         // 12 tick marks
-                        var i, angle;
+                        var i, angle, cos, sin;
                         var tickOuterR = powerupSlowRadius * 0.85;
                         var tickInnerR = powerupSlowRadius * 0.8;
                         ctx.beginPath();
                         for (i = 0; i < 12; i += 1) {
                             angle = Math.PI * 2 * (i / 12);
-                            lineFromTo(ctx, cx + trig.cos(angle) * tickOuterR, cy + trig.sin(angle) * tickOuterR,
-                                            cx + trig.cos(angle) * tickInnerR, cy + trig.sin(angle) * tickInnerR);
+                            cos = trig.cos(angle);
+                            sin = trig.sin(angle);
+                            lineFromTo(
+                                ctx,
+                                cx + cos * tickOuterR,
+                                cy + sin * tickOuterR,
+                                cx + cos * tickInnerR,
+                                cy + sin * tickInnerR
+                            );
                         }
                         ctx.stroke();
 
@@ -987,25 +1007,35 @@ if (typeof Math.log2 !== "function") {
                 };
             }()),
             drawActivePowerupBackground = function (ctx, lifeleft, totalLifetime, x, y) {
-                var fractionLifeLeft = lifeleft / totalLifetime,
-                    nearDeath = fractionLifeLeft < 0.25,
-                    roundAmt = nearDeath ? 120 : 60,
-                    roundedFrac = Math.ceil(fractionLifeLeft * roundAmt) / roundAmt,
-                    angleOfGrayArc = 2 * Math.PI * roundedFrac;
-                if (angleOfGrayArc <= 0) {
+                if (lifeleft <= 0) {
                     return;
                 }
-                // Fill in the correct portion of the circle with gray;
+                var fractionLifeLeft = lifeleft / totalLifetime;
+                var nearDeath = fractionLifeLeft < 0.25;
+
+                // Round the progress of the time-left arc to give a
+                // ticking motion.
+                // When closer to dying, the ticking happens faster,
+                // so `roundedFrac' must be rounded to higher precision:
+                var roundAmt = nearDeath ? 120 : 60;
+                // Fraction of the circle to be darker:
+                var roundedFrac = Math.ceil(fractionLifeLeft * roundAmt) / roundAmt;
+                var angleOfGrayArc = 2 * Math.PI * roundedFrac;
+
+                // Fill a fraction of the circle with dark gray (or red);
                 ctx.beginPath();
                 ctx.moveTo(x, y);
-                ctx.arc(x, y, activePowerupBubbleRadius, 0, angleOfGrayArc, false);
+                ctx.arc(x, y, powerupBubbleRadius, 0, angleOfGrayArc, false);
                 ctx.fillStyle = nearDeath ? "rgba(200, 0, 0, 1)" : "rgba(150, 150, 150, 0.65)";
                 ctx.fill();
-                if (angleOfGrayArc < 2 * Math.PI) { // To prevent the entire circle from being filled when really none should be filled. This condition can happen due to rounding in 'roundedFrac'.
-                    // Fill in the rest of the circle with a ghosted gray;
+
+                // Fill the rest of the circle with a ghosted background gray:
+                if (angleOfGrayArc < 2 * Math.PI) {
+                    // This condition can fail due to rounding in `roundedFrac'
+
                     ctx.beginPath();
                     ctx.moveTo(x, y);
-                    ctx.arc(x, y, activePowerupBubbleRadius, 0, angleOfGrayArc, true);
+                    ctx.arc(x, y, powerupBubbleRadius, 0, angleOfGrayArc, true);
                     ctx.fillStyle = "rgba(150, 150, 150, 0.25)";
                     ctx.fill();
                 }
@@ -1024,7 +1054,7 @@ if (typeof Math.log2 !== "function") {
                     } else {
                         drawActivePowerupBackground(ctx, actives[i].lifetime, actives[i].totalLifetime, xPos, yPos);
                         drawPowerup(ctx, actives[i].type, xPos, yPos);
-                        xPos -= 2.1 * activePowerupBubbleRadius;
+                        xPos -= 2.1 * powerupBubbleRadius;
                     }
                 }
             },
@@ -1067,8 +1097,12 @@ if (typeof Math.log2 !== "function") {
                     btn: "darkblue"
                 };
                 return function (ctx, edgeX, edgeY, width, height, pressed, reddish, radius) {
-                    var clrs = reddish ? tintedClrs : stdClrs;
-                    clrs = starfieldActive ? starfieldClrs : clrs;
+                    var clrs = stdClrs;
+                    if (starfieldActive) {
+                        clrs = starfieldClrs;
+                    } else if (reddish) {
+                        clrs = tintedClrs;
+                    }
                     radius = radius || 8;
                     if (pressed) {
                         ctx.fillStyle = clrs.btn;
@@ -1093,15 +1127,22 @@ if (typeof Math.log2 !== "function") {
             },
             drawBtn = function (ctx, btn) {
                 var pressed = Touch.curTouch && btn.touchIsInside(Touch.curTouch);
+
+                // Draw visual structure of button (shapes behind the label):
                 drawButtonStructureAt(ctx, btn.edgeX(), btn.y, btn.w, btn.h, pressed, btn.tintedRed);
                 var x = btn.x, y = btn.y;
                 if (pressed) {
                     x -= btnShadowOffset;
                     y += btnShadowOffset;
                 }
-                ctx.fillStyle = starfieldActive ? "royalblue" :
-                                btn.tintedRed ? "rgb(175, 145, 125)" :
-                                "rgb(120, 135, 130)";
+
+                // Set color to use for button label:
+                ctx.fillStyle =
+                    starfieldActive ? "royalblue" :
+                    btn.tintedRed ? "rgb(175, 145, 125)" :
+                    "rgb(120, 135, 130)";
+
+                // Draw button label with that color:
                 if (btn.text === ":pause") {
                     drawPauseBars(ctx, pressed ? -btnShadowOffset : 0, y, btn);
                 } else {
@@ -1122,7 +1163,11 @@ if (typeof Math.log2 !== "function") {
             drawMovingBg = (function () {
                 var bgsWidth = 864;
                 var bgsHeight = 1024;
-                var cloudsSelected; // To keep track of value of fillStyle
+                var cloudsSelected;
+                // `cloudsSelected' is true when `bgCtx.fillStyle' is set
+                // to `cloudPattern', and false when it is set to `starPattern'
+
+                // Set up cloud background image
                 var cloudImg = new Image(), cloudPattern;
                 cloudImg.onload = function () {
                     cloudPattern = bgCtx.createPattern(cloudImg, "repeat");
@@ -1130,15 +1175,23 @@ if (typeof Math.log2 !== "function") {
                     cloudsSelected = true;
                 };
                 cloudImg.src = "img/bg-clouds-20-blurs.png";
+
+                // Set up star background image
                 var starImg = new Image(), starPattern;
                 starImg.onload = function () {
                     starPattern = bgCtx.createPattern(starImg, "repeat");
                 };
                 starImg.src = "img/bg-star-field.png";
+
+                // `xOffset' and `yOffset' record how far the background
+                // has visually drifted
                 var xOffset = 0, yOffset = 0;
                 return function (doMovement) {
+                    // Make the background wrap around
                     xOffset = modulo(xOffset, bgsWidth);
                     yOffset = modulo(yOffset, bgsHeight);
+
+                    // Change the background image to be used, if necessary
                     if (cloudsSelected && starfieldActive) {
                         cloudsSelected = false;
                         bgCtx.fillStyle = starPattern;
@@ -1146,7 +1199,11 @@ if (typeof Math.log2 !== "function") {
                         cloudsSelected = true;
                         bgCtx.fillStyle = cloudPattern;
                     }
+
+                    // Draw the background
                     if (cloudPattern && starPattern) {
+                        // The following state changes feel wasteful, but
+                        // are safe and don't seem to show up in profiles
                         bgCtx.save();
                         bgCtx.translate(-xOffset, -yOffset);
                         bgCtx.fillRect(0, 0, gameWidth * 6, gameHeight * 4);
@@ -1194,9 +1251,9 @@ if (typeof Math.log2 !== "function") {
                 game.fbs.forEach(function (fb) {
                     drawFb(mainCtx, fb);
                 });
-                game.powerups.forEach(function (powerup) {
-                    var x = powerup.xPos();
-                    var y = powerup.yPos();
+                forEachInObject(game.powerups, function (pname, powerup) {
+                    var x = calcPowerupXPos(powerup);
+                    var y = calcPowerupYPos(powerup);
                     drawPowerupBubble(mainCtx, x, y);
                     drawPowerup(mainCtx, powerup.type, x, y);
                 });
@@ -1217,7 +1274,7 @@ if (typeof Math.log2 !== "function") {
             }()),
             drawSwipeHelpText = (function () {
                 var lines = ["Swipe to draw", "platforms"];
-                var pxSize =  25;
+                var pxSize = 25;
                 return function (ctx, x, y) {
                     ctx.font = "italic " + pxSize + "px i0";
                     ctx.lineWidth = 4;
@@ -1255,12 +1312,12 @@ if (typeof Math.log2 !== "function") {
                     ctx.fillStyle = starfieldActive ? "rgba(0, 0, 0, 0.8)" : "rgba(200, 200, 200, 0.75)";
                     ctx.fillRect(-1, -1, gameWidth + 1, gameHeight + 1);
                 };
-                return function (f) {
+                return function (drawFn) {
                     return function (game) {
                         drawGame(game);
                         overlayCtx.save();
                         vagueify(overlayCtx);
-                        f.apply(null, [overlayCtx].concat([].slice.apply(arguments)));
+                        drawFn(overlayCtx, game);
                         overlayCtx.restore();
                     };
                 };
@@ -1303,8 +1360,7 @@ if (typeof Math.log2 !== "function") {
                 var scoreFontSize = 24;
                 ctx.font = scoreFontSize + "px r0";
                 var curY = startY + 325;
-                highscores.highest().forEach(function (score) {
-                    if (!score) { return; }
+                highscores.each(function (score) {
                     ctx.fillText(score, gameWidth / 2, curY);
                     curY += scoreFontSize + 2;
                 });
@@ -1312,7 +1368,7 @@ if (typeof Math.log2 !== "function") {
                 // Replay btn
                 drawBtn(ctx, replayBtn);
             });
-        return {
+        return Object.freeze({
             menu: drawMenu,
             game: drawGame,
             gamePaused: drawGamePaused,
@@ -1320,7 +1376,7 @@ if (typeof Math.log2 !== "function") {
             btnLayer: redrawBtnLayer,
             tutorial: drawTutorial,
             background: drawMovingBg
-        };
+        });
     }());
 
     // Handle device events:
@@ -1347,7 +1403,7 @@ if (typeof Math.log2 !== "function") {
     }());
 
     // Collision predicates:
-    var Collision = {
+    var Collision = Object.freeze({
         player_platfm: function (player, platfm) {
             // Make sure that the ball is in the square who's opposite
             // corners are the endpoints of the platfm. Necessary because
@@ -1369,8 +1425,8 @@ if (typeof Math.log2 !== "function") {
             return distLT(player.x, player.y, x, y, playerRadius + circleRadius);
         },
         player_circle: function (player, x, y, circleRadius) {
-            return Collision.playerWheel_circle(player, x, y, circleRadius)
-                || (!player.ducking && distLT(player.x, player.y - playerWheelToHeadDist, x, y, playerHeadRadius + circleRadius));
+            return Collision.playerWheel_circle(player, x, y, circleRadius) ||
+                    (!player.ducking && distLT(player.x, player.y - playerWheelToHeadDist, x, y, playerHeadRadius + circleRadius));
         },
         playerHead_circle: function (player, x, y, circleRadius) {
             var headX, headY;
@@ -1385,7 +1441,7 @@ if (typeof Math.log2 !== "function") {
         },
         playerTorso_circle: function (player, x, y, circleRadius) {
             var approxRadius = playerTorsoLen * 0.4;
-            var cy = player.y - playerTorsoLen  * 0.8;
+            var cy = player.y - playerTorsoLen * 0.8;
             return distLT(player.x, cy, x, y, approxRadius + circleRadius);
         },
         playerHeadNearFb: function (player, fb) {
@@ -1394,19 +1450,25 @@ if (typeof Math.log2 !== "function") {
             return distLT(player.x, player.y - playerWheelToHeadDist, fb.x, fb.y, headWithMargin + fbRadius);
         },
         player_fb: function (player, fb) {
-            return Collision.playerHead_circle(player, fb.x, fb.y, fbRadius)
-                || Collision.playerTorso_circle(player, fb.x, fb.y, fbRadius);
+            return Collision.playerHead_circle(player, fb.x, fb.y, fbRadius) ||
+                    Collision.playerTorso_circle(player, fb.x, fb.y, fbRadius);
         },
         player_coin: function (player, coin) {
             return Collision.player_circle(player, coin.x, coin.y, coinRadius);
         },
         player_powerup: function (player, powerup) {
-            return Collision.player_circle(player, powerup.xPos(), powerup.yPos(), activePowerupBubbleRadius);
+            return Collision.player_circle(
+                player,
+                calcPowerupXPos(powerup),
+                calcPowerupYPos(powerup),
+                powerupBubbleRadius
+            );
         }
-    };
+    });
 
     // Other small gameplay functions:
-    var maybeGetPlatfmFromTouch = function (touch, success) {
+    var
+        maybeGetPlatfmFromTouch = function (touch, success) {
             var tx0 = touch.x0;
             if (Touch.zeroLength(touch)) {
                 return;
@@ -1423,14 +1485,13 @@ if (typeof Math.log2 !== "function") {
         randomXPosition = function () {
             return Math.random() * gameWidth;
         },
-        // 'fb' is short for 'fireball'
         updateFbsGeneric = (function () {
-            var fewInLowerPortion = function (fbArray) {
+            var fewInLowerPortion = function (fbs) {
                 // Predicate asks: are there few enough fbs in bottom
-                // of screen that more should be made?
+                // of screen that more must be made?
                 var i, fb;
-                for (i = 0; i < fbArray.length; i += 1) {
-                    fb = fbArray[i];
+                for (i = 0; i < fbs.length; i += 1) {
+                    fb = fbs[i];
                     if (fb.y > gameHeight * 3 / 4) {
                         return false;
                     }
@@ -1450,8 +1511,7 @@ if (typeof Math.log2 !== "function") {
                         fb.frame = 0;
                     }
                 });
-                var chanceFactor = 4 / 7;
-                if (Math.random() < 1 / 7000 * chanceFactor * dt || fewInLowerPortion(obj.fbs)) {
+                if (Math.random() < fbCreationChanceFactor * dt || fewInLowerPortion(obj.fbs)) {
                     obj.fbs.push(createFb(
                         randomXPosition(),
                         gameHeight + fbRadius
@@ -1520,9 +1580,11 @@ if (typeof Math.log2 !== "function") {
         };
 
     // Functions operating on the game object:
-    var gUpdaters = (function () {
+    var
+        gUpdaters = (function () {
             // Some util first:
-            var addToActivePowerups = function (game, type, x, y) {
+            var
+                addToActivePowerups = function (game, type, x, y) {
                     var newActive = createActivePowerup(type, x, y);
                     var i;
                     for (i = 0; i < game.activePowerups.length; i += 1) {
@@ -1545,6 +1607,15 @@ if (typeof Math.log2 !== "function") {
                 coinColWidthDense = gameWidth / coinColumnsDense,
                 // So that random-released coins don't overlap with early pattern-released ones:
                 patternCoinStartingY = coinStartingY + coinColWidthStd,
+                scaleDistanceToObject = function (objToMove, target, scale) {
+                    // Change the position of `objToMove' to make its distance
+                    // to `target' be scaled by `scale'.
+                    // Used for effect of magnet powerup on coins.
+                    var relativeX = objToMove.x - target.x;
+                    var relativeY = objToMove.y - target.y;
+                    objToMove.x = target.x + relativeX * scale;
+                    objToMove.y = target.y + relativeY * scale;
+                },
 
                 addDiagCoinPattern = function (game, do_rtl, eachCoinValue) {
                     // If do_rtl is truthy, the diag pattern
@@ -1607,17 +1678,23 @@ if (typeof Math.log2 !== "function") {
                     platfm.bounceSpeed = dist(0, 0, platfm.bounceVx, platfm.bounceVy);
                 },
                 die = function (game) {
-                    if (game.dead) { return; }
+                    if (game.dead) {
+                        return;
+                    }
                     game.dead = true;
                     if (game.previewPlatfmTouch) {
-                        game.previewPlatfmTouch = Touch.copy(game.previewPlatfmTouch); // This means that when the player dies, when he/she moves the touch it doens't effect the preview.
+                        // At this point, `game.previewPlatfmTouch === Touch.curTouch',
+                        // so to freeze the shape of the preview-platfm, set it to
+                        // a copy of itself
+                        game.previewPlatfmTouch = Touch.copy(game.previewPlatfmTouch);
                     }
                     Render.btnLayer(game);
                 };
             return {
                 player: function (game, realDt, dt, uncurvedDt) {
                     var i, platfm, playerSpeed, collided = false;
-                    if (game.previewPlatfmTouch && Collision.player_platfm(game.player, game.previewPlatfmTouch)) {
+                    if (game.previewPlatfmTouch
+                            && Collision.player_platfm(game.player, game.previewPlatfmTouch)) {
                         // Use game.previewPlatfmTouch rather than Touch.curTouch
                         // so that in runTutorial, the automated touch still
                         // is used here in place of a real touch.
@@ -1645,7 +1722,7 @@ if (typeof Math.log2 !== "function") {
                         if (Collision.player_platfm(game.player, platfm)) {
                             collided = true;
                             if (!playerSpeed) {
-                                playerSpeed = quickSqrt(game.player.magnitudeSquared());
+                                playerSpeed = Vector.findMagnitude(game.player);
                             }
                             if (!platfm.bounceVx) {
                                 setBounceVelForPlatfm(platfm, uncurvedDt);
@@ -1656,7 +1733,7 @@ if (typeof Math.log2 !== "function") {
                                 game.player.vx *= (playerSpeed + 2) / platfm.bounceSpeed;
                                 game.player.vy *= (playerSpeed + 2) / platfm.bounceSpeed;
                             }
-                            game.player.vy -= platfmRiseRate * dt;
+                            game.player.vy -= platfmRiseRate * realDt;
                             break;
                         }
                     }
@@ -1673,14 +1750,15 @@ if (typeof Math.log2 !== "function") {
                     game.player.vy = Math.min(game.player.vy, maxVyFromTimePoints(game.points - game.pointsFromCoins));
                     game.player.ducking = false;
                     for (i = 0; i < game.fbs.length; i += 1) {
-                        if (game.player.ducking === false && Collision.playerHeadNearFb(game.player, game.fbs[i])) {
+                        if (!game.player.ducking && Collision.playerHeadNearFb(game.player, game.fbs[i])) {
                             game.player.ducking = true;
                         }
                         if (Collision.player_fb(game.player, game.fbs[i])) {
                             die(game);
                         }
                     }
-                    var curCoinValue = handleActivesPoints(game.activePowerups, coinValue * difficultyCurveFromTimePoints(game.points - game.pointsFromCoins));
+                    var diffCurve = difficultyCurveFromTimePoints(game.points - game.pointsFromCoins);
+                    var curCoinValue = handleActivesPoints(game.activePowerups, coinValue * diffCurve);
                     game.coins.forEach(function (coin, index) {
                         if (Collision.player_coin(game.player, coin)) {
                             if (Number.isFinite(coin.groupId) && game.coinGroups.hasOwnProperty(coin.groupId)) {
@@ -1700,7 +1778,7 @@ if (typeof Math.log2 !== "function") {
                             }
                             game.coins.splice(index, 1);
                             game.points += curCoinValue;
-                            game.pointsFromCoins += curCoinValue; // Needs to be kept track of for difficulty curve, which is not affected by coin points
+                            game.pointsFromCoins += curCoinValue;
                         }
                     });
                     game.coinGroupGottenNotifs.forEach(function (notif, i) {
@@ -1715,10 +1793,15 @@ if (typeof Math.log2 !== "function") {
                         notif.x += dx;
                         notif.y += dy;
                     });
-                    game.powerups.forEach(function (powerup, key) {
+                    forEachInObject(game.powerups, function (pname, powerup) {
                         if (Collision.player_powerup(game.player, powerup)) {
-                            game.powerups[key] = null;
-                            addToActivePowerups(game, powerup.type, powerup.xPos(), powerup.yPos());
+                            delete game.powerups[pname];
+                            addToActivePowerups(
+                                game,
+                                powerup.type,
+                                calcPowerupXPos(powerup),
+                                calcPowerupXPos(powerup)
+                            );
                         }
                     });
                     game.player.x = modulo(game.player.x + game.player.vx * uncurvedDt / 20, gameWidth);
@@ -1731,19 +1814,30 @@ if (typeof Math.log2 !== "function") {
                     var dy = coinRiseRate * dt;
                     // The coins are all rendered in a vertically sliding
                     // grid, and coinGridOffset keeps track of the distance
-                    // to the bottom on-screen invisible line of that grid
+                    // to the lowest on-screen invisible line of that grid
                     // from the base of the screen.
                     game.coinGridOffset += dy;
                     game.coinGridOffset = game.coinGridOffset % coinColWidthStd;
                     game.coins.forEach(function (coin, index) {
                         coin.y -= dy;
-                        var distanceSqd;
-                        var distance;
+                        var distSqd;
+                        var distScaleFactor;
                         if (magnetOn) {
-                            distanceSqd = coin.distanceSqdTo(game.player);
-                            if (distanceSqd < 100 * 100) {
-                                distance = quickSqrt(distanceSqd);
-                                coin.setDistanceTo(game.player, distance - (100 / distance));
+                            // Slide coin closer to player
+                            distSqd = distanceSquared(coin.x, coin.y, game.player.x, game.player.y);
+                            if (distSqd < 10000) {
+                                distScaleFactor = 1 - 100 / distSqd;
+                                // Logic behind definition of distScaleFactor:
+                                // We want to set distance to `player' to
+                                //    (curDistance - (100 / curDistance)),
+                                // so we equivalently want to scale the distance by
+                                //   (curDistance - (100 / curDistance)) / curDistance
+                                //   = 1 - 100 / curDistance^2
+                                // The prior math breaks down when curDistance < 10,
+                                // (which would make the scale factor negative), but
+                                // by then the coin will have collided with the player
+                                // and thus been removed from `game.coins'
+                                scaleDistanceToObject(coin, game.player, distScaleFactor);
                             }
                         }
                         if (coin.y < -2 * coinRadius) {
@@ -1757,7 +1851,8 @@ if (typeof Math.log2 !== "function") {
                         }
                     });
                     // Release modes are: "random", "blocks", "diagLTR", "diagRTL"
-                    var curCoinValue = handleActivesPoints(game.activePowerups, coinValue * difficultyCurveFromTimePoints(game.points - game.pointsFromCoins));
+                    var diffCurve = difficultyCurveFromTimePoints(game.points - game.pointsFromCoins);
+                    var curCoinValue = handleActivesPoints(game.activePowerups, coinValue * diffCurve);
                     var random = Math.random(); // Used in all following if/else branches
                     if (game.coinReleaseMode === "random") {
                         if (Math.random() < (dt / 1000) / 6) {
@@ -1807,26 +1902,26 @@ if (typeof Math.log2 !== "function") {
                     });
                 },
                 powerups: function (game, dt) {
-                    game.powerups.forEach(function (powerup, key) {
+                    forEachInObject(game.powerups, function (pname, powerup) {
                         powerup.lifetime += dt;
-                        if (powerup.xPos() > gameWidth + activePowerupBubbleRadius + playerRadius) {
-                            // The active powerup bubble is larger than all powerups,
-                            // and the '+ playerRadius' is so that he can catch one
-                            // just as it disappears.
-                            game.powerups[key] = null;
+                        if (calcPowerupXPos(powerup) >
+                                gameWidth + powerupBubbleRadius + playerRadius) {
+                            // The '+ playerRadius' is so that he can catch
+                            // one just as it disappears.
+                            delete game.powerups[pname];
                         }
                     });
-                    var chanceFactor = 1 / 75000;
-                    if (!game.powerups.X2 && Math.random() < chanceFactor * dt) { // 100 times less frequent than fireballs
+                    var possib = powerupCreationChanceFactor * dt;
+                    if (!game.powerups.X2 && Math.random() < possib) {
                         game.powerups.X2 = makePowerupRandom("X2", 25, 145);
                     }
-                    if (!game.powerups.slow && Math.random() < chanceFactor * dt) {
+                    if (!game.powerups.slow && Math.random() < possib) {
                         game.powerups.slow = makePowerupRandom("slow", 25, 145);
                     }
-                    if (!game.powerups.weight && game.points > 50 && Math.random() < chanceFactor * dt) {
+                    if (!game.powerups.weight && game.points > 50 && Math.random() < possib) {
                         game.powerups.weight = makePowerupRandom("weight", 25, 145);
                     }
-                    if (!game.powerups.magnet && Math.random() < chanceFactor * dt) {
+                    if (!game.powerups.magnet && Math.random() < possib) {
                         game.powerups.magnet = makePowerupRandom("magnet", 25, 145);
                     }
                 },
@@ -1886,8 +1981,12 @@ if (typeof Math.log2 !== "function") {
                 }
             },
             handleBtnLayerUpdates: (function () {
-                var sensitivityMarginY = 40, // Margin around button for events to trigger redraws on, so that a release is registered when the user slides a finger off the button
-                    sensitivityMarginX = 70; // People do faster horizontal swipes, so a larger margin is necessary
+                // Margin around button for events to trigger redraws on, so
+                // that a release is registered when the user slides a finger
+                // off the button:
+                var sensitivityMarginY = 40;
+                // People do faster horizontal swipes, so a larger margin is necessary
+                var sensitivityMarginX = 70;
                 return function (game, event, lastRedraw) {
                     // This should handle all of: touchmove, touchstart, touchend
                     var now = Date.now(),
@@ -1907,8 +2006,10 @@ if (typeof Math.log2 !== "function") {
         };
 
     // Update/render loops of home menu and gameplay:
-    var play = function (existingGame) {
-            var game = existingGame || createGame(),
+    var
+        play = function (existingGame) {
+            var
+                game = existingGame || createGame(),
                 restart = function () {
                     game = createGame();
                     setCurGame(game);
@@ -1946,26 +2047,28 @@ if (typeof Math.log2 !== "function") {
                 var uncurvedDt = realDt;
                 realDt *= game.stats.diffCurve;
                 if (realDt < 0 || !Number.isFinite(realDt)) {
-                    // I have reason to believe that this situation may be a cause
-                    // (or link in a chain of causes) for an error.
-                    // If this ever happens, something went very wrong, so avoid
-                    // anything further and hope it was just for that frame.
+                    // Having seen an error arise from negative or non-finite
+                    // `realDt' in the past, this is a precautionary measure,
+                    // although I am about certain that changes I made removed
+                    // the risk for error
+                    // Consider removing the handling of this case, as well
+                    // as `game.stats' and `game.statsPrev'
                     realDt = approxFrameLen;
-                    localStorage.setItem("error_log", (localStorage.getItem("error_log") || "") + "\n,\n" + JSON.stringify({t: Date.now(), game: game}) + '\n,"realDt is ' + realDt + " of type" + (typeof realDt) + '"');
-                    console.log("realDt toxic. info added to error_log at " + Date.now());
+                    localStorage.setItem("error_log",
+                        (localStorage.getItem("error_log") || "")
+                        + "\n,\n" + Date.now() + " " + JSON.stringify(game)
+                        + "\n,realDt is " + realDt + " of type" + typeof realDt);
                 }
                 game.stats.realDt = realDt;
 
 
                 // Handle effects of slow powerup
-                var dt;
+                var dt = realDt;
                 if (powerupObtained(game.activePowerups, "slow")) {
-                    dt = realDt * 2/3;
-                    uncurvedDt *= 2/3;
+                    dt *= 2 / 3;
+                    uncurvedDt *= 2 / 3;
                     // Any functions given 'dt' as the time delta will thus
                     // behave as if 2/3 as much time has passed.
-                } else {
-                    dt = realDt;
                 }
                 game.stats.dt = dt;
                 game.stats.prevFrameTime = prevFrameTime;
@@ -2027,8 +2130,8 @@ if (typeof Math.log2 !== "function") {
                 }());
         },
         createAutomatedTouch = function (dir) {
-            var autoTouchStartY = 230,
-                autoTouchStartXDiff = gameWidth * 0.3;
+            var autoTouchStartY = 230;
+            var autoTouchStartXDiff = gameWidth * 0.3;
             var x = gameWidth / 2 + dir * autoTouchStartXDiff;
             return {
                 x0: x,
@@ -2047,7 +2150,8 @@ if (typeof Math.log2 !== "function") {
         },
         timeBetweenAutoTouches = 600,
         runTutorial = function () {
-            var game = createGame(),
+            var
+                game = createGame(),
                 prevFrameTime = performance.now() - approxFrameLen,
                 autoTouchDir = 1,
                 curAutomatedTouch = createAutomatedTouch(autoTouchDir),
@@ -2141,13 +2245,12 @@ if (typeof Math.log2 !== "function") {
         },
         createMenu = function () {
             return {
-                fbs: [],
-                firebitsRed: [],
-                firebitsOrg: []
+                fbs: []
             };
         },
         runMenu = function () {
-            var menu = createMenu(),
+            var
+                menu = createMenu(),
                 prevFrameTime = performance.now() - approxFrameLen,
                 startGame = function () {
                     document.body.onclick = function () {};
