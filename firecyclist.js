@@ -19,22 +19,26 @@
     (function () {
         var htmlModule = document.getElementById("Main"),
             windowDims = {
-                width: window.innerWidth || document.documentElement.clientWidth, // The defaulting expression (.documentElement....) is for IE
+                // The defaulting expression (.documentElement....) is for IE
+                width: window.innerWidth || document.documentElement.clientWidth,
                 height: window.innerHeight || document.documentElement.clientHeight
             },
             scaleX = windowDims.width / gameWidth,
             scaleY = windowDims.height / gameHeight,
             moduleOffsetX = 0;
+
         pageScaleFactor = Math.min(scaleX, scaleY);
+
         if (scaleX > scaleY) {
             // If the game is as tall as the screen but not as wide, center it
             moduleOffsetX = (windowDims.width - gameWidth * pageScaleFactor) / 2;
             htmlModule.setAttribute("style", "position: fixed; left: " + Math.floor(moduleOffsetX) + "px;");
             // <body> is sky-blue while page is loading, but once it has loaded,
-            // the canvas handles all color in the 288x576 so for the sake of
-            // those playing in the browser, set body background back to black:
+            // the canvas handles all color in the 288x576 so for phones with
+            // resolutions not at exactly 2:1 screens, turn bg black:
             document.body.setAttribute("style", "background-color: black;");
         }
+
         calcTouchPos = function (event) {
             var literalX, literalY;
             if (typeof event.clientX === "number") {
@@ -49,9 +53,12 @@
             }
             return {
                 x: (literalX - moduleOffsetX) / pageScaleFactor,
-                y: literalY / pageScaleFactor
+                y: literalY / pageScaleFactor,
+                rawX: literalX,
+                rawY: literalY
             };
         };
+
         [bgCanvas, mainCanvas, btnCanvas, overlayCanvas].forEach(function (canvas) {
             canvas.width *= pageScaleFactor;
             canvas.height *= pageScaleFactor;
@@ -61,38 +68,64 @@
     // Touch system:
     var Touch = (function () {
         var touchesCount = 0;
-        document.onmousemove = document.ontouchmove = function (event) {
+
+        document.addEventListener("touchmove", function (event) {
             var xy = calcTouchPos(event);
-            if (Touch.curTouch !== null) { // Condition fails when a platfm has been materialized, and thus curTouch was reset to null
+            if (Touch.curTouch) {
+                // Condition fails when a platfm has been materialized,
+                // and thus curTouch was reset to null
                 Touch.curTouch.x1 = xy.x;
                 Touch.curTouch.y1 = xy.y;
+                Touch.curTouch.rawX1 = xy.rawX;
+                Touch.curTouch.rawY1 = xy.rawY;
             }
-            event.preventDefault(); // Stops the swipe-to-move-through-browser-history feature in Chrome from interferring.
-        };
-        document.onmousedown = document.ontouchstart = function (event) {
+            // `preventDefault()' to stop Chrome from moving
+            // through browser history on swipes
+            event.preventDefault();
+        });
+
+        document.addEventListener("touchstart", function (event) {
             var now = Date.now(), xy = calcTouchPos(event);
             Touch.curTouch = {
                 t0: now,
                 id: touchesCount,
                 x0: xy.x,
                 y0: xy.y,
+                rawX0: xy.rawX,
+                rawY0: xy.rawY,
                 x1: xy.x,
-                y1: xy.y
+                y1: xy.y,
+                rawX1: xy.rawX,
+                rawY1: xy.rawY
             };
             touchesCount += 1;
-        };
-        document.onmouseup = document.ontouchend = function () {
-            if (typeof Touch.onTouchend === "function" && Touch.curTouch) {
-                Touch.onTouchend(Touch.curTouch);
+        });
+
+        document.addEventListener("touchend", function () {
+            if (Touch.curTouch) {
+                if (typeof Touch.onTouchend === "function") {
+                    Touch.onTouchend(Touch.curTouch);
+                }
+                Touch.curTouch = null;
             }
-            Touch.curTouch = null;
-            // Do not use preventDefault here, it prevents
-            // triggering of the 'tap' event.
-        };
+        });
+
         return Object.seal({
             curTouch: null,
-            // `onTouchend' can be set, specifying a custom handler
+
+            // `onTouchend' can be set, specifying a handler, called above
             onTouchend: null,
+
+            touchIsValidAsTap: function (t) {
+                if (Math.abs(t.rawX1 - t.rawX0) < 12
+                        && Math.abs(t.rawY1 - t.rawY0) < 12) {
+                    if (Date.now() - t.t0 < 350) {
+                        return true;
+                    }
+                }
+                return false;
+            },
+
             copy: function (t) {
                 return {
                     t0: t.t0,
@@ -103,6 +136,7 @@
                     y1: t.y1
                 };
             },
+
             zeroLength: function (t) {
                 return t.x0 === t.x1 && t.y0 === t.y1;
             }
@@ -112,24 +146,16 @@
     // Generic util:
     var
         forEachInObject = function (obj, f) {
-            Object.keys(obj).forEach(function (key) {
-                f(key, obj[key]);
-            });
-        },
-        makeObject = function (proto, props) {
-            var o = Object.create(proto);
-            forEachInObject(props, function (key, value) {
-                o[key] = value;
-            });
-            return o;
-        },
-        modulo = function (num, modBy) {
-            if (num < 0) {
-                return modulo(modBy + num, modBy);
+            var keys = Object.keys(obj), i;
+            for (i = 0; i < keys.length; i += 1) {
+                f(keys[i], obj[keys[i]]);
             }
-            return num % modBy;
         },
-        sqrt3 = Math.sqrt(3),
+
+        modulo = function (num, modBy) {
+            return num - modBy * Math.floor(num / modBy);
+        },
+
         oneDegree = Math.PI / 180,
         trig = (function () {
             var
@@ -145,51 +171,62 @@
                     return cosines[modulo(Math.round(radians / oneDegree), 360)];
                 },
                 i;
+
             for (i = 0; i < 360; i += 1) {
                 sines[i] = Math.sin(i * oneDegree);
                 cosines[i] = Math.cos(i * oneDegree);
             }
+
             return {sin: sin, cos: cos};
         }()),
+
         quickSqrt = (function () {
-            var sqrts = {}; // square root of x is at sqrts[x * 2]
             var i;
-            for (i = 0; i < 500; i += 1) {
-                sqrts[i] = Math.sqrt(i / 2);
+
+            // Square root of x is at sqrtsLarge[x].
+            // `sqrtsLarge' is defined initially for 0 <= x < 250,
+            // but is extensible by memoization
+            var sqrtsLarge = {};
+            for (i = 0; i < 250; i += 1) {
+                sqrtsLarge[i] = Math.sqrt(i);
             }
+
+            // Square root of x is at sqrtsSmall[x * 50].
+            // `sqrtsSmall' is defined for 0 <= x < 10
+            var sqrtsSmallMax = 10;
+            var sqrtsSmall = {};
+            for (i = 0; i < sqrtsSmallMax * 50; i += 1) {
+                sqrtsSmall[i] = Math.sqrt(i / 50);
+            }
+
             return function (x) {
-                var pos = Math.round(x * 2);
-                if (sqrts[pos] === undefined) {
-                    sqrts[pos] = Math.sqrt(pos / 2);
+                if (x < sqrtsSmallMax) {
+                    return sqrtsSmall[Math.round(x * 50)];
                 }
-                return sqrts[pos];
+
+                var pos = Math.round(x);
+                if (sqrtsLarge[pos] === undefined) {
+                    sqrtsLarge[pos] = Math.sqrt(pos);
+                }
+                return sqrtsLarge[pos];
             };
         }()),
+
         distanceSquared = function (x0, y0, x1, y1) {
             var dx = x1 - x0;
             var dy = y1 - y0;
             return dx * dx + dy * dy;
         },
+
         distLT = function (x0, y0, x1, y1, compareWith) {
             var distSquared = distanceSquared(x0, y0, x1, y1);
             return distSquared < compareWith * compareWith;
         },
+
         dist = function (x0, y0, x1, y1) {
             return quickSqrt(distanceSquared(x0, y0, x1, y1));
         },
-        // For dealing with periods (sets of 3 digits, read RTL) in a natural number:
-        getPeriodsReverse = function (num) {
-            // Returns an array of the periods in num, from least
-            // to greatest significance.
-            var pds = [];
-            var pdNum = 0;
-            do {
-                pds.push(num % 1000); // push the first period in `num`
-                pdNum += 1;
-                num = Math.floor(num / 1000); // discard first period in `num` and slide rest over
-            } while (num > 0);
-            return pds;
-        },
+
         padNumericPeriod = function (num) {
             // E.g., if given 34, returns "034"
             return num < 10 ? "00" + num :
@@ -197,37 +234,39 @@
                    "" + num;
         };
 
-    // Config:
+    // Is space-mode rendering on:
+    var starfieldActive = false;
+
+    // Velocity config:
     var
-        starfieldActive = false,
-        approxFrameLen = 1000 / 60, // With requestAnimationFrame, this is approximate
-        playerGrav = 0.01,
         fbRiseRate = 0.1,
+        playerGrav = 0.00075,
+        coinRiseRate = 0.1,
+        platfmRiseRate = 0.15,
+        activePowerupTravelTime = 250,
+        activePowerupLifespan = 10000;
+
+    // Other numeric config:
+    var
         fbRadius = 10,
         fbNumRecordedFrames = 300,
         fbCreationChanceFactor = 1 / 12250,
-        coinRiseRate = 0.1,
         coinRadius = 10,
-        coinSquareLen = 8.5,
         coinValue = 11,
         coinStartingY = gameHeight + coinRadius,
-        platfmRiseRate = 0.15,
         totalFbHeight = 10,
-        platfmBounciness = 0.07,
         platfmThickness = 6,
         playerTorsoLen = 9.375,
         playerRadius = 7.5,
         playerHeadRadius = 5.625,
         playerElbowXDiff = 5,
-        playerElbowYDiff = 1.25,
         playerWheelToHeadDist = playerTorsoLen + playerRadius + playerHeadRadius,
         playerDuckingXDiff = -3,
         playerDuckingYDiff = -10,
         inGamePointsPxSize = 30,
+        inGamePointsXPos = 16,
         inGamePointsYPos = 9,
         activePowerupsStartingXPos = gameWidth - 78,
-        activePowerupTravelTime = 250,
-        activePowerupLifespan = 10000,
         powerupBubbleRadius = 18,
         powerupCreationChanceFactor = 1 / 75000,
         powerupTotalLifespan = 5500, // in milliseconds
@@ -241,41 +280,36 @@
         powerupWeightBlockLowerWidth = 30,
         powerupWeightBlockHeight = 20,
         powerupWeightHeight = powerupWeightBlockHeight + powerupWeightHandleHeight,
-        btnShadowOffset = 2,
-        mkBtn = (function () {
-            var proto = {
-                edgeX: function () {
-                    return this.x - this.w / 2;
-                },
-                touchIsInside: function (xy) {
-                    var withinHeight = xy.y1 >= this.y && xy.y1 <= this.y + this.h;
-                    var withinWidth = xy.x1 >= this.edgeX() && xy.x1 <= this.edgeX() + this.w;
-                    return withinHeight && withinWidth;
-                }
-            };
-            return function (o) {
-                var btn = makeObject(proto, o);
-                btn.tintedRed = !!o.tintedRed;
-                btn.textWDiff = o.textWDiff || 0;
-                btn.textHDiff = o.textHDiff || 0;
-                btn.textXOffset = o.textXOffset || 0;
-                // `textXOffset' is for small adjustments to alignment
-                // which make the button text *appear* better centered
-                return Object.freeze(btn);
-            };
-        }()),
+        btnShadowOffset = 2;
+
+    // Button util and config:
+    var
+        mkBtn = function (data) {
+            data.tintedRed = !!data.tintedRed;
+            data.textWDiff = data.textWDiff || 0;
+            data.textHDiff = data.textHDiff || 0;
+            data.textXOffset = data.textXOffset || 0;
+            // `textXOffset' is for small adjustments to alignment
+            // which make the button text *appear* better centered
+
+            data.edgeX = data.x - data.w / 2;
+
+            return Object.freeze(data);
+        },
+
         menuPlayBtn = mkBtn({
             text: "Play",
-            font: "italic bold 53px i0",
+            font: "italic bold 53px font0",
             x: gameWidth / 2,
             y: 280,
             w: 121,
             h: 57,
             textHDiff: -13
         }),
+
         replayBtn = mkBtn({
             text: "Replay",
-            font: "bold 33px b0",
+            font: "bold 33px font0",
             x: gameWidth / 2,
             y: 323,
             w: 110,
@@ -284,9 +318,10 @@
             textWDiff: -5,
             tintedRed: true
         }),
+
         resumeBtn = mkBtn({
             text: "Resume",
-            font: "bold 30px b0",
+            font: "bold 30px font0",
             x: gameWidth / 2,
             y: replayBtn.y - 68,
             w: replayBtn.w + 9,
@@ -296,6 +331,7 @@
             textWDiff: -5,
             tintedRed: true
         }),
+
         pauseBtn = (function () {
             var margin = 30;
             var s = 40;
@@ -307,7 +343,21 @@
                 h: s,
                 textHDiff: -17
             });
-        }());
+        }()),
+
+        touchIsInsideBtn = function (xy, btn) {
+            var withinHeight = xy.y1 >= btn.y && xy.y1 <= btn.y + btn.h;
+            var withinWidth = xy.x1 >= btn.edgeX && xy.x1 <= btn.edgeX + btn.w;
+            return withinHeight && withinWidth;
+        },
+
+        touchIsInPauseBtn = function (xy) {
+            // Checks whether a touch is above and to the right of the
+            // bottom-left bound of the pause btn. A more inclusive and
+            // useful test than whether the touch is exactly in the btn.
+            return xy.y1 <= pauseBtn.y + pauseBtn.h &&
+                    xy.x1 >= pauseBtn.edgeX;
+        };
 
     // Highscore update and storage:
     var
@@ -367,6 +417,93 @@
         }
     });
 
+    var runLoop = (function () {
+        var fallbackFps = 31;
+        var mustFallback = false;
+
+        var rafLoop = function (tick, isLagTooGreat, handleDowngrade) {
+            var deltas = [];
+            var prevTime = performance.now() - 20;
+            var firstFrame = true;
+            var stop = false;
+
+            isLagTooGreat = isLagTooGreat || function () {
+                return false;
+            };
+
+            requestAnimationFrame(function repeat(now) {
+                if (stop) {
+                    return;
+                }
+
+                requestAnimationFrame(repeat);
+
+                if (!firstFrame) {
+                    deltas.push(now - prevTime);
+                } else {
+                    firstFrame = false;
+                }
+
+                stop = tick(now);
+                if (isLagTooGreat(deltas)) {
+                    stop = true;
+                    mustFallback = true;
+                    handleDowngrade(tick, fallbackFps);
+                }
+                prevTime = now;
+            });
+
+            return deltas;
+        };
+
+        var intervalLoop = function (tick, fps) {
+            var deltas = [];
+            var prevTime = performance.now() - 20;
+            var firstFrame = true;
+
+            var intervalId = setInterval(function () {
+                var now = performance.now();
+                if (!firstFrame) {
+                    deltas.push(now - prevTime);
+                } else {
+                    firstFrame = true;
+                }
+
+                var stop = tick(now);
+                if (stop) {
+                    clearInterval(intervalId);
+                }
+
+                prevTime = now;
+            }, 1000 / fps);
+
+            return deltas;
+        };
+
+        var frameTooSlow = function (dt) {
+            return 1000 / dt < 55;
+        };
+        var lagThresholdReached = function (deltas) {
+            // TODO: Test on Galaxy Note 3 and refine
+            var lastFew = deltas.slice(-10);
+            var numSlow = lastFew.filter(frameTooSlow).length;
+            if (deltas.length <= 5) {
+                if (numSlow > 2) {
+                    return true;
+                }
+            }
+            return numSlow > 3;
+        };
+
+        return function (tick) {
+            if (mustFallback) {
+                intervalLoop(tick, fallbackFps);
+            } else {
+                rafLoop(tick, lagThresholdReached, intervalLoop);
+            }
+        };
+    }());
+
     // Constructors for in-game objects:
     var
         createPlayer = function (x, y, vx, vy) {
@@ -379,6 +516,7 @@
                 ducking: false
             };
         },
+
         createPlatfm = function (x0, y0, x1, y1) {
             return {
                 x0: x0,
@@ -387,19 +525,27 @@
                 y1: y1,
                 time_left: 800,
                 lengthSquared: distanceSquared(x0, y0, x1, y1),
-                bounceVx: undefined,
+
+                // `maybeGetPlatfmFromTouch' ensures that for all hand-drawn
+                // platfms, platfm.x1 !== platfm.x0, so that the following
+                // slope calculation does not blow up:
+                slope: (y1 - y0) / (x1 - x0),
+                bounceSpeedX: undefined,
                 bounceVy: undefined,
                 bounceSpeed: undefined
                 // bounceSpeed is a cache of the magnitude of
                 // the vector (bounceVx, bounceVy)
             };
         },
+
         createCoin = function (x, y, groupId) {
             return {x: x, y: y, groupId: groupId};
         },
+
         createFb = function (x, y) {
             return {x: x, y: y, frame: Math.floor(Math.random() * fbNumRecordedFrames)};
         },
+
         createPowerup = function (y, powerupType) {
             return {
                 offsetY: y,
@@ -407,12 +553,17 @@
                 type: powerupType
             };
         },
+
         calcPowerupXPos = function (powerup) {
             return powerup.lifetime / powerupTotalLifespan * gameWidth;
         },
+
         calcPowerupYPos = function (powerup) {
+            // y position of a powerup is a sin function of its x
+            // position, with stretched period and amplitude
             return powerup.offsetY + trig.sin(calcPowerupXPos(powerup) / 20) * 40;
         },
+
         createActivePowerup = function (type, srcX, srcY) {
             var lifetime = type === "slow"
                 ? activePowerupLifespan * 2 / 3
@@ -426,6 +577,7 @@
                 timeSinceAcquired: 0
             };
         },
+
         createGame = function () {
             return {
                 player: createPlayer(gameWidth / 2, 50, 0, 0),
@@ -461,7 +613,8 @@
                 // randomly, without a timeout, so the following is `null'
                 coinReleaseModeTimeLeft: null,
 
-                // Explained in `gUpdaters.coins()':
+                // `coinGridOffset' is explained in detail in
+                // the `gUpdaters.coins' function
                 coinGridOffset: 0,
 
                 powerups: {},
@@ -476,6 +629,9 @@
 
                 paused: false,
                 dead: false,
+
+                // Is the pause button currently drawn in the pressed position?
+                pauseBtnDown: false,
 
                 // For debugging
                 statsPrev: {},
@@ -536,230 +692,122 @@
                     ctx.fillText(text, x + offset, y - offset);
                 }
             },
+
             drawCircle = function (ctx, x, y, radius, color, fillOrStroke) {
                 ctx.beginPath();
                 ctx[fillOrStroke + "Style"] = color;
                 ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
                 ctx[fillOrStroke]();
             },
+
             circleAt = function (ctx, x, y, radius) {
                 // The `+ radius' in the `moveTo' call below prevents a line
                 // from being drawn from the edge of the circle to its center
                 ctx.moveTo(x + radius, y);
                 ctx.arc(x, y, radius, 0, 2 * Math.PI, true);
             },
+
             lineFromTo = function (ctx, x0, y0, x1, y1) {
                 ctx.moveTo(x0, y0);
                 ctx.lineTo(x1, y1);
             },
-            oneArm = function (ctx, reverse) {
-                if (reverse) {
-                    ctx.scale(-1, -1);
-                }
-                ctx.moveTo(0, 0);
-                ctx.lineTo(-playerElbowXDiff, -playerElbowYDiff);
-                ctx.lineTo(-2 * playerElbowXDiff, playerElbowYDiff);
-            },
-            wheelSpokesAt = function (ctx, x, y, angleInDegrees) {
-                var spokeAngle, spinOffset = angleInDegrees * oneDegree, relX, relY, i;
-                for (i = 0; i < 6; i += 1) {
-                    spokeAngle = i / 3 * Math.PI;
-                    relX = trig.cos(spinOffset + spokeAngle) * playerRadius;
-                    relY = trig.sin(spinOffset + spokeAngle) * playerRadius;
-                    ctx.moveTo(x + relX, y + relY);
-                    ctx.lineTo(x - relX, y - relY);
-                }
-            },
-            wheelOutlineAt = function (ctx, x, y, useStarsStyle) {
-                // Wheel outline is drawn in two solid parts to get around
-                // Chrome-for-Android rendering bug for outlined arcs of
-                // a certian size.
-                ctx.save();
 
-                ctx.beginPath();
-                circleAt(ctx, x, y, playerRadius);
-                ctx.fillStyle = useStarsStyle ? "white" : "black";
-                ctx.fill();
-
-                ctx.beginPath();
-                circleAt(ctx, x, y, playerRadius - 1);
-                ctx.clip();
-                ctx.clearRect(x - playerRadius, y - playerRadius, playerRadius * 2, playerRadius * 2);
-
-                ctx.restore();
-            },
             drawPlayerDuckingAt = (function () {
                 var w = playerRadius * 3;
                 var h = playerRadius * 3 + 6;
                 var hToWheelCenter = h - 3 - playerRadius;
-                var drawStaticParts = function (useStarsStyle, ctx) {
-                    var cx = w / 2, cy = hToWheelCenter;
-                    ctx.strokeStyle = useStarsStyle ? "white" : "black";
 
-                    wheelOutlineAt(ctx, cx, cy, useStarsStyle);
+                var forClouds = new Image();
+                forClouds.src = "img/player-ducking-spritesheet_clouds.png";
+                var forStars = new Image();
+                forStars.src = "img/player-ducking-spritesheet_stars.png";
 
-                    ctx.beginPath();
-
-                    var playerHeadX = cx + playerDuckingXDiff;
-                    var playerHeadY = cy + playerDuckingYDiff;
-
-                    // Torso:
-                    var torsoStartX = playerHeadX + sqrt3 / 2 * playerHeadRadius;
-                    var torsoStartY = playerHeadY + 0.5 * playerHeadRadius;
-                    var torsoMidX = torsoStartX + 5;
-                    var torsoMidY = torsoStartY + 2;
-                    ctx.moveTo(torsoStartX, torsoStartY);
-                    ctx.lineTo(torsoMidX, torsoMidY);
-                    ctx.lineTo(cx, cy);
-
-                    // One arm (shadowed by head):
-                    ctx.moveTo(torsoMidX, torsoMidY);
-                    ctx.lineTo(torsoMidX - 1, playerHeadY - playerHeadRadius * 0.65);
-                    ctx.lineTo(playerHeadX - playerHeadRadius * 1.4, playerHeadY - playerHeadRadius + 4);
-
-                    ctx.stroke();
-
-                    // Solid, transparent body of head, with slight extra radius for transparent border:
-                    ctx.save();
-                    ctx.beginPath();
-                    circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius + 1);
-                    ctx.clip();
-                    ctx.clearRect(
-                        playerHeadX - playerHeadRadius - 1,
-                        playerHeadY - playerHeadRadius - 1,
-                        playerHeadRadius * 2,
-                        playerHeadRadius * 2
+                return function (ctx, x, y, wheelAngle) {
+                    var sourceX = modulo(Math.trunc(wheelAngle), 60) * w - w / 2;
+                    ctx.drawImage(
+                        starfieldActive ? forStars : forClouds,
+                        // source x, y:
+                        sourceX, hToWheelCenter,
+                        w, h,
+                        // target x, y (position to draw in `ctx'):
+                        x - w / 2, y - hToWheelCenter,
+                        w, h
                     );
-                    ctx.restore();
-
-                    // Now for the lines to appear in front of head:
-
-                    ctx.beginPath();
-
-                    // Outline of head:
-                    circleAt(ctx, playerHeadX, playerHeadY, playerHeadRadius);
-
-                    // Final arm (not shadowed by head):
-                    ctx.moveTo(torsoMidX, torsoMidY);
-                    ctx.lineTo(cx, playerHeadY);
-                    ctx.lineTo(cx - playerHeadRadius - 3, playerHeadY + 3);
-
-                    ctx.stroke();
-                };
-                var staticPartsClouds = offScreenRender(w, h, drawStaticParts.bind(null, false));
-                var staticPartsStars = offScreenRender(w, h, drawStaticParts.bind(null, true));
-                return function (ctx, x, y, wheelAngle) {
-                    var staticParts = starfieldActive ? staticPartsStars : staticPartsClouds;
-                    ctx.drawImage(staticParts, x - w / 2 - 0.5, y - hToWheelCenter - 0.5);
-                    ctx.beginPath();
-                    wheelSpokesAt(ctx, x, y, wheelAngle);
-                    ctx.strokeStyle = starfieldActive ? "white" : "black";
-                    ctx.stroke();
                 };
             }()),
+
             drawPlayerAt = (function () {
-                var w = 4 * playerElbowXDiff;
-                var h = playerHeadRadius * 2 + playerTorsoLen + playerRadius * 2 + 6;
+                var w = 4 * playerElbowXDiff + 4 + 1;
+                var h = 42;
                 var hToWheelCenter = playerHeadRadius * 2 + playerTorsoLen + playerRadius + 3;
-                var drawStaticParts = function (useStarsStyle, ctx) {
-                    var cx = w / 2, cy = hToWheelCenter; // (cx, cy) is the center of the wheel
-                    ctx.strokeStyle = useStarsStyle ? "white" : "black";
 
-                    // Circle of wheel:
-                    wheelOutlineAt(ctx, cx, cy, useStarsStyle);
+                var forClouds = new Image();
+                forClouds.src = "img/player-spritesheet_clouds.png";
+                var forStars = new Image();
+                forStars.src = "img/player-spritesheet_stars.png";
 
-                    ctx.beginPath();
-
-                    // Head and torso:
-                    circleAt(ctx, cx, cy - playerWheelToHeadDist, playerHeadRadius);
-                    ctx.moveTo(cx, cy - playerTorsoLen - playerRadius);
-                    ctx.lineTo(cx, cy);
-
-                    // Arms:
-                    ctx.save();
-                    ctx.translate(cx, cy - playerRadius - playerTorsoLen / 2);
-                    oneArm(ctx);
-                    oneArm(ctx, true);
-                    ctx.restore();
-
-                    ctx.stroke();
-                };
-                var staticPartsClouds = offScreenRender(w, h, drawStaticParts.bind(null, false));
-                var staticPartsStars = offScreenRender(w, h, drawStaticParts.bind(null, true));
                 return function (ctx, x, y, wheelAngle) {
-                    var staticParts = starfieldActive ? staticPartsStars : staticPartsClouds;
-                    ctx.drawImage(staticParts, x - w / 2 - 0.5, y - hToWheelCenter - 0.5);
-                    ctx.beginPath();
-                    wheelSpokesAt(ctx, x, y, wheelAngle);
-                    ctx.strokeStyle = starfieldActive ? "white" : "black";
-                    ctx.stroke();
+                    var sourceX = modulo(Math.trunc(wheelAngle), 60) * w;
+                    ctx.drawImage(
+                        starfieldActive ? forStars : forClouds,
+                        // source x, y:
+                        sourceX, 0,
+                        w, h,
+                        // target x, y (position to draw in `ctx'):
+                        x - w / 2, y - hToWheelCenter,
+                        w, h
+                    );
                 };
             }()),
-            drawFbCircles = function (ctx, fbWidth) {
-                ctx.beginPath();
-                var i;
-                for (i = 0; i < fbNumRecordedFrames; i += 1) {
-                    circleAt(ctx, i * fbWidth + fbWidth / 2, fbWidth / 2, fbRadius);
-                }
-                ctx.fillStyle = starfieldActive ? "blue" : "orange";
-                ctx.fill();
-            },
-            drawFirebits = function (ctx, xs, ys, color) {
-                var i;
-                var s = 2.5;
-                ctx.beginPath();
-                for (i = 0; i < xs.length; i += 1) {
-                    ctx.rect(xs[i], ys[i], s, s);
-                }
-                ctx.fillStyle = color;
-                ctx.fill();
-            },
-            drawFb = (function () {
-                var w = 30; // Width occupied by each frame in spritesCtx
-                var h = 70; // Height of each frame in spritesCtx
-                var offsetRadius = w / 2;
-                // window.frames from frames.js is used
-                var sprites = document.createElement("canvas");
-                sprites.width = fbNumRecordedFrames * w;
-                sprites.height = h;
-                var spritesCtx = sprites.getContext('2d');
-                drawFbCircles(spritesCtx, w, fbNumRecordedFrames);
-                drawFirebits(spritesCtx, frames.rx, frames.ry, "red");
-                drawFirebits(spritesCtx, frames.ox, frames.oy, "darkOrange");
-                return function (ctx, fb) {
-                    var i = fb.frame % fbNumRecordedFrames; // In case of e.g. off by one error
-                    ctx.drawImage(sprites, i * w, 0, w, h, fb.x - offsetRadius, fb.y - offsetRadius, w, h);
-                };
-            }()),
-            drawCoin = (function () {
-                var s = coinRadius * 2.5;
-                var doRender = function (useStarsStyle, ctx) {
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    circleAt(ctx, s / 2, s / 2, coinRadius);
-                    ctx.strokeStyle = useStarsStyle ? "darkgreen" : "orange";
-                    ctx.stroke();
-                    ctx.fillStyle = useStarsStyle ? "palegreen" : "yellow";
-                    ctx.fill();
 
-                    ctx.fillStyle = useStarsStyle ? "palegreen" : "darkOrange";
-                    ctx.fillRect(s / 2 - coinSquareLen / 2, s / 2 - coinSquareLen / 2, coinSquareLen, coinSquareLen);
-                    if (useStarsStyle) {
-                        ctx.lineWidth = 1;
-                    }
-                    ctx.strokeRect(s / 2 - coinSquareLen / 2, s / 2 - coinSquareLen / 2, coinSquareLen, coinSquareLen);
+            drawFb = (function () {
+                // Dimensions occupied by each frame in img/fb-frames.png
+                var w = 30;
+                var h = 70;
+
+                // Distance to center from top edge and left edge of sprite:
+                var radiusToCenter = w / 2;
+
+                var frames = new Image();
+                frames.src = "img/fb-frames.png";
+
+                return function (ctx, fb) {
+                    var i = fb.frame % fbNumRecordedFrames;
+                    ctx.drawImage(
+                        frames, // source image
+                        i * w, // source x
+                        0, // source y
+                        w,
+                        h,
+                        fb.x - radiusToCenter, // target x
+                        fb.y - radiusToCenter, // target y
+                        w,
+                        h
+                    );
                 };
-                var gold = offScreenRender(s, s, doRender.bind(null, false));
-                var green = offScreenRender(s, s, doRender.bind(null, true));
+            }()),
+
+            drawCoin = (function () {
+                var s = coinRadius * 2.5; // width and height of png sprites
+
+                var gold = new Image();
+                gold.src = "img/coin_clouds.png";
+
+                var green = new Image();
+                green.src = "img/coin_stars.png";
+
                 return function (ctx, coin) {
                     ctx.drawImage(starfieldActive ? green : gold, coin.x - s / 2, coin.y - s / 2);
                 };
             }()),
+
             drawCoinGroupGottenNotif = (function () {
                 var notif = document.createElement("canvas");
                 var pxSize = 18;
                 notif.width = pxSize * 4;
                 notif.height = pxSize * 1.5;
+
+                // Some constants:
                 var message = "100%";
                 var clrOuter = "#DD0B11";
                 var clrInner = "#ECB435";
@@ -768,29 +816,32 @@
                 var ctx = notif.getContext("2d");
 
                 // Set up styling of first text-draw immediately:
-                ctx.lineWidth = 5;
+                ctx.lineWidth = 6;
                 ctx.strokeStyle = clrOuter;
 
                 // Wait for onload to ensure that the correct font has loaded:
                 window.addEventListener("load", function () {
-                    ctx.font = "bold italic " + pxSize + "px r0";
+                    ctx.font = "italic " + pxSize + "px font0";
 
                     ctx.strokeText(message, innerX, innerY);
 
-                    ctx.lineWidth = 3;
+                    ctx.lineWidth = 4;
                     ctx.strokeStyle = clrInner;
                     ctx.strokeText(message, innerX, innerY);
                 }, false);
+
                 return function (ctx, x, y) {
                     ctx.drawImage(notif, x, y);
                 };
             }()),
+
             setupGenericPlatfmChars = function (ctx) {
                 ctx.strokeStyle = starfieldActive ? "white" : "black";
                 ctx.lineWidth = platfmThickness;
                 ctx.lineCap = "round";
                 ctx.lineJoin = "smooth";
             },
+
             drawPlatfm = function (ctx, p) { // Must be run after setupGenericPlatfmChars
                 ctx.beginPath();
                 if (starfieldActive) {
@@ -802,6 +853,7 @@
                 ctx.lineTo(p.x1, p.y1);
                 ctx.stroke();
             },
+
             drawPreviewPlatfm = function (ctx, touch) { // Must be run after setupGenericPlatfmChars
                 ctx.beginPath();
                 ctx.strokeStyle = starfieldActive ? "white" : "grey";
@@ -809,101 +861,73 @@
                 ctx.lineTo(touch.x1, touch.y1);
                 ctx.stroke();
             },
-            populateSheetWithScores = function (sheet, sectW, sectH, scoreMin, scoreMax, scoreWidths, pad) {
-                sheet.setAttribute("width", sectW * (scoreMax - scoreMin + 1));
-                sheet.setAttribute("height", sectH);
-                var sheetCtx = sheet.getContext("2d");
-                sheetCtx.textAlign = "left";
-                sheetCtx.font = "bold " + inGamePointsPxSize + "px r0";
-                (function () {
-                    // Draw numbers from `scoreMin' to `scoreMax' on the sheet
-                    var i, text;
-                    for (i = scoreMin; i <= scoreMax; i += 1) {
-                        text = pad ? padNumericPeriod(i) : i + "";
-                        scoreWidths[i] = sheetCtx.measureText(text).width + 1; // `+ 1' is to include shadow
-                        fillShadowyText(
-                            sheetCtx,
-                            text, // points
-                            (i - scoreMin) * sectW, // text x position
-                            inGamePointsPxSize // text y position
-                        );
-                    }
-                }());
-            },
-            drawInGamePoints = (function () {
-                // Cache images of all numbers from 0 to 999
-                var sheetSectionWidth = 60;
-                var sheetHeight = 30;
-                // Due to limits of <canvas> size, must be split into two spritesheets
-                var scoreWidths = []; // Value at index `i` is width of `i` when rendered as a score
-                // sheetA covers 000 to 499
-                var sheetA = document.createElement("canvas");
-                populateSheetWithScores(sheetA, sheetSectionWidth, sheetHeight, 0, 499, scoreWidths, true);
-                // sheetB covers 500 to 999
-                var sheetB = document.createElement("canvas");
-                populateSheetWithScores(sheetB, sheetSectionWidth, sheetHeight, 500, 999, scoreWidths, true);
-                // sheetPartial covers 0 to 99, without padding with 0s (e.g. 7 as '7', not '007')
-                var nonpaddedScoreWidths = scoreWidths.slice(); // Will be the same as scoreWidths for all i > 99
-                var sheetPartial = document.createElement("canvas");
-                populateSheetWithScores(sheetPartial, sheetSectionWidth, sheetHeight, 0, 99, nonpaddedScoreWidths, false);
 
-                // Use the above to draw any given period
-                var drawPeriod = function (ctx, score, x, y, doPartial) { // draw three digits
-                    // `score` is the value of the period (number under 1000) to be drawn
-                    var sheet, position;
-                    if (doPartial && score < 100) {
-                        sheet = sheetPartial;
-                        position = score;
-                    } else if (score < 500) {
-                        sheet = sheetA;
-                        position = score;
-                    } else {
-                        sheet = sheetB;
-                        position = score - 500;
-                        // Subtract 500 because sheetB starts with '500' at x=0
-                    }
-                    ctx.drawImage(sheet,
-                        position * sheetSectionWidth, 0, // x,y in source canvas
-                        sheetSectionWidth, sheetHeight, // w,h in source canvas
-                        x, y, // x,y on target canvas
-                        sheetSectionWidth, sheetHeight // w,h on target canvas
+            updateInGamePointsDisplay = (function () {
+                // Clear the canvas in the area taken up by the least
+                // significant digits of the player's points-display
+                // and draw over that area the new least significant
+                // digits of the player's points. Redraws as few
+                // digits as possible--usually only one digit or none.
+
+                // Get png images for each digit 0-9:
+                var i;
+                var digits = [];
+                for (i = 0; i < 10; i += 1) {
+                    digits[i] = new Image();
+                    digits[i].src = "img/scores/score-" + i + ".png";
+                }
+                Object.freeze(digits);
+
+                // `digitWidths[i]' is the width allocated to `i' as a
+                // score digit when drawn below
+                var digitWidths = Object.freeze([
+                    19, 13, 17, 17, 17, 18, 17, 16, 17, 17
+                ]);
+
+                var drawScoreDigitsAt = function (ctx, scoreStr, startX) {
+                    // Clear the digit space in which we'll draw `scoreStr':
+                    ctx.clearRect(
+                        startX,
+                        inGamePointsYPos,
+                        pauseBtn.edgeX - startX - 5,
+                        inGamePointsPxSize
                     );
-                };
 
-                // Use the above to draw any number as a sequence of comma-separated periods
-                var commaWidth = 7;
-                var comma = offScreenRender(commaWidth, sheetHeight + 10, function (ctx) {
-                    ctx.textAlign = "left";
-                    ctx.font = "bold " + inGamePointsPxSize + "px r0";
-                    fillShadowyText(ctx, ",", -3, inGamePointsPxSize);
-                });
-                var drawPeriods = function (ctx, score, x, y) {
-                    var periods = getPeriodsReverse(score);
+                    // Draw in the new digits (i.e. `scoreStr'):
                     var i;
-                    var xDisplacement = 0;
-                    // For the first (most significant) period:
-                    var fstPeriod = periods[periods.length - 1];
-                    drawPeriod(ctx, fstPeriod, x, y, true);
-                    xDisplacement += nonpaddedScoreWidths[fstPeriod];
-                    // For the rest of them:
-                    for (i = periods.length - 2; i >= 0; i -= 1) {
-                        ctx.drawImage(comma, x + xDisplacement - 2, y);
-                        xDisplacement += commaWidth;
-                        drawPeriod(ctx, periods[i], x + xDisplacement, y);
-                        xDisplacement += scoreWidths[periods[i]];
+                    var digitX = startX;
+                    for (i = 0; i < scoreStr.length; i += 1) {
+                        ctx.drawImage(digits[scoreStr[i]], digitX, inGamePointsYPos);
+                        digitX += digitWidths[scoreStr[i]];
                     }
                 };
 
                 return function (ctx, game) {
-                    drawPeriods(ctx, Math.floor(game.points), 16, inGamePointsYPos);
+                    var sPrev = "" + Math.floor(game.prevPoints);
+                    var sNow = "" + Math.floor(game.points);
+
+                    if (sNow === sPrev) {
+                        return;
+                    }
+
+                    var i;
+                    var x = inGamePointsXPos;
+                    for (i = 0; i < sNow.length; i += 1) {
+                        if (sNow[i] !== sPrev[i]) {
+                            return drawScoreDigitsAt(ctx, sNow.slice(i), x);
+                        }
+                        x += digitWidths[sNow[i]];
+                    }
                 };
             }()),
+
             drawPowerupBubble = function (ctx, x, y) {
                 ctx.beginPath();
                 circleAt(ctx, x, y, powerupBubbleRadius);
                 ctx.fillStyle = "rgba(255, 215, 0, 0.35)";
                 ctx.fill();
             },
+
             drawPowerup = (function () {
                 var canvases = {
                     "X2": offScreenRender(powerupX2Width, powerupX2Height, function (ctx, w, h) {
@@ -915,6 +939,7 @@
                         ctx.strokeStyle = "orange";
                         ctx.strokeText("X2", 5, h * 0.82, w, h);
                     }),
+
                     "slow": offScreenRender(powerupSlowRadius * 2 + 5, powerupSlowRadius * 2 + 5, function (ctx, w, h) {
                         var cx = w / 2, cy = h / 2;
                         ctx.lineWidth = 2;
@@ -952,6 +977,7 @@
                         ctx.strokeStyle = "red";
                         ctx.stroke();
                     }),
+
                     "weight": offScreenRender(powerupWeightBlockLowerWidth, powerupWeightHeight, function (ctx, w, fullHeight) {
                         var cx = w / 2;
                         var blockHeight = powerupWeightBlockHeight;
@@ -982,6 +1008,7 @@
                         ctx.textAlign = "center";
                         ctx.fillText("1000", cx, fullHeight - 3, 24);
                     }),
+
                     "magnet": offScreenRender(powerupMagnetRadius * 3, powerupMagnetRadius * 3, function (ctx, w, h) {
                         var x = w / 2, y = h / 2;
                         var thick = powerupMagnetThickness;
@@ -998,6 +1025,7 @@
                         ctx.fillRect(x + powerupMagnetRadius - thick / 2, y + thick / 2 - 1, thick, thick / 2 + 2);
                     })
                 };
+
                 return function (ctx, type, x, y) {
                     var canvas = canvases[type];
                     if (type === "weight") {
@@ -1006,6 +1034,7 @@
                     ctx.drawImage(canvas, x - canvas.width / 2 - 0.5, y - canvas.height / 2 - 0.5);
                 };
             }()),
+
             drawActivePowerupBackground = function (ctx, lifeleft, totalLifetime, x, y) {
                 if (lifeleft <= 0) {
                     return;
@@ -1040,6 +1069,7 @@
                     ctx.fill();
                 }
             },
+
             drawActivePowerups = function (ctx, actives) {
                 var xPos = activePowerupsStartingXPos;
                 var yPos = inGamePointsYPos + 21;
@@ -1058,6 +1088,7 @@
                     }
                 }
             },
+
             drawMenuTitle = function (ctx) {
                 ctx.font = "italic bold 170px arial";
                 ctx.textAlign = "center";
@@ -1065,6 +1096,7 @@
                 ctx.font = "italic bold 95px arial";
                 fillShadowyText(ctx, "cyclist", gameWidth / 2 - 3, 240, true, 2);
             },
+
             drawRoundedRectPath = function (ctx, x, y, width, height, radius) {
                 // Thank you, Juan Mendes (function from <http://js-bits.blogspot.com/2010/07/canvas-rounded-corner-rectangles.html>, with slight modification).
                 ctx.moveTo(x + radius, y);
@@ -1078,11 +1110,13 @@
                 ctx.quadraticCurveTo(x, y, x + radius, y);
                 ctx.closePath();
             },
+
             drawRoundedRect = function (ctx, x, y, width, height, radius, style) {
                 ctx.beginPath();
                 drawRoundedRectPath(ctx, x, y, width, height, radius, style);
                 ctx[style]();
             },
+
             drawButtonStructureAt = (function () {
                 var stdClrs = {
                     shadow: "rgba(130, 150, 170, 0.7)",
@@ -1115,8 +1149,9 @@
                     }
                 };
             }()),
+
             drawPauseBars = function (ctx, offsetX, y, btn) {
-                var leftX = btn.edgeX() + offsetX + 9 + btn.textXOffset;
+                var leftX = btn.edgeX + offsetX + 9 + btn.textXOffset;
                 var barsY = y + 9;
                 var barW = btn.w / 4 - 2 + btn.textWDiff;
                 var barH = btn.h + btn.textHDiff;
@@ -1125,12 +1160,19 @@
                 ctx.rect(leftX + barW * 5 / 3, barsY, barW, barH);
                 ctx.fill();
             },
+
             drawBtn = function (ctx, btn) {
-                var pressed = Touch.curTouch && btn.touchIsInside(Touch.curTouch);
+                // Draw the button `ctx', and return a boolean representing if
+                // the button was drawn impressed.
+
+                var pressed = Touch.curTouch && touchIsInsideBtn(Touch.curTouch, btn);
 
                 // Draw visual structure of button (shapes behind the label):
-                drawButtonStructureAt(ctx, btn.edgeX(), btn.y, btn.w, btn.h, pressed, btn.tintedRed);
-                var x = btn.x, y = btn.y;
+                drawButtonStructureAt(ctx, btn.edgeX, btn.y, btn.w, btn.h, pressed, btn.tintedRed);
+
+                var x = btn.x;
+                var y = btn.y;
+
                 if (pressed) {
                     x -= btnShadowOffset;
                     y += btnShadowOffset;
@@ -1150,16 +1192,24 @@
                     ctx.textAlign = "center";
                     ctx.fillText(btn.text, x + btn.textXOffset, y + btn.h + btn.textHDiff, btn.w + btn.textWDiff, btn.h + btn.textHDiff);
                 }
+
+                return pressed;
             },
-            clearBtnLayer = function () {
-                btnCtx.clearRect(0, 0, gameWidth, 100);
+
+            clearPauseBtn = function () {
+                btnCtx.clearRect(
+                    pauseBtn.edgeX - btnShadowOffset,
+                    0,
+                    gameWidth - (pauseBtn.edgeX - btnShadowOffset),
+                    pauseBtn.y + pauseBtn.h + btnShadowOffset
+                );
             },
-            redrawBtnLayer = function (game) {
-                clearBtnLayer();
-                if (!game.paused && !game.dead) {
-                    drawBtn(btnCtx, pauseBtn);
-                }
+
+            redrawPauseBtn = function (game) {
+                clearPauseBtn();
+                game.pauseBtnDown = drawBtn(btnCtx, pauseBtn);
             },
+
             drawMovingBg = (function () {
                 var bgsWidth = 864;
                 var bgsHeight = 1024;
@@ -1215,6 +1265,7 @@
                     }
                 };
             }()),
+
             drawMenu = function (menu) {
                 mainCtx.clearRect(-1, -1, gameWidth + 1, gameHeight + 1);
                 menu.fbs.forEach(function (fb) {
@@ -1223,34 +1274,46 @@
                 drawMenuTitle(mainCtx);
                 drawBtn(mainCtx, menuPlayBtn);
             },
+
             drawGame = function (game) {
+                var i, val;
                 mainCtx.save();
                 mainCtx.clearRect(-1, -1, gameWidth + 1, gameHeight + 1);
                 overlayCtx.clearRect(-1, -1, gameWidth + 1, gameHeight + 1);
+
+                // Player
                 if (game.player.ducking) {
                     drawPlayerDuckingAt(mainCtx, game.player.x, game.player.y, game.player.wheelAngle);
                 } else {
                     drawPlayerAt(mainCtx, game.player.x, game.player.y, game.player.wheelAngle);
                 }
+
+                // Platfms
                 setupGenericPlatfmChars(mainCtx);
-                game.platfms.forEach(function (platfm) {
-                    drawPlatfm(mainCtx, platfm);
-                });
+                for (i = 0; i < game.platfms.length; i += 1) {
+                    drawPlatfm(mainCtx, game.platfms[i]);
+                }
                 mainCtx.globalAlpha = 1; // Changed in platfm drawing, so must be reset
                 if (game.previewPlatfmTouch) {
                     drawPreviewPlatfm(mainCtx, game.previewPlatfmTouch);
                 }
-                game.coins.forEach(function (coin) {
-                    if (coin.y < gameHeight + coinRadius) {
-                        drawCoin(mainCtx, coin);
+
+                // Other moving screen elements
+                for (i = 0; i < game.coins.length; i += 1) {
+                    val = game.coins[i];
+                    if (val.y < gameHeight + coinRadius) {
+                        drawCoin(mainCtx, val);
                     }
-                });
-                game.coinGroupGottenNotifs.forEach(function (notif) {
-                    drawCoinGroupGottenNotif(mainCtx, notif.x, notif.y);
-                });
-                game.fbs.forEach(function (fb) {
-                    drawFb(mainCtx, fb);
-                });
+                }
+                for (i = 0; i < game.coinGroupGottenNotifs.length; i += 1) {
+                    val = game.coinGroupGottenNotifs[i];
+                    drawCoinGroupGottenNotif(mainCtx, val.x, val.y);
+                }
+                for (i = 0; i < game.fbs.length; i += 1) {
+                    drawFb(mainCtx, game.fbs[i]);
+                }
+
+                // Powerups
                 forEachInObject(game.powerups, function (pname, powerup) {
                     var x = calcPowerupXPos(powerup);
                     var y = calcPowerupYPos(powerup);
@@ -1258,11 +1321,13 @@
                     drawPowerup(mainCtx, powerup.type, x, y);
                 });
                 drawActivePowerups(mainCtx, game.activePowerups);
-                if (!game.dead) {
-                    drawInGamePoints(mainCtx, game);
-                }
+
+                // Points
+                updateInGamePointsDisplay(btnCtx, game);
+
                 mainCtx.restore();
             },
+
             drawTutorialHand = (function () {
                 var handClouds = new Image();
                 handClouds.src = "img/hand-on-blue.png";
@@ -1272,11 +1337,13 @@
                     ctx.drawImage(starfieldActive ? handStars : handClouds, x, y);
                 };
             }()),
+
             drawSwipeHelpText = (function () {
                 var lines = ["Swipe to draw", "platforms"];
                 var pxSize = 25;
-                return function (ctx, x, y) {
-                    ctx.font = "italic " + pxSize + "px i0";
+                var drawIt = function (ctx, x, y) {
+                    ctx.textAlign = "center";
+                    ctx.font = "italic " + pxSize + "px font0";
                     ctx.lineWidth = 4;
                     ctx.strokeStyle = "tan";
                     ctx.strokeText(lines[0], x, y);
@@ -1285,7 +1352,32 @@
                     ctx.fillText(lines[0], x, y);
                     ctx.fillText(lines[1], x, y + pxSize);
                 };
+
+                var w = 164, h = 58;
+                var xrad = 81, yrad = 23;
+
+                var helpTextCanvas = offScreenRender(w, h, function (ctx) {
+                    drawIt(ctx, xrad, yrad);
+                });
+
+                var helpTextImage = new Image();
+                helpTextImage.src = "img/tutorial-text_clouds.png";
+                var imageLoaded = false;
+                helpTextImage.addEventListener("load", function () {
+                    imageLoaded = true;
+                });
+
+                return function (ctx, x, y) {
+                    // The fallback to `helpTextCanvas' is necessary, as the
+                    // user may press 'Play' (starting the tutorial) very
+                    // quickly, before the image has loaded.
+                    var toDraw = imageLoaded
+                        ? helpTextImage
+                        : helpTextCanvas;
+                    ctx.drawImage(toDraw, x - xrad, y - yrad);
+                };
             }()),
+
             drawTutorial = function (game, handX, handY) {
                 mainCtx.save();
                 mainCtx.clearRect(-1, -1, gameWidth + 1, gameHeight + 1);
@@ -1307,11 +1399,13 @@
                 drawSwipeHelpText(mainCtx, gameWidth / 2, 350);
                 mainCtx.restore();
             },
+
             gameOverlayDrawer = (function () {
                 var vagueify = function (ctx) {
                     ctx.fillStyle = starfieldActive ? "rgba(0, 0, 0, 0.8)" : "rgba(200, 200, 200, 0.75)";
                     ctx.fillRect(-1, -1, gameWidth + 1, gameHeight + 1);
                 };
+
                 return function (drawFn) {
                     return function (game) {
                         drawGame(game);
@@ -1322,25 +1416,27 @@
                     };
                 };
             }()),
-            drawGamePaused = gameOverlayDrawer(function (ctx, game) {
+
+            drawGamePaused = gameOverlayDrawer(function (ctx) {
                 ctx.fillStyle = starfieldActive ? "royalblue" : "darkOrange";
-                ctx.font = "64px r0";
+                ctx.font = "64px font0";
                 ctx.textAlign = "center";
                 ctx.fillText("Paused", gameWidth / 2, gameHeight / 2 - 28);
                 drawBtn(ctx, resumeBtn);
             }),
+
             drawGameDead = gameOverlayDrawer(function (ctx, game) {
                 var startY = 105;
 
                 // 'Game Over' text
                 ctx.fillStyle = starfieldActive ? "royalblue" : "darkOrange";
-                ctx.font = "bold italic 90px i0";
+                ctx.font = "bold italic 90px font0";
                 ctx.textAlign = "center";
                 ctx.fillText("Game", gameWidth / 2 - 4, startY);
                 ctx.fillText("Over", gameWidth / 2 - 4, startY + 75);
 
                 // Points big
-                ctx.font = "140px r0";
+                ctx.font = "140px font0";
                 ctx.fillText(Math.floor(game.points), gameWidth / 2, gameHeight * 2 / 3 - 38);
 
                 startY += 18;
@@ -1355,10 +1451,10 @@
                 ctx.stroke();
 
                 // Highscores
-                ctx.font = "bold italic 28px i0";
+                ctx.font = "bold italic 28px font0";
                 ctx.fillText("Highscores", gameWidth / 2, startY + 300);
                 var scoreFontSize = 24;
-                ctx.font = scoreFontSize + "px r0";
+                ctx.font = scoreFontSize + "px font0";
                 var curY = startY + 325;
                 highscores.each(function (score) {
                     ctx.fillText(score, gameWidth / 2, curY);
@@ -1368,12 +1464,14 @@
                 // Replay btn
                 drawBtn(ctx, replayBtn);
             });
+
         return Object.freeze({
             menu: drawMenu,
             game: drawGame,
             gamePaused: drawGamePaused,
             gameDead: drawGameDead,
-            btnLayer: redrawBtnLayer,
+            clearPauseBtn: clearPauseBtn,
+            pauseBtn: redrawPauseBtn,
             tutorial: drawTutorial,
             background: drawMovingBg
         });
@@ -1482,9 +1580,11 @@
             }
             success(createPlatfm(tx0, touch.y0, touch.x1, touch.y1));
         },
+
         randomXPosition = function () {
             return Math.random() * gameWidth;
         },
+
         updateFbsGeneric = (function () {
             var fewInLowerPortion = function (fbs) {
                 // Predicate asks: are there few enough fbs in bottom
@@ -1501,16 +1601,18 @@
             return function (obj, dt) {
                 // Can be passed a menu object or game object, and
                 // thus is not directly placed in gUpdaters.
-                obj.fbs.forEach(function (fb, index) {
+                var i, fb;
+                for (i = 0; i < obj.fbs.length; i += 1) {
+                    fb = obj.fbs[i];
+
                     fb.y -= fbRiseRate * dt;
+
                     if (fb.y < -totalFbHeight - 20) {
-                        obj.fbs.splice(index, 1);
+                        obj.fbs.splice(i, 1);
                     }
-                    fb.frame += 1;
-                    if (fb.frame >= fbNumRecordedFrames) {
-                        fb.frame = 0;
-                    }
-                });
+
+                    fb.frame = (fb.frame + 1) % fbNumRecordedFrames;
+                }
                 if (Math.random() < fbCreationChanceFactor * dt || fewInLowerPortion(obj.fbs)) {
                     obj.fbs.push(createFb(
                         randomXPosition(),
@@ -1519,6 +1621,7 @@
                 }
             };
         }()),
+
         powerupObtained = function (activePowerups, type) {
             var i;
             for (i = 0; i < activePowerups.length; i += 1) {
@@ -1531,23 +1634,24 @@
 
         // The following difficulty curve functions are based on "time points",
         // which are (game.points - game.pointsFromCoins), i.e. the number
-        // of points gotten from just time spent in the game. Doing it based
+        // of points earned from just time spent in the game. Doing it based
         // on this and not straight points prevents clear jumps in difficulty
-        // after getting a bunch of coins at once, and not on straight time
-        // playing so that people struggling at the top of the screen don't
-        // get overwhelmed too quickly.
+        // after getting a bunch of coins at once, and not based on straight
+        // seconds playing so that people struggling at the top of the screen
+        // don't get overwhelmed too quickly.
         difficultyCurveFromTimePoints = function (x) {
             x = Math.max(x, 0); // Just in case (i.e. strongly avoiding NaN)
             return x < 20 ? 0.8 :
-                   // x < 50 ? same as below :
                    x < 100 ? 0.8 + (x - 20) * 0.001 : // (increase linearly)
                    x < 300 ? 0.83 + (x - 100) * 0.0005 : // (increase linearly)
                    x < 600 ? 0.98 : // (level off)
                    0.98 + (x - 600) * 0.0001; // (slowly, increase linearly)
         },
+
         unitsOfPlayerGrav = function (x) {
             return x * playerGrav * 88;
         },
+
         maxVyFromTimePoints = function (x) {
             x = Math.max(x, 0);
             var mvy =
@@ -1560,6 +1664,7 @@
                 11; // (level off)
             return unitsOfPlayerGrav(mvy);
         },
+
         handleActivesPoints = function (activePowerups, pointsReceived) {
             // Handle the effect that active powerups have on the amount of
             // points recieved.
@@ -1568,6 +1673,7 @@
             }
             return pointsReceived;
         },
+
         timeBasedPointsVanilla = function (playerY, realDt) {
             // Find the points earned, not including coins or powerups,
             // during this frame. 'Vanilla' because powerup effects are
@@ -1624,18 +1730,24 @@
                     var groupId = game.nextCoinGroupId;
                     var coinsCreated = 0;
                     game.nextCoinGroupId += 1;
+
                     for (column = 0; column < coinColumnsStd; column += 1) {
                         xPos = (column + 0.5) * coinColWidthStd;
-                        if (do_rtl) { xPos = gameWidth - xPos; }
+                        if (do_rtl) {
+                            xPos = gameWidth - xPos;
+                        }
+
                         newcoin = createCoin(xPos, patternCoinStartingY + column * coinColWidthStd, groupId);
                         game.coins.push(newcoin);
                         coinsCreated += 1;
                     }
+
                     game.coinReleaseMode = do_rtl ? "diagRTL" : "diagLTR";
                     game.coinReleaseModeTimeLeft = (coinColumnsStd + 1) * coinColWidthStd / (coinRiseRate * 0.9); // Approximate time the coins will take to be fully visible
                     game.coinGroups[groupId] = coinsCreated;
                     game.coinGroupBonuses[groupId] = coinsCreated * eachCoinValue * 0.5;
                 },
+
                 addCoinBlock = function (game, w, h, row, col, groupId) {
                     var curRow, curCol, xPos, yPos, newCoin;
                     var coinsCreated = 0;
@@ -1650,6 +1762,7 @@
                     }
                     return coinsCreated;
                 },
+
                 addBlocksCoinPattern = function (game, eachCoinValue) {
                     // Generate a width and height between 2*2 and 4*4,
                     // heavily weighted against w=4 or h=4.
@@ -1665,18 +1778,24 @@
                     game.coinReleaseModeTimeLeft = (h + 1) * coinColWidthDense / (coinRiseRate * 0.9);
                     game.coinGroupBonuses[groupId] = numCoinsCreated * eachCoinValue * 0.5;
                 },
+
                 addCoinRandom = function (game) {
                     var column = Math.floor(Math.random() * coinColumnsStd);
                     var pos = (column + 0.5) * coinColWidthStd;
                     var newcoin = createCoin(pos, coinStartingY + coinColWidthStd - game.coinGridOffset);
                     game.coins.push(newcoin);
                 },
-                setBounceVelForPlatfm = function (platfm, uncurvedDt) {
-                    var platfmSlope = (platfm.y1 - platfm.y0) / (platfm.x1 - platfm.x0);
-                    platfm.bounceVx = Math.sign(platfmSlope) * 3.2;
-                    platfm.bounceVy = Math.abs(platfmSlope) * 3.2 - platfmBounciness * uncurvedDt;
-                    platfm.bounceSpeed = dist(0, 0, platfm.bounceVx, platfm.bounceVy);
+
+                setBounceVelForPlatfm = function (platfm) {
+                    var abs_slope = Math.min(5, Math.abs(platfm.slope));
+
+                    // x-direction is calculated each frame of collision, often
+                    // taking into account the position of the player
+                    platfm.bounceSpeedX = 0.16;
+                    platfm.bounceVy = Math.min(abs_slope, 5 / abs_slope) * 0.16;
+                    platfm.bounceSpeed = dist(0, 0, platfm.bounceSpeedX, platfm.bounceVy);
                 },
+
                 die = function (game) {
                     if (game.dead) {
                         return;
@@ -1688,11 +1807,13 @@
                         // a copy of itself
                         game.previewPlatfmTouch = Touch.copy(game.previewPlatfmTouch);
                     }
-                    Render.btnLayer(game);
+                    Render.clearPauseBtn(game);
                 };
+
             return {
-                player: function (game, realDt, dt, uncurvedDt) {
-                    var i, platfm, playerSpeed, collided = false;
+                player: function (game, dt, uncurvedDt) {
+                    var i, val, collided = false;
+
                     if (game.previewPlatfmTouch
                             && Collision.player_platfm(game.player, game.previewPlatfmTouch)) {
                         // Use game.previewPlatfmTouch rather than Touch.curTouch
@@ -1708,6 +1829,7 @@
                             game.previewPlatfmTouch = null;
                         });
                     }
+
                     if (game.player.y > gameHeight + playerRadius) {
                         die(game);
                         // The frame finishes, with all other components also
@@ -1715,28 +1837,39 @@
                         // so does the player's position. This is why there is
                         // no 'return;' here.
                     }
+
                     // Iterate backwards through game.platfms in the following
-                    // recently created platfms take precedence
-                    for (i = game.platfms.length - 1; i >= 0; i -= 1) {
-                        platfm = game.platfms[i];
-                        if (Collision.player_platfm(game.player, platfm)) {
+                    // so that recently created platfms take precedence. (Loop
+                    // ends after the first detected collision.)
+                    var curPlayerSpeed;
+                    for (i = game.platfms.length - 1; i >= 0 && !collided; i -= 1) {
+                        val = game.platfms[i];
+                        if (Collision.player_platfm(game.player, val)) {
                             collided = true;
-                            if (!playerSpeed) {
-                                playerSpeed = Vector.findMagnitude(game.player);
+                            if (!curPlayerSpeed) {
+                                curPlayerSpeed = Vector.findMagnitude(game.player);
                             }
-                            if (!platfm.bounceVx) {
-                                setBounceVelForPlatfm(platfm, uncurvedDt);
+
+                            if (!val.bounceSpeedX) {
+                                setBounceVelForPlatfm(val);
                             }
-                            game.player.vx = platfm.bounceVx;
-                            game.player.vy = platfm.bounceVy;
-                            if (platfm.bounceSpeed > playerSpeed + 2) {
-                                game.player.vx *= (playerSpeed + 2) / platfm.bounceSpeed;
-                                game.player.vy *= (playerSpeed + 2) / platfm.bounceSpeed;
+
+                            game.player.vx = val.bounceSpeedX;
+                            game.player.vy = val.bounceVy;
+
+                            if (Math.abs(val.slope) < 5) {
+                                // Just follow the direction of the platfm:
+                                game.player.vx *= Math.sign(val.slope);
+                            } else {
+                                // Bounce leftward if the player is to the left
+                                // of the platfm, right if he is to the right:
+                                game.player.vx *= Math.sign(game.player.x - ((val.y1 - game.player.y) / val.slope + val.x1));
                             }
-                            game.player.vy -= platfmRiseRate * realDt;
-                            break;
+
+                            game.player.vy -= platfmRiseRate;
                         }
                     }
+
                     if (!collided) {
                         if (powerupObtained(game.activePowerups, "weight")) {
                             game.player.vy += playerGrav * 5 / 2 * uncurvedDt;
@@ -1747,8 +1880,10 @@
                         // be scaled by `uncurvedDt` because it represents the
                         // accumulation of gravity over `uncurvedDt` milliseconds.
                     }
+
                     game.player.vy = Math.min(game.player.vy, maxVyFromTimePoints(game.points - game.pointsFromCoins));
                     game.player.ducking = false;
+
                     for (i = 0; i < game.fbs.length; i += 1) {
                         if (!game.player.ducking && Collision.playerHeadNearFb(game.player, game.fbs[i])) {
                             game.player.ducking = true;
@@ -1757,16 +1892,19 @@
                             die(game);
                         }
                     }
+
                     var diffCurve = difficultyCurveFromTimePoints(game.points - game.pointsFromCoins);
                     var curCoinValue = handleActivesPoints(game.activePowerups, coinValue * diffCurve);
-                    game.coins.forEach(function (coin, index) {
-                        if (Collision.player_coin(game.player, coin)) {
-                            if (Number.isFinite(coin.groupId) && game.coinGroups.hasOwnProperty(coin.groupId)) {
-                                game.coinGroups[coin.groupId] -= 1;
-                                if (game.coinGroups[coin.groupId] <= 0) {
-                                    delete game.coinGroups[coin.groupId];
-                                    game.points += game.coinGroupBonuses[coin.groupId];
-                                    delete game.coinGroupBonuses[coin.groupId];
+
+                    for (i = 0; i < game.coins.length; i += 1) {
+                        val = game.coins[i];
+                        if (Collision.player_coin(game.player, val)) {
+                            if (Number.isFinite(val.groupId) && game.coinGroups.hasOwnProperty(val.groupId)) {
+                                game.coinGroups[val.groupId] -= 1;
+                                if (game.coinGroups[val.groupId] <= 0) {
+                                    delete game.coinGroups[val.groupId];
+                                    game.points += game.coinGroupBonuses[val.groupId];
+                                    delete game.coinGroupBonuses[val.groupId];
                                     game.coinGroupGottenNotifs.push({
                                         x: game.player.x,
                                         y: game.player.y,
@@ -1776,23 +1914,26 @@
                                     });
                                 }
                             }
-                            game.coins.splice(index, 1);
+                            game.coins.splice(i, 1);
                             game.points += curCoinValue;
                             game.pointsFromCoins += curCoinValue;
                         }
-                    });
-                    game.coinGroupGottenNotifs.forEach(function (notif, i) {
-                        if (Date.now() - notif.t0 > 1000) {
+                    }
+
+                    var dx = 0.02 * dt;
+                    var dy = -(coinRiseRate + 0.03) * dt;
+                    for (i = 0; i < game.coinGroupGottenNotifs.length; i += 1) {
+                        val = game.coinGroupGottenNotifs[i];
+                        if (Date.now() - val.t0 > 1000) {
                             return game.coinGroupGottenNotifs.splice(i, 1);
                         }
-                        var dx = 0.02 * dt;
-                        var dy = -(coinRiseRate + 0.03) * dt;
-                        if (notif.x0 > gameWidth * 0.5) {
+                        if (val.x0 > gameWidth * 0.5) {
                             dx *= -1;
                         }
-                        notif.x += dx;
-                        notif.y += dy;
-                    });
+                        val.x += dx;
+                        val.y += dy;
+                    }
+
                     forEachInObject(game.powerups, function (pname, powerup) {
                         if (Collision.player_powerup(game.player, powerup)) {
                             delete game.powerups[pname];
@@ -1804,29 +1945,36 @@
                             );
                         }
                     });
-                    game.player.x = modulo(game.player.x + game.player.vx * uncurvedDt / 20, gameWidth);
-                    game.player.y += game.player.vy * uncurvedDt / 20;
+
+                    game.player.x = modulo(game.player.x + game.player.vx * uncurvedDt, gameWidth);
+                    game.player.y += game.player.vy * uncurvedDt;
                     game.player.wheelAngle += Math.sign(game.player.vx) * 0.22 * uncurvedDt;
                 },
+
                 fbs: updateFbsGeneric,
+
                 coins: function (game, dt) {
                     var magnetOn = powerupObtained(game.activePowerups, "magnet");
                     var dy = coinRiseRate * dt;
-                    // The coins are all rendered in a vertically sliding
-                    // grid, and coinGridOffset keeps track of the distance
-                    // to the lowest on-screen invisible line of that grid
-                    // from the base of the screen.
+
+                    // The coins are all rendered in a vertically
+                    // sliding grid, and coinGridOffset keeps track of
+                    // the distance to the lowest on-screen invisible
+                    // horizontal line of that grid from the base of
+                    // the screen.
                     game.coinGridOffset += dy;
                     game.coinGridOffset = game.coinGridOffset % coinColWidthStd;
-                    game.coins.forEach(function (coin, index) {
+
+                    var i, coin, distSqd, distScaleFactor;
+                    for (i = 0; i < game.coins.length; i += 1) {
+                        coin = game.coins[i];
                         coin.y -= dy;
-                        var distSqd;
-                        var distScaleFactor;
                         if (magnetOn) {
                             // Slide coin closer to player
                             distSqd = distanceSquared(coin.x, coin.y, game.player.x, game.player.y);
                             if (distSqd < 10000) {
                                 distScaleFactor = 1 - 100 / distSqd;
+                                scaleDistanceToObject(coin, game.player, distScaleFactor);
                                 // Logic behind definition of distScaleFactor:
                                 // We want to set distance to `player' to
                                 //    (curDistance - (100 / curDistance)),
@@ -1837,19 +1985,20 @@
                                 // (which would make the scale factor negative), but
                                 // by then the coin will have collided with the player
                                 // and thus been removed from `game.coins'
-                                scaleDistanceToObject(coin, game.player, distScaleFactor);
                             }
                         }
+
                         if (coin.y < -2 * coinRadius) {
-                            if (Number.isFinite(coin.groupId)) {
+                            if (typeof coin.groupId === "number" && game.coinGroups[coin.groupId]) {
                                 delete game.coinGroups[coin.groupId];
                                 delete game.coinGroupBonuses[coin.groupId];
                                 // Since a coin has escaped, the group data
                                 // can be discarded entirely.
                             }
-                            game.coins.splice(index, 1);
+                            game.coins.splice(i, 1);
                         }
-                    });
+                    }
+
                     // Release modes are: "random", "blocks", "diagLTR", "diagRTL"
                     var diffCurve = difficultyCurveFromTimePoints(game.points - game.pointsFromCoins);
                     var curCoinValue = handleActivesPoints(game.activePowerups, coinValue * diffCurve);
@@ -1887,20 +2036,24 @@
                             }
                         }
                     }
+
                     if (Number.isFinite(game.coinReleaseModeTimeLeft)) {
                         game.coinReleaseModeTimeLeft -= dt;
                     }
                 },
+
                 platfms: function (game, dt) {
-                    game.platfms.forEach(function (platfm, index) {
-                        platfm.y0 -= platfmRiseRate * dt;
-                        platfm.y1 -= platfmRiseRate * dt;
-                        platfm.time_left -= dt;
-                        if (platfm.time_left <= 0) {
-                            game.platfms.splice(index, 1);
+                    var i;
+                    for (i = 0; i < game.platfms.length; i += 1) {
+                        game.platfms[i].y0 -= platfmRiseRate * dt;
+                        game.platfms[i].y1 -= platfmRiseRate * dt;
+                        game.platfms[i].time_left -= dt;
+                        if (game.platfms[i].time_left <= 0) {
+                            game.platfms.splice(i, 1);
                         }
-                    });
+                    }
                 },
+
                 powerups: function (game, dt) {
                     forEachInObject(game.powerups, function (pname, powerup) {
                         powerup.lifetime += dt;
@@ -1911,33 +2064,36 @@
                             delete game.powerups[pname];
                         }
                     });
+
                     var possib = powerupCreationChanceFactor * dt;
+
                     if (!game.powerups.X2 && Math.random() < possib) {
                         game.powerups.X2 = makePowerupRandom("X2", 25, 145);
-                    }
-                    if (!game.powerups.slow && Math.random() < possib) {
+                    } else if (!game.powerups.slow && Math.random() < possib) {
                         game.powerups.slow = makePowerupRandom("slow", 25, 145);
-                    }
-                    if (!game.powerups.weight && game.points > 50 && Math.random() < possib) {
+                    } else if (!game.powerups.weight && game.points > 50 && Math.random() < possib) {
                         game.powerups.weight = makePowerupRandom("weight", 25, 145);
-                    }
-                    if (!game.powerups.magnet && Math.random() < possib) {
+                    } else if (!game.powerups.magnet && Math.random() < possib) {
                         game.powerups.magnet = makePowerupRandom("magnet", 25, 145);
                     }
                 },
+
                 activePowerups: function (game, dt) {
-                    game.activePowerups.forEach(function (activePowerup, index) {
-                        if (activePowerup.lifetime <= 0) {
-                            game.activePowerups.splice(index, 1);
+                    var i, active;
+                    for (i = 0; i < game.activePowerups.length; i += 1) {
+                        active = game.activePowerups[i];
+                        if (active.lifetime <= 0) {
+                            game.activePowerups.splice(i, 1);
                         }
-                        activePowerup.lifetime -= dt;
-                        if (activePowerup.timeSinceAcquired < activePowerupTravelTime) {
-                            activePowerup.timeSinceAcquired += dt;
+                        active.lifetime -= dt;
+                        if (active.timeSinceAcquired < activePowerupTravelTime) {
+                            active.timeSinceAcquired += dt;
                         }
-                    });
+                    }
                 }
             };
         }()),
+
         gEventHandlers = {
             handleTouchendForThemeSwitch: function (touch) {
                 var touchTime = Date.now() - touch.t0;
@@ -1945,64 +2101,34 @@
                     starfieldActive = !starfieldActive;
                 }
             },
+
             handleTouchendForPlatfmAdd: function (game, touch) {
                 if (!game.paused && !game.dead) {
                     maybeGetPlatfmFromTouch(touch, function (platfm) {
                         game.platfms.push(platfm);
                         game.previewPlatfmTouch = null;
-                        // If not reset previewPlatfmTouch, then when the user
-                        // lifts finger at same time preview is hit by player,
-                        // two platfms would be created at that position.
+                        // If previewPlatfmTouch were not reset to null, then when
+                        // the user lifts finger at same time the preview is hit by
+                        // the player, two platfms would be created at that position.
                     });
                 }
             },
-            handleDocumentClick: function (game, event, restart, disallowPause) {
-                var q = calcTouchPos(event);
-                var p = {
-                    x1: q.x,
-                    y1: q.y
-                };
+
+            handleDocumentClick: function (game, touch, restart, disallowPause) {
                 if (game.paused) {
-                    if (resumeBtn.touchIsInside(p)) {
+                    if (touchIsInsideBtn(touch, resumeBtn)) {
                         game.paused = false;
-                        requestAnimationFrame(function () {
-                            return Render.btnLayer(game);
-                        });
+                        Render.pauseBtn(game);
                     }
                 } else if (game.dead) {
-                    if (replayBtn.touchIsInside(p)) {
+                    if (touchIsInsideBtn(touch, replayBtn)) {
                         restart();
                     }
-                } else if (!disallowPause && pauseBtn.touchIsInside(p)) {
+                } else if (!disallowPause && touchIsInPauseBtn(touch)) {
                     game.paused = true;
-                    requestAnimationFrame(function () {
-                        return Render.btnLayer(game);
-                    });
+                    Render.clearPauseBtn(game);
                 }
-            },
-            handleBtnLayerUpdates: (function () {
-                // Margin around button for events to trigger redraws on, so
-                // that a release is registered when the user slides a finger
-                // off the button:
-                var sensitivityMarginY = 40;
-                // People do faster horizontal swipes, so a larger margin is necessary
-                var sensitivityMarginX = 70;
-                return function (game, event, lastRedraw) {
-                    // This should handle all of: touchmove, touchstart, touchend
-                    var now = Date.now(),
-                        dt = now - lastRedraw,
-                        touch = calcTouchPos(event);
-                    if (dt > 30 && // To prevent way-too-inefficiently-frequent rerendering
-                            touch.x > pauseBtn.edgeX() - sensitivityMarginX &&
-                            touch.y < pauseBtn.y + pauseBtn.h + sensitivityMarginY) {
-                        requestAnimationFrame(function () {
-                            return Render.btnLayer(game);
-                        });
-                        return now; // Tell caller last redraw happened at 'now'
-                    }
-                    return lastRedraw; // Tell caller the time of the last redraw hasn't changed
-                };
-            }())
+            }
         };
 
     // Update/render loops of home menu and gameplay:
@@ -2013,54 +2139,30 @@
                 restart = function () {
                     game = createGame();
                     setCurGame(game);
-                    Render.btnLayer(game);
+                    Render.pauseBtn(game);
                 },
-                prevFrameTime = performance.now() - approxFrameLen,
+                prevFrameTime = performance.now() - 20,
                 startTime = performance.now();
             setCurGame(game);
             window.deltas = window.deltas || [];
 
-            requestAnimationFrame(function runFrame(now) {
-                window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
+            runLoop(function () {
+                var now = performance.now();
 
-                requestAnimationFrame(runFrame);
+                window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
 
                 // Initialize time deltas
                 var realDt = now - prevFrameTime;
                 if (!game.paused && !game.dead) {
                     if (startTime !== now) {
-                        // To prevent the first time delta (manufactured to
-                        // always be approxFrameLen) from confusing the data
+                        // To prevent the first time delta (made to
+                        // always be 20) from confusing the data
                         window.deltas.push(realDt);
                     }
                 }
 
-                game.statsPrev = game.stats;
-                game.stats = {};
-
-                game.stats.literalTimeDiff = realDt;
-                // Cap realDt at 3 times the normal frame length to prevent
-                // a large noticable jump in on-screen objects:
-                realDt = Math.min(realDt, approxFrameLen);
-
-                game.stats.diffCurve = difficultyCurveFromTimePoints(game.points - game.pointsFromCoins);
                 var uncurvedDt = realDt;
-                realDt *= game.stats.diffCurve;
-                if (realDt < 0 || !Number.isFinite(realDt)) {
-                    // Having seen an error arise from negative or non-finite
-                    // `realDt' in the past, this is a precautionary measure,
-                    // although I am about certain that changes I made removed
-                    // the risk for error
-                    // Consider removing the handling of this case, as well
-                    // as `game.stats' and `game.statsPrev'
-                    realDt = approxFrameLen;
-                    localStorage.setItem("error_log",
-                        (localStorage.getItem("error_log") || "")
-                        + "\n,\n" + Date.now() + " " + JSON.stringify(game)
-                        + "\n,realDt is " + realDt + " of type" + typeof realDt);
-                }
-                game.stats.realDt = realDt;
-
+                realDt *= difficultyCurveFromTimePoints(game.points - game.pointsFromCoins);
 
                 // Handle effects of slow powerup
                 var dt = realDt;
@@ -2070,13 +2172,20 @@
                     // Any functions given 'dt' as the time delta will thus
                     // behave as if 2/3 as much time has passed.
                 }
-                game.stats.dt = dt;
-                game.stats.prevFrameTime = prevFrameTime;
-                game.stats.now = now;
-                game.stats.startingFramePoints = game.points;
                 prevFrameTime = now;
 
-                Render.background(!game.paused && !game.dead);
+                game.prevPoints = game.points === 0 ? -1 : game.points;
+
+                if (Touch.curTouch && !game.dead && !game.paused) {
+                    // If the current rendered state of the pause btn
+                    // (pressed or not pressed) is incorrect given the
+                    // touch position, redraw the pause btn
+                    if (game.pauseBtnDown !== touchIsInPauseBtn(Touch.curTouch)) {
+                        Render.pauseBtn(game);
+                    }
+                }
+
+                // Render.background(!game.paused && !game.dead);
                 if (game.paused) {
                     Render.gamePaused(game);
                 } else if (game.dead) {
@@ -2084,22 +2193,27 @@
                 } else {
                     // Update state
                     game.previewPlatfmTouch = Touch.curTouch;
-                    gUpdaters.player(game, realDt, dt, Math.min(dt, uncurvedDt * 0.83));
+                    gUpdaters.player(game, dt, Math.min(dt, uncurvedDt * 0.83));
                     gUpdaters.coins(game, dt);
                     gUpdaters.fbs(game, dt);
                     gUpdaters.platfms(game, dt);
                     gUpdaters.powerups(game, dt);
                     gUpdaters.activePowerups(game, dt);
-                    game.points += handleActivesPoints(game.activePowerups, timeBasedPointsVanilla(game.player.y, realDt));
-                    // Because timeBasedPointsVanilla takes 'realDt', when the
-                    // slow powerup is held, points still flow in at the normal
-                    // speed from the user's perspective.
 
-                    game.points = Math.max(0, game.points);
-                    // Although a user floating above the top of the screen
-                    // should lose points, negative points don't make sense.
+                    game.points += handleActivesPoints(game.activePowerups, timeBasedPointsVanilla(game.player.y, realDt));
+                    // timeBasedPointsVanilla is given `realDt', not dt. This
+                    // means when the slow powerup is held, points still flow
+                    // in at the normal speed from the user's perspective.
+
+                    if (game.points < 0) {
+                        game.points = 0;
+                        // Although a user floating above the top of the screen
+                        // should lose points, negative points don't make sense.
+                    }
 
                     if (game.dead) {
+                        // If, after updating the game state, the game is over,
+                        // then compare it with highscores.
                         highscores.sendScore(Math.floor(game.points));
                     }
 
@@ -2107,28 +2221,21 @@
                     Render.game(game);
                 }
             });
+
             Touch.onTouchend = function (touch) {
                 gEventHandlers.handleTouchendForPlatfmAdd(game, touch);
+
                 if (game.paused || game.dead) {
                     gEventHandlers.handleTouchendForThemeSwitch(touch);
                 }
+                if (Touch.touchIsValidAsTap(touch)) {
+                    gEventHandlers.handleDocumentClick(game, touch, restart);
+                }
             };
-            document.body.onclick = function (event) {
-                gEventHandlers.handleDocumentClick(game, event, restart);
-            };
-            Render.btnLayer(game);
-            document.body.ontouchmove =
-                document.body.ontouchstart =
-                document.body.ontouchend =
-                document.body.onmousedown =
-                document.body.onmousemove =
-                document.body.onmouseup = (function () {
-                    var lastRedraw = Date.now();
-                    return function (event) {
-                        lastRedraw = gEventHandlers.handleBtnLayerUpdates(game, event, lastRedraw);
-                    };
-                }());
+
+            Render.pauseBtn(game);
         },
+
         createAutomatedTouch = function (dir) {
             var autoTouchStartY = 230;
             var autoTouchStartXDiff = gameWidth * 0.3;
@@ -2140,19 +2247,21 @@
                 y1: autoTouchStartY
             };
         },
-        stepAutomatedTouch = function (autoTouch) {
+
+        stepAutomatedTouch = function (autoTouch, dt) {
             if (autoTouch.x0 > gameWidth / 2) {
-                autoTouch.x1 -= 1.4 * 5;
+                autoTouch.x1 -= 0.44 * dt;
             } else {
-                autoTouch.x1 += 1.4 * 5;
+                autoTouch.x1 += 0.44 * dt;
             }
-            autoTouch.y1 += 1 * 5;
+            autoTouch.y1 += 0.31 * dt;
         },
-        timeBetweenAutoTouches = 600,
+
+        timeBetweenAutoTouches = 450,
         runTutorial = function () {
             var
                 game = createGame(),
-                prevFrameTime = performance.now() - approxFrameLen,
+                prevFrameTime = performance.now() - 20,
                 autoTouchDir = 1,
                 curAutomatedTouch = createAutomatedTouch(autoTouchDir),
                 interTouchWait = 0,
@@ -2164,55 +2273,56 @@
                     curAutomatedTouch = createAutomatedTouch(autoTouchDir);
                     interTouchWait = timeBetweenAutoTouches;
                 },
-                startRealGame = function () {
-                    document.body.onclick = function () {};
-                    play(game);
-                },
                 realGameReady = false,
                 restartTut = function () {
                     game = createGame();
                     curAutomatedTouch = createAutomatedTouch(autoTouchDir);
                 };
+
             var prevX, prevY, midwayX, midwayY;
-            requestAnimationFrame(function runFrame(now) {
+
+            runLoop(function () {
+                var now = performance.now();
+
                 if (realGameReady) {
-                    return startRealGame();
+                    play(game);
+                    return true;
                 }
-                requestAnimationFrame(runFrame);
 
                 window.tutorial = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
 
                 // Initialize time delta
                 var dt = now - prevFrameTime;
-                // Cap dt at 3 times the normal frame length to prevent
-                // a large noticable jump in on-screen objects:
-                dt = Math.min(dt, approxFrameLen);
 
                 var uncurvedDt = dt;
                 dt *= difficultyCurveFromTimePoints(0);
 
                 prevFrameTime = now;
 
-                Render.background(!game.paused && !game.dead);
+                // TODO: execute the following conditionally, based on chosen framerate
+                //Render.background(!game.paused && !game.dead);
                 if (game.paused) {
                     Render.gamePaused(game);
                 } else if (game.dead) {
                     Render.gameDead(game);
                 } else {
                     // Update state
-                    gUpdaters.player(game, dt, dt, uncurvedDt * 0.83);
+                    gUpdaters.player(game, dt, uncurvedDt * 0.83);
                     gUpdaters.platfms(game, dt);
+
                     if (Touch.curTouch) {
                         materializeAutoTouch();
                         realGameReady = true;
                     }
+
                     if (curAutomatedTouch.y1 > 290) {
                         materializeAutoTouch();
                     } else if (interTouchWait <= 0) {
-                        stepAutomatedTouch(curAutomatedTouch);
+                        stepAutomatedTouch(curAutomatedTouch, dt);
                     } else {
                         interTouchWait -= dt;
                     }
+
                     // Placement of hand
                     if (interTouchWait <= 0) {
                         // Put it at the end of the automated touch
@@ -2231,17 +2341,16 @@
                     Render.tutorial(game, midwayX, midwayY);
                 }
             });
+
             Touch.onTouchend = function (touch) {
                 gEventHandlers.handleTouchendForPlatfmAdd(game, touch);
                 if (game.paused || game.dead) {
                     gEventHandlers.handleTouchendForThemeSwitch(touch);
                 }
+                if (Touch.touchIsValidAsTap(touch)) {
+                    gEventHandlers.handleDocumentClick(game, touch, restartTut, true);
+                }
             };
-            document.body.onclick = function (event) {
-                gEventHandlers.handleDocumentClick(game, event, restartTut, true);
-            };
-            // Not adding events for handleBtnLayerUpdates because the pause
-            // btn is not drawn in tutorial.
         },
         createMenu = function () {
             return {
@@ -2251,32 +2360,37 @@
         runMenu = function () {
             var
                 menu = createMenu(),
-                prevFrameTime = performance.now() - approxFrameLen,
+                prevFrameTime = performance.now() - 20,
                 startGame = function () {
-                    document.body.onclick = function () {};
                     Touch.onTouchend = null;
                     runTutorial();
                 },
                 playPressed = false;
+
             window.menu = menu;
+            window.menuDeltas = [];
+
             requestAnimationFrame(function runFrame(now) {
                 if (playPressed) {
                     return startGame();
                 }
                 requestAnimationFrame(runFrame);
                 var dt = now - prevFrameTime;
+                window.menuDeltas.push(dt);
                 prevFrameTime = now;
                 updateFbsGeneric(menu, dt * 0.83);
                 Render.background(true);
                 Render.menu(menu);
             });
-            document.body.onclick = function (event) {
-                var pos = calcTouchPos(event), tpos = {x1: pos.x, y1: pos.y};
-                if (menuPlayBtn.touchIsInside(tpos)) {
-                    playPressed = true;
+
+            Touch.onTouchend = function (touch) {
+                gEventHandlers.handleTouchendForThemeSwitch(touch);
+                if (Touch.touchIsValidAsTap(touch)) {
+                    if (touchIsInsideBtn(touch, menuPlayBtn)) {
+                        playPressed = true;
+                    }
                 }
             };
-            Touch.onTouchend = gEventHandlers.handleTouchendForThemeSwitch;
         };
     runMenu();
 }());

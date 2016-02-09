@@ -1,16 +1,16 @@
-/* Fonts: */
+/* Comic Neue in various styles: */
 @font-face {
-    font-family: 'i0';
+    font-family: 'font0';
     src: url('fonts/ComicNeue-Angular_Oblique.otf');
     font-style: italic;
 }
 @font-face {
-    font-family: 'b0';
+    font-family: 'font0';
     src: url('fonts/ComicNeue-Angular_Bold.otf');
     font-weight: bold;
 }
 @font-face {
-    font-family: 'r0';
+    font-family: 'font0';
     src: url('fonts/ComicNeue-Angular_Regular.otf');
     font-style: normal;
     font-weight: normal;
@@ -21,7 +21,7 @@ html, body {
     margin: 0;
     padding: 0;
     user-select: none;
-    cursor: default;
+    cursor: pointer;
     background-color: rgb(153, 217, 233); /* Same blue as in clouds background */
     width: 100%;
     height: 100%;
