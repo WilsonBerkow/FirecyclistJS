@@ -281,7 +281,7 @@
         powerupWeightBlockHeight = 20,
         powerupWeightHeight = powerupWeightBlockHeight + powerupWeightHandleHeight,
         btnShadowOffset = 2,
-        maxFpsForSlowFrame = 45;
+        maxFpsForSlowFrame = 40;
 
     // Button util and config:
     var
@@ -448,7 +448,7 @@
                     firstFrame = false;
                 }
 
-                stop = tick(now);
+                stop = tick(now, true);
                 if (deltas.length < detlasMaxLength
                         && isLagTooGreat(deltas)) {
                     stop = true;
@@ -475,7 +475,7 @@
                     firstFrame = true;
                 }
 
-                var stop = tick(now);
+                var stop = tick(now, false);
                 if (stop) {
                     clearInterval(intervalId);
                 }
@@ -490,7 +490,7 @@
             return 1000 / dt < maxFpsForSlowFrame;
         };
         var lagThresholdReached = function (deltas) {
-            // TODO: Test on Galaxy Note 3 and refine
+            // TODO: Test more on Galaxy Note 3 and refine
             var lastFew = deltas.slice(-10);
             var numSlow = lastFew.filter(frameTooSlow).length;
             if (deltas.length <= 5) {
@@ -2152,9 +2152,7 @@
             setCurGame(game);
             window.deltas = window.deltas || [];
 
-            runLoop(function () {
-                var now = performance.now();
-
+            runLoop(function (now, rafUsed) {
                 window.game = game; // FOR DEBUGGING. It is a good idea to have this in case I see an issue at an unexpected time.
 
                 // Initialize time deltas
@@ -2191,7 +2189,9 @@
                     }
                 }
 
-                // Render.background(!game.paused && !game.dead);
+                if (rafUsed && !game.paused && !game.dead) {
+                    Render.background(true);
+                }
                 if (game.paused) {
                     Render.gamePaused(game);
                 } else if (game.dead) {
@@ -2287,9 +2287,7 @@
 
             var prevX, prevY, midwayX, midwayY;
 
-            runLoop(function () {
-                var now = performance.now();
-
+            runLoop(function (now, rafUsed) {
                 if (realGameReady) {
                     play(game);
                     return true;
@@ -2305,8 +2303,9 @@
 
                 prevFrameTime = now;
 
-                // TODO: execute the following conditionally, based on chosen framerate
-                //Render.background(!game.paused && !game.dead);
+                if (rafUsed && !game.paused && !game.dead) {
+                    Render.background(true);
+                }
                 if (game.paused) {
                     Render.gamePaused(game);
                 } else if (game.dead) {
