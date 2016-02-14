@@ -280,7 +280,8 @@
         powerupWeightBlockLowerWidth = 30,
         powerupWeightBlockHeight = 20,
         powerupWeightHeight = powerupWeightBlockHeight + powerupWeightHandleHeight,
-        btnShadowOffset = 2;
+        btnShadowOffset = 2,
+        maxFpsForSlowFrame = 45;
 
     // Button util and config:
     var
@@ -376,6 +377,7 @@
                     scores = fromLocal;
                 }
             }
+
             return Object.freeze({
                 each: function (f) {
                     scores.forEach(function (score) {
@@ -384,6 +386,7 @@
                         }
                     });
                 },
+
                 sendScore: function (score) {
                     var i, result = false;
                     for (i = 0; i < scores.length; i += 1) {
@@ -400,7 +403,6 @@
             });
         },
         highscores = mkHighscores("highscores");
-
 
     // Vector and line util:
     var Vector = Object.freeze({
@@ -421,8 +423,10 @@
         var fallbackFps = 31;
         var mustFallback = false;
 
+        // Run a game-loop with requestAnimationFrame (raf) to time ticks
         var rafLoop = function (tick, isLagTooGreat, handleDowngrade) {
             var deltas = [];
+            var detlasMaxLength = 100;
             var prevTime = performance.now() - 20;
             var firstFrame = true;
             var stop = false;
@@ -438,14 +442,15 @@
 
                 requestAnimationFrame(repeat);
 
-                if (!firstFrame) {
+                if (!firstFrame && deltas.length < detlasMaxLength) {
                     deltas.push(now - prevTime);
                 } else {
                     firstFrame = false;
                 }
 
                 stop = tick(now);
-                if (isLagTooGreat(deltas)) {
+                if (deltas.length < detlasMaxLength
+                        && isLagTooGreat(deltas)) {
                     stop = true;
                     mustFallback = true;
                     handleDowngrade(tick, fallbackFps);
@@ -456,6 +461,7 @@
             return deltas;
         };
 
+        // Run a game-loop with setInterval to time ticks
         var intervalLoop = function (tick, fps) {
             var deltas = [];
             var prevTime = performance.now() - 20;
@@ -481,7 +487,7 @@
         };
 
         var frameTooSlow = function (dt) {
-            return 1000 / dt < 55;
+            return 1000 / dt < maxFpsForSlowFrame;
         };
         var lagThresholdReached = function (deltas) {
             // TODO: Test on Galaxy Note 3 and refine
