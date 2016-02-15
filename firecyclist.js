@@ -494,7 +494,7 @@
             var lastFew = deltas.slice(-10);
             var numSlow = lastFew.filter(frameTooSlow).length;
             if (deltas.length <= 5) {
-                if (numSlow > 2) {
+                if (numSlow >= 4) {
                     return true;
                 }
             }
