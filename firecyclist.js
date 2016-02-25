@@ -1872,7 +1872,12 @@
                                 game.player.vx *= Math.sign(game.player.x - ((val.y1 - game.player.y) / val.slope + val.x1));
                             }
 
-                            game.player.vy -= platfmRiseRate;
+                            // Incorporate the upward push of the platform
+                            // by adding its velocity at the current time.
+                            // `dt / uncurvedDt` is the factor by which the
+                            // speeding up of the game over time will affect
+                            // the effective velocity of platfms
+                            game.player.vy -= platfmRiseRate * dt / uncurvedDt;
                         }
                     }
 
