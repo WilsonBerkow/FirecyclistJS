@@ -420,7 +420,7 @@
     });
 
     var runLoop = (function () {
-        var fallbackFps = 31;
+        var fallbackFps = 35;
         var mustFallback = false;
 
         // Run a game-loop with requestAnimationFrame (raf) to time ticks
